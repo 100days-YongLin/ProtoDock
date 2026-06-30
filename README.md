@@ -43,7 +43,8 @@ prototype-project/
     "id": "project-pictale",
     "name": "PicTale 微信小程序",
     "description": "家长端移动原型",
-    "devicePreset": "iphone-portrait"
+    "devicePreset": "iphone-portrait",
+    "safeAreaEnabled": true
   },
   "pages": {
     "home": {

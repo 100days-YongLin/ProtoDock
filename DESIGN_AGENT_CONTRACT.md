@@ -74,3 +74,5 @@ Design pages for the project `devicePreset`:
 - `web-portrait`: tall web pages.
 
 Use responsive CSS for the target device viewport. ProtoDock renders the page at the real preset size first, then scales that viewport down inside the canvas node. For example, `iphone-portrait` pages should look correct at `390 x 830`; do not design for the small thumbnail size shown on the canvas.
+
+When `project.safeAreaEnabled` is `true`, ProtoDock reserves the preset safe area inside the device shell before rendering the page. Design static pages to remain usable when the top safe area and bottom gesture area are reserved.

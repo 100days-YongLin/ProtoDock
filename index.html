@@ -57,6 +57,14 @@
               <span id="canvasPresetDesc">390 × 844，移动端小程序外壳</span>
             </div>
           </div>
+          <label class="setting-toggle">
+            <input id="safeAreaToggle" type="checkbox" data-requires-project>
+            <span>
+              <strong>安全区</strong>
+              <small>避开刘海和底部手势条</small>
+            </span>
+            <i aria-hidden="true"></i>
+          </label>
         </section>
 
         <section class="panel-section">
@@ -91,6 +99,7 @@
             </defs>
           </svg>
 
+          <div class="alignment-guides" id="alignmentGuides" aria-hidden="true"></div>
           <div id="nodeMount"></div>
           <div id="noteMount"></div>
         </div>

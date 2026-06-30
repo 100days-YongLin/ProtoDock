@@ -5,6 +5,7 @@ const MAX_ZOOM = 1.8;
 const VIRTUAL_CANVAS_LIMIT = 100000;
 const MIN_INSPECTOR_WIDTH = 320;
 const MAX_INSPECTOR_WIDTH = 760;
+const ALIGN_SNAP_THRESHOLD = 10;
 
 const els = {
   workspace: document.querySelector('.workspace'),
@@ -12,6 +13,7 @@ const els = {
   canvasShell: document.getElementById('canvasShell'),
   canvasTransform: document.getElementById('canvasTransform'),
   edgeLayer: document.getElementById('edgeLayer'),
+  alignmentGuides: document.getElementById('alignmentGuides'),
   nodeMount: document.getElementById('nodeMount'),
   noteMount: document.getElementById('noteMount'),
   zoomValue: document.getElementById('zoomValue'),
@@ -19,6 +21,7 @@ const els = {
   pageList: document.getElementById('pageList'),
   canvasPresetName: document.getElementById('canvasPresetName'),
   canvasPresetDesc: document.getElementById('canvasPresetDesc'),
+  safeAreaToggle: document.getElementById('safeAreaToggle'),
   canvasProductName: document.getElementById('canvasProductName'),
   canvasProductDesc: document.getElementById('canvasProductDesc'),
   startScreen: document.getElementById('startScreen'),
@@ -100,6 +103,8 @@ const canvasPresets = {
     height: 830,
     frameWidth: 428,
     frameHeight: 868,
+    safeTop: 59,
+    safeBottom: 34,
     thumbnailWidth: 188
   },
   'iphone-landscape': {
@@ -119,6 +124,8 @@ const canvasPresets = {
     height: 724,
     frameWidth: 560,
     frameHeight: 778,
+    safeTop: 24,
+    safeBottom: 20,
     thumbnailWidth: 174
   },
   'ipad-landscape': {
@@ -164,6 +171,7 @@ const state = {
   playbackIndex: 0,
   playbackActive: false,
   playbackJobId: null,
+  edgeFrameId: null,
   isSettingEditorValue: false,
   markdownEditor: null
 };
@@ -242,11 +250,21 @@ function presetFor() {
   return canvasPresets[id] || canvasPresets['iphone-portrait'];
 }
 
+function safeAreaEnabled() {
+  return state.manifest?.project?.safeAreaEnabled !== false;
+}
+
+function safeAreaClassFor(preset) {
+  return safeAreaEnabled() && ((preset.safeTop || 0) > 0 || (preset.safeBottom || 0) > 0) ? ' safe-area-on' : '';
+}
+
 function previewStyleFor(preset, previewWidth = preset.thumbnailWidth || 124) {
   const width = preset.width || 390;
   const height = preset.height || 844;
   const frameWidth = preset.frameWidth || width;
   const frameHeight = preset.frameHeight || height;
+  const safeTop = safeAreaEnabled() ? preset.safeTop || 0 : 0;
+  const safeBottom = safeAreaEnabled() ? preset.safeBottom || 0 : 0;
   const scale = previewWidth / frameWidth;
   const viewportWidth = frameWidth * scale;
   const viewportHeight = frameHeight * scale;
@@ -255,6 +273,8 @@ function previewStyleFor(preset, previewWidth = preset.thumbnailWidth || 124) {
     `--preview-height:${height}px`,
     `--device-frame-width:${frameWidth}px`,
     `--device-frame-height:${frameHeight}px`,
+    `--safe-top:${safeTop}px`,
+    `--safe-bottom:${safeBottom}px`,
     `--preview-scale:${scale.toFixed(5)}`,
     `--viewport-width:${viewportWidth.toFixed(2)}px`,
     `--viewport-height:${viewportHeight.toFixed(2)}px`
@@ -290,7 +310,8 @@ function normalizeManifest(input) {
     id: manifest.project?.id || `project-${Date.now()}`,
     name: manifest.project?.name || '未命名 ProtoDock 项目',
     description: manifest.project?.description || '本地原型工作台',
-    devicePreset: manifest.project?.devicePreset || manifest.canvasType || 'iphone-portrait'
+    devicePreset: manifest.project?.devicePreset || manifest.canvasType || 'iphone-portrait',
+    safeAreaEnabled: manifest.project?.safeAreaEnabled ?? true
   };
   manifest.pages = manifest.pages || {};
   manifest.canvas = manifest.canvas || {};
@@ -598,9 +619,10 @@ async function hydratePreview(node) {
 
 function renderPreviewShell(node, page) {
   const preset = presetFor();
+  const safeAreaClass = safeAreaClassFor(preset);
   if (preset.deviceClass) {
     return `
-      <div class="prototype-shell device-backed">
+      <div class="prototype-shell device-backed${safeAreaClass}">
         <div class="prototype-device-viewport">
           <div class="prototype-device device ${escapeHtml(preset.deviceClass)}">
             <div class="device-frame">
@@ -636,9 +658,10 @@ function renderPreviewShell(node, page) {
 
 function renderPlaybackShell(node, page) {
   const preset = presetFor();
+  const safeAreaClass = safeAreaClassFor(preset);
   if (preset.deviceClass) {
     return `
-      <div class="prototype-shell playback-shell device-backed">
+      <div class="prototype-shell playback-shell device-backed${safeAreaClass}">
         <div class="prototype-device-viewport">
           <div class="prototype-device device ${escapeHtml(preset.deviceClass)}">
             <div class="device-frame">
@@ -862,6 +885,7 @@ function renderProjectActions() {
   });
   buttons.saveProject?.toggleAttribute('disabled', !hasProject || state.readOnly);
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
+  els.safeAreaToggle?.toggleAttribute('disabled', !hasProject);
   els.productSelect.disabled = !hasProject;
 }
 
@@ -885,6 +909,9 @@ function renderChrome() {
   els.canvasProductDesc.textContent = state.manifest.project.description || '本地原型工作台';
   els.canvasPresetName.textContent = preset.label;
   els.canvasPresetDesc.textContent = preset.desc;
+  if (els.safeAreaToggle) {
+    els.safeAreaToggle.checked = safeAreaEnabled();
+  }
   els.productSelect.innerHTML = `<option>${escapeHtml(state.manifest.project.name)}</option>`;
   renderPageList();
 }
@@ -957,9 +984,31 @@ function preferredSides(fromRect, toRect) {
   return dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
 }
 
-function edgePath(from, to) {
+function edgePath(from, to, fromSide, toSide) {
+  const verticalPair = (fromSide === 'top' || fromSide === 'bottom') && (toSide === 'top' || toSide === 'bottom');
+  const horizontalPair = (fromSide === 'left' || fromSide === 'right') && (toSide === 'left' || toSide === 'right');
+  if (verticalPair) {
+    if (Math.abs(from.x - to.x) <= 4) {
+      return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+    }
+    const midY = (from.y + to.y) / 2;
+    return `M ${from.x} ${from.y} L ${from.x} ${midY} L ${to.x} ${midY} L ${to.x} ${to.y}`;
+  }
+  if (horizontalPair && Math.abs(from.y - to.y) <= 4) {
+    return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+  }
   const dx = Math.max(80, Math.abs(to.x - from.x) * 0.42);
   return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
+}
+
+function scheduleRenderEdges() {
+  if (state.edgeFrameId) {
+    return;
+  }
+  state.edgeFrameId = window.requestAnimationFrame(() => {
+    state.edgeFrameId = null;
+    renderEdges();
+  });
 }
 
 function renderEdges() {
@@ -973,9 +1022,11 @@ function renderEdges() {
       return '';
     }
     const [autoFromSide, autoToSide] = preferredSides(fromRect, toRect);
-    const from = connectorPoint(fromRect, edge.fromSide || autoFromSide);
-    const to = connectorPoint(toRect, edge.toSide || autoToSide);
-    const path = edgePath(from, to);
+    const fromSide = edge.fromSide || autoFromSide;
+    const toSide = edge.toSide || autoToSide;
+    const from = connectorPoint(fromRect, fromSide);
+    const to = connectorPoint(toRect, toSide);
+    const path = edgePath(from, to, fromSide, toSide);
     const labelX = (from.x + to.x) / 2;
     const labelY = (from.y + to.y) / 2 - 8;
     const selected = edge.id === state.selectedEdgeId;
@@ -1205,7 +1256,83 @@ function isCanvasBlankTarget(target) {
     || target === els.canvasTransform
     || target === els.nodeMount
     || target === els.noteMount
-    || target === els.edgeLayer;
+    || target === els.edgeLayer
+    || target === els.alignmentGuides;
+}
+
+function nodeBoxFromElement(element) {
+  return {
+    x: Number.parseFloat(element.style.left) || 0,
+    y: Number.parseFloat(element.style.top) || 0,
+    w: element.offsetWidth,
+    h: element.offsetHeight
+  };
+}
+
+function buildAlignmentCandidates(activeElement) {
+  const activeBox = nodeBoxFromElement(activeElement);
+  const xCandidates = [];
+  const yCandidates = [];
+  document.querySelectorAll('.page-node').forEach((element) => {
+    if (element === activeElement) {
+      return;
+    }
+    const box = nodeBoxFromElement(element);
+    [
+      { line: box.x, value: box.x },
+      { line: box.x + box.w / 2, value: box.x + box.w / 2 - activeBox.w / 2 },
+      { line: box.x + box.w, value: box.x + box.w - activeBox.w }
+    ].forEach((candidate) => xCandidates.push(candidate));
+    [
+      { line: box.y, value: box.y },
+      { line: box.y + box.h / 2, value: box.y + box.h / 2 - activeBox.h / 2 },
+      { line: box.y + box.h, value: box.y + box.h - activeBox.h }
+    ].forEach((candidate) => yCandidates.push(candidate));
+  });
+  return { xCandidates, yCandidates };
+}
+
+function nearestAlignmentCandidate(candidates, value, threshold) {
+  let nearest = null;
+  candidates.forEach((candidate) => {
+    const distance = Math.abs(candidate.value - value);
+    if (distance <= threshold && (!nearest || distance < nearest.distance)) {
+      nearest = { ...candidate, distance };
+    }
+  });
+  return nearest;
+}
+
+function snapNodePosition(drag, x, y) {
+  const threshold = ALIGN_SNAP_THRESHOLD / state.zoom;
+  const snapX = nearestAlignmentCandidate(drag.alignment?.xCandidates || [], x, threshold);
+  const snapY = nearestAlignmentCandidate(drag.alignment?.yCandidates || [], y, threshold);
+  return {
+    x: snapX ? snapX.value : x,
+    y: snapY ? snapY.value : y,
+    guideX: snapX?.line ?? null,
+    guideY: snapY?.line ?? null
+  };
+}
+
+function renderAlignmentGuides(guides = {}) {
+  if (!els.alignmentGuides) {
+    return;
+  }
+  const lines = [];
+  if (Number.isFinite(guides.guideX)) {
+    lines.push(`<span class="alignment-guide vertical" style="left:${guides.guideX}px;"></span>`);
+  }
+  if (Number.isFinite(guides.guideY)) {
+    lines.push(`<span class="alignment-guide horizontal" style="top:${guides.guideY}px;"></span>`);
+  }
+  els.alignmentGuides.innerHTML = lines.join('');
+}
+
+function clearAlignmentGuides() {
+  if (els.alignmentGuides) {
+    els.alignmentGuides.innerHTML = '';
+  }
 }
 
 function handleNodePointerDown(event) {
@@ -1242,9 +1369,11 @@ function handleNodePointerDown(event) {
     startX: event.clientX,
     startY: event.clientY,
     originalX: node.x,
-    originalY: node.y
+    originalY: node.y,
+    alignment: buildAlignmentCandidates(element)
   };
   element.setPointerCapture(event.pointerId);
+  els.canvasShell.classList.add('is-dragging-node');
   event.preventDefault();
 }
 
@@ -1272,11 +1401,13 @@ function moveActiveDrags(event) {
     const drag = state.activeDrag;
     const dx = (event.clientX - drag.startX) / state.zoom;
     const dy = (event.clientY - drag.startY) / state.zoom;
-    drag.node.x = clampCanvasCoord(drag.originalX + dx);
-    drag.node.y = clampCanvasCoord(drag.originalY + dy);
+    const snapped = snapNodePosition(drag, drag.originalX + dx, drag.originalY + dy);
+    drag.node.x = clampCanvasCoord(snapped.x);
+    drag.node.y = clampCanvasCoord(snapped.y);
     drag.element.style.left = `${drag.node.x}px`;
     drag.element.style.top = `${drag.node.y}px`;
-    renderEdges();
+    renderAlignmentGuides(snapped);
+    scheduleRenderEdges();
   }
   if (state.activeNoteDrag) {
     const drag = state.activeNoteDrag;
@@ -1302,6 +1433,9 @@ function moveActiveDrags(event) {
 function endActiveDrags() {
   if (state.activeDrag) {
     state.activeDrag = null;
+    els.canvasShell.classList.remove('is-dragging-node');
+    clearAlignmentGuides();
+    renderEdges();
     markDirty('画布位置已修改');
   }
   if (state.activeNoteDrag) {
@@ -1370,6 +1504,18 @@ function setToolMode(mode) {
     state.activeEdgeDraft = null;
   }
   renderToolMode();
+}
+
+function setSafeAreaEnabled(enabled) {
+  if (!state.manifest) {
+    return;
+  }
+  state.manifest.project.safeAreaEnabled = enabled;
+  renderCanvas();
+  if (state.playbackActive) {
+    renderPlayback();
+  }
+  markDirty(enabled ? '已开启安全区' : '已关闭安全区');
 }
 
 function addNode() {
@@ -1574,7 +1720,8 @@ function starterManifest(name, devicePreset) {
       id: `project-${Date.now()}`,
       name,
       description: '本地静态原型工作台',
-      devicePreset
+      devicePreset,
+      safeAreaEnabled: true
     },
     pages: {
       home: {
@@ -1647,6 +1794,7 @@ function starterProjectReadme(manifest) {
 - ProtoDock 项目 ID：${project.id}
 - 项目名称：${project.name}
 - 设备壳：${project.devicePreset}
+- 安全区：${project.safeAreaEnabled === false ? '关闭' : '开启'}
 - Manifest：\`${MANIFEST_FILE}\`
 
 > 项目 ID 以 \`${MANIFEST_FILE}\` 里的 \`project.id\` 为唯一来源。不要在 README、文档或页面源码里另行编造项目 ID。
@@ -1864,6 +2012,7 @@ function renderPlayback() {
   els.playbackMount.style.cssText = playbackStyleFor(preset);
   els.playbackMount.innerHTML = renderPlaybackShell(node, page);
   selectNode(node.id);
+  centerNode(node.id);
   hydratePlaybackPreview(node);
   window.lucide?.createIcons();
 }
@@ -1913,6 +2062,9 @@ function bindGlobalEvents() {
   buttons.closePlayback?.addEventListener('click', stopPlayback);
   buttons.playbackPrev?.addEventListener('click', () => stepPlayback(-1));
   buttons.playbackNext?.addEventListener('click', () => stepPlayback(1));
+  els.safeAreaToggle?.addEventListener('change', (event) => {
+    setSafeAreaEnabled(event.currentTarget.checked);
+  });
   buttons.resetView?.addEventListener('click', () => {
     state.zoom = 1;
     state.panX = 0;
@@ -2055,6 +2207,7 @@ window.ProtoDock = {
       previewResetNodeIds: Array.from(state.previewResetNodeIds),
       playbackActive: state.playbackActive,
       playbackIndex: state.playbackIndex,
+      safeAreaEnabled: safeAreaEnabled(),
       readOnly: state.readOnly,
       dirty: state.dirty,
       zoom: state.zoom,

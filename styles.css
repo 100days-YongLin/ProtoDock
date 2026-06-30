@@ -329,6 +329,81 @@ select {
   line-height: 1.35;
 }
 
+.setting-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 11px;
+  cursor: pointer;
+}
+
+.setting-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.setting-toggle > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.setting-toggle strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.setting-toggle small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setting-toggle i {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: #d2d2d7;
+  transition: background 0.16s ease;
+}
+
+.setting-toggle i::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.22);
+  transition: transform 0.16s ease;
+}
+
+.setting-toggle input:checked ~ i {
+  background: var(--primary);
+}
+
+.setting-toggle input:checked ~ i::after {
+  transform: translateX(14px);
+}
+
+.setting-toggle:has(input:focus-visible) {
+  outline: 2px solid rgba(0, 113, 227, 0.24);
+  outline-offset: 2px;
+}
+
 .preset-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -418,6 +493,10 @@ select {
 .canvas-shell.is-panning,
 .canvas-shell.is-panning .page-node {
   cursor: grabbing;
+}
+
+.canvas-shell.is-dragging-node iframe {
+  pointer-events: none;
 }
 
 .canvas-shell.is-linking {
@@ -554,6 +633,33 @@ select {
   overflow: visible;
 }
 
+.alignment-guides {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.alignment-guide {
+  position: absolute;
+  display: block;
+  background: rgba(0, 113, 227, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.75);
+}
+
+.alignment-guide.vertical {
+  top: -100000px;
+  width: 1px;
+  height: 200000px;
+}
+
+.alignment-guide.horizontal {
+  left: -100000px;
+  width: 200000px;
+  height: 1px;
+}
+
 .edge-path {
   fill: none;
   stroke: #7a7a7a;
@@ -629,6 +735,7 @@ select {
   background: transparent;
   cursor: grab;
   user-select: none;
+  will-change: left, top;
 }
 
 .page-node:active {
@@ -1018,6 +1125,18 @@ select {
 .prototype-device .device-screen {
   overflow: hidden;
   background: #fff;
+}
+
+.prototype-shell.safe-area-on .device-screen {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+.prototype-shell.safe-area-on .device-screen .prototype-frame,
+.prototype-shell.safe-area-on .device-screen .playback-frame,
+.prototype-shell.safe-area-on .device-screen .preview-loading,
+.prototype-shell.safe-area-on .device-screen .preview-error {
+  height: calc(var(--preview-height) - var(--safe-top) - var(--safe-bottom));
 }
 
 .prototype-shell.web {
