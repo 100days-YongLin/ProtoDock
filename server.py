@@ -320,7 +320,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     host = os.environ.get("PROTODOCK_HOST", "0.0.0.0")
-    port = int(os.environ.get("PROTODOCK_PORT", "6000"))
+    port = int(os.environ.get("PROTODOCK_PORT", "6080"))
     SHARES_DIR.mkdir(parents=True, exist_ok=True)
     httpd = ThreadingHTTPServer((host, port), ProtoDockHandler)
     print(f"ProtoDock server listening on http://{host}:{port}")

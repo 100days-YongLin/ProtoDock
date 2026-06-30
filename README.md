@@ -110,18 +110,20 @@ http://localhost:4175/index.html
 如果需要让同事通过 URL 只读预览项目，可以启动内置 Python 服务：
 
 ```bash
-PROTODOCK_PORT=6000 python3 server.py
+PROTODOCK_PORT=6080 python3 server.py
 ```
 
 然后打开：
 
 ```text
-http://<server-ip>:6000/index.html
+http://<server-ip>:6080/index.html
 ```
 
 右上角“分享”按钮会上传 `.zip` 项目包到后端。压缩包根目录可以直接包含 `protodock.project.json`，也可以外层包一层项目文件夹；服务端只解压 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，生成 `/s/<share-id>` 只读预览链接。
 
 分享链接中的项目会从 `shares/<share-id>/` 读取，不会写回上传者本地文件，也不会允许浏览者编辑 canvas、docs 或页面信息。
+
+默认使用 `6080` 是为了避开 Chrome 会拦截的保留端口，例如 `6000` 和 `6666`。
 
 ## 冲突处理
 
