@@ -187,6 +187,33 @@ select {
   opacity: 0.42;
 }
 
+.share-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
+}
+
+.share-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.share-button:hover {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .status {
   display: none;
   align-items: center;
@@ -1833,6 +1860,12 @@ select {
   box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.14);
 }
 
+.markdown-panel.is-readonly .markdown-editor-shell,
+.markdown-panel.is-readonly .markdown-fallback {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
 .source-panel {
   min-width: 0;
 }
@@ -2015,6 +2048,74 @@ select {
   color: var(--danger);
 }
 
+.share-modal {
+  max-width: 520px;
+}
+
+.share-dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 154px;
+  border: 1px dashed #b8bec8;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 24px;
+  text-align: center;
+}
+
+.share-dropzone svg {
+  width: 28px;
+  height: 28px;
+  color: var(--primary);
+}
+
+.share-dropzone strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 720;
+}
+
+.share-dropzone span,
+.share-status,
+.share-result span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.share-dropzone.drag-over {
+  border-color: var(--primary-focus);
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.share-status {
+  min-height: 18px;
+}
+
+.share-result {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.share-result[hidden] {
+  display: none;
+}
+
+.share-result a {
+  overflow-wrap: anywhere;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 @media (max-width: 1180px) {
   .workspace {
     --inspector-width: 292px;
@@ -2071,6 +2172,15 @@ select {
     width: 138px;
     height: 30px;
     font-size: 12px;
+  }
+
+  .share-button span {
+    display: none;
+  }
+
+  .share-button {
+    width: 30px;
+    padding: 0;
   }
 
   .start-screen {

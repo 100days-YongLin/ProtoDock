@@ -40,6 +40,10 @@
         </div>
       </nav>
       <div class="project-display" id="productSelect" aria-label="当前项目">未打开项目</div>
+      <button class="share-button" id="openShareModal" type="button" title="分享项目包" aria-label="分享项目包">
+        <i data-lucide="share-2"></i>
+        <span>分享</span>
+      </button>
       <div class="status">
         <span class="dot"></span>
         <span>本地预览</span>
@@ -300,9 +304,41 @@
     </section>
   </div>
 
+  <div class="project-modal-backdrop" id="shareModal" hidden>
+    <section class="project-modal share-modal" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="shareModalTitle">分享原型项目</strong>
+          <span>上传包含 protodock.project.json、pages、docs 和 assets 的 zip，生成只读预览链接。</span>
+        </div>
+        <button class="tool-button" id="closeShareModal" title="关闭" aria-label="关闭">×</button>
+      </header>
+
+      <div class="share-dropzone" id="shareDropZone" role="button" tabindex="0" aria-label="上传 ProtoDock 项目压缩包">
+        <i data-lucide="upload-cloud"></i>
+        <strong id="shareFileName">拖入项目 zip，或点击选择</strong>
+        <span>支持根目录直接包含 protodock.project.json，或外层包一层项目文件夹。</span>
+        <input id="shareFileInput" type="file" accept=".zip,application/zip" hidden>
+      </div>
+
+      <div class="share-status" id="shareStatus" aria-live="polite">等待上传项目压缩包</div>
+
+      <div class="share-result" id="shareResult" hidden>
+        <span>分享链接</span>
+        <a id="shareUrl" href="#" target="_blank" rel="noreferrer"></a>
+      </div>
+
+      <div class="action-row">
+        <button class="secondary" id="chooseShareFile" type="button">选择 zip</button>
+        <button class="primary" id="uploadShareFile" type="button" disabled>上传并生成链接</button>
+      </div>
+    </section>
+  </div>
+
   <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
   <script src="./vendor/lucide.min.js"></script>
   <script src="./placement.js"></script>
   <script src="./app.js"></script>
+  <script src="./share.js"></script>
 </body>
 </html>

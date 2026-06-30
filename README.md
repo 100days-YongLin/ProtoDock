@@ -105,6 +105,24 @@ http://localhost:4175/index.html
 
 打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json` 与 `docs/*.md`。
 
+## 分享预览服务
+
+如果需要让同事通过 URL 只读预览项目，可以启动内置 Python 服务：
+
+```bash
+PROTODOCK_PORT=6000 python3 server.py
+```
+
+然后打开：
+
+```text
+http://<server-ip>:6000/index.html
+```
+
+右上角“分享”按钮会上传 `.zip` 项目包到后端。压缩包根目录可以直接包含 `protodock.project.json`，也可以外层包一层项目文件夹；服务端只解压 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，生成 `/s/<share-id>` 只读预览链接。
+
+分享链接中的项目会从 `shares/<share-id>/` 读取，不会写回上传者本地文件，也不会允许浏览者编辑 canvas、docs 或页面信息。
+
 ## 冲突处理
 
 保存前如果磁盘上的 `protodock.project.json` 已经被其他工具或 Agent 修改，ProtoDock 会弹窗提示：

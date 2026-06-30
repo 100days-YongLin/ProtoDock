@@ -163,6 +163,7 @@ const state = {
   manifestHandle: null,
   projectBaseUrl: null,
   projectDirectoryName: null,
+  shareId: null,
   readOnly: true,
   manifestHash: null,
   dirty: false,
@@ -237,6 +238,14 @@ function setStatus(message) {
   els.statusLabel.textContent = message;
 }
 
+function readonlyProjectMessage() {
+  return state.shareId ? '分享预览只读，不能修改项目' : '示例项目只读，请打开本地目录';
+}
+
+function canEditProject() {
+  return !!state.manifest && !state.readOnly;
+}
+
 function clampInspectorWidth(width) {
   const workspaceWidth = els.workspace.getBoundingClientRect().width || window.innerWidth;
   const sidebarWidth = window.matchMedia('(max-width: 760px)').matches ? 0 : 248;
@@ -267,6 +276,11 @@ function restoreInspectorWidth() {
 }
 
 function markDirty(message = '未保存') {
+  if (state.readOnly) {
+    setStatus(readonlyProjectMessage());
+    renderProjectActions();
+    return;
+  }
   state.dirty = true;
   setStatus(message);
   renderProjectActions();
@@ -966,7 +980,7 @@ function renderNote(note) {
   return `
     <article class="text-note ${note.id === state.selectedNoteId ? 'selected' : ''}" data-note-id="${escapeHtml(note.id)}" style="left:${note.x}px;top:${note.y}px;">
       <button class="note-grip" title="移动文本" aria-label="移动文本" tabindex="-1"></button>
-      <div class="note-content" contenteditable="true" spellcheck="false">${escapeHtml(note.text)}</div>
+      <div class="note-content" contenteditable="${state.readOnly ? 'false' : 'true'}" spellcheck="false">${escapeHtml(note.text)}</div>
     </article>
   `;
 }
@@ -995,14 +1009,26 @@ function renderPageList() {
 
 function renderProjectActions() {
   const hasProject = !!state.manifest;
+  const canEdit = canEditProject();
   document.querySelectorAll('[data-requires-project]').forEach((button) => {
     button.disabled = !hasProject;
   });
-  buttons.saveProject?.toggleAttribute('disabled', !hasProject || state.readOnly);
+  [
+    buttons.saveProject,
+    buttons.addNode,
+    buttons.addText,
+    els.safeAreaToggle,
+    els.safeAreaSettingsButton,
+    els.saveSafeAreaSettings,
+    els.sortPagesButton,
+    els.pageSettingsButton,
+    els.savePageSettings
+  ].forEach((control) => {
+    control?.toggleAttribute('disabled', !canEdit);
+  });
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
-  els.safeAreaToggle?.toggleAttribute('disabled', !hasProject);
-  els.sortPagesButton?.toggleAttribute('disabled', !hasProject);
   els.productSelect?.setAttribute('aria-disabled', String(!hasProject));
+  els.nodeInspectorPanel?.classList.toggle('is-readonly', hasProject && state.readOnly);
 }
 
 function syncSafeAreaInputs() {
@@ -1020,19 +1046,20 @@ function syncSafeAreaInputs() {
 
 function renderSafeAreaSettingsControls() {
   const hasProject = !!state.manifest;
-  if (!hasProject) {
+  const canEdit = canEditProject();
+  if (!canEdit) {
     state.safeAreaSettingsOpen = false;
   }
   if (els.safeAreaPanel) {
-    els.safeAreaPanel.hidden = !hasProject || !state.safeAreaSettingsOpen;
+    els.safeAreaPanel.hidden = !canEdit || !state.safeAreaSettingsOpen;
   }
   if (els.safeAreaSettingsButton) {
     els.safeAreaSettingsButton.classList.toggle('active', state.safeAreaSettingsOpen);
     els.safeAreaSettingsButton.setAttribute('aria-expanded', String(state.safeAreaSettingsOpen));
   }
-  els.safeAreaTopInput?.toggleAttribute('disabled', !hasProject);
-  els.safeAreaBottomInput?.toggleAttribute('disabled', !hasProject);
-  els.saveSafeAreaSettings?.toggleAttribute('disabled', !hasProject);
+  els.safeAreaTopInput?.toggleAttribute('disabled', !canEdit);
+  els.safeAreaBottomInput?.toggleAttribute('disabled', !canEdit);
+  els.saveSafeAreaSettings?.toggleAttribute('disabled', !canEdit);
   if (!state.safeAreaSettingsOpen) {
     syncSafeAreaInputs();
   }
@@ -1064,20 +1091,30 @@ function syncPageSettingsInputs() {
 
 function renderPageSettingsControls() {
   const hasActivePage = !!activeNode() && !!activePage();
+  const canEdit = hasActivePage && !state.readOnly;
   if (!hasActivePage) {
     state.pageSettingsOpen = false;
     state.pageSettingsNodeId = null;
   }
   if (els.pageSettingsPanel) {
-    els.pageSettingsPanel.hidden = !hasActivePage || !state.pageSettingsOpen;
+    els.pageSettingsPanel.hidden = !canEdit || !state.pageSettingsOpen;
   }
   if (els.pageSettingsButton) {
     els.pageSettingsButton.hidden = !hasActivePage;
-    els.pageSettingsButton.disabled = !hasActivePage;
+    els.pageSettingsButton.disabled = !canEdit;
     els.pageSettingsButton.classList.toggle('active', state.pageSettingsOpen);
     els.pageSettingsButton.setAttribute('aria-expanded', String(state.pageSettingsOpen));
   }
-  els.savePageSettings?.toggleAttribute('disabled', !hasActivePage);
+  [
+    els.pageTitleInput,
+    els.pageKindInput,
+    els.pageSourceDirInput,
+    els.pageEntryInput,
+    els.pageDocInput,
+    els.savePageSettings
+  ].forEach((control) => {
+    control?.toggleAttribute('disabled', !canEdit);
+  });
   if (hasActivePage && (!state.pageSettingsOpen || state.pageSettingsNodeId !== activeNode().id)) {
     syncPageSettingsInputs();
   }
@@ -1085,6 +1122,10 @@ function renderPageSettingsControls() {
 
 function setPageSettingsOpen(open) {
   if (!activeNode() || !activePage()) {
+    return;
+  }
+  if (state.readOnly) {
+    setStatus(readonlyProjectMessage());
     return;
   }
   state.pageSettingsOpen = !!open;
@@ -1099,7 +1140,10 @@ function setPageSettingsOpen(open) {
 function savePageSettings() {
   const node = activeNode();
   const page = activePage();
-  if (!node || !page) {
+  if (!node || !page || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   const next = {
@@ -1321,7 +1365,10 @@ function renderEdgeLabelEditor() {
 }
 
 function beginEdgeLabelEdit(edgeId) {
-  if (!state.manifest) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   const edge = state.manifest.canvas.edges.find((item) => item.id === edgeId);
@@ -1433,6 +1480,9 @@ function bindRenderedCanvas() {
     noteElement.addEventListener('pointerdown', () => selectNote(noteElement.dataset.noteId));
     noteElement.querySelector('.note-grip')?.addEventListener('pointerdown', handleNotePointerDown);
     noteElement.querySelector('.note-content')?.addEventListener('input', () => {
+      if (state.readOnly) {
+        return;
+      }
       const note = state.manifest.canvas.notes.find((item) => item.id === noteElement.dataset.noteId);
       if (note) {
         note.text = noteElement.querySelector('.note-content').textContent;
@@ -1589,7 +1639,7 @@ function setEditorValue(value) {
 }
 
 function handleEditorChange() {
-  if (state.isSettingEditorValue) {
+  if (state.isSettingEditorValue || state.readOnly) {
     return;
   }
   const node = activeNode();
@@ -1742,6 +1792,9 @@ function handleNodePointerDown(event) {
     return;
   }
   selectNode(nodeId);
+  if (state.readOnly) {
+    return;
+  }
   const node = state.manifest.canvas.nodes.find((item) => item.id === nodeId);
   if (!node) {
     return;
@@ -1762,6 +1815,10 @@ function handleNodePointerDown(event) {
 }
 
 function handleNotePointerDown(event) {
+  if (state.readOnly) {
+    setStatus(readonlyProjectMessage());
+    return;
+  }
   const noteElement = event.currentTarget.closest('.text-note');
   const note = state.manifest.canvas.notes.find((item) => item.id === noteElement.dataset.noteId);
   if (!note) {
@@ -1855,7 +1912,10 @@ function endActiveDrags(event) {
 }
 
 function handleAnchorPointerDown(event) {
-  if (event.button !== 0 || !state.manifest) {
+  if (event.button !== 0 || !state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   event.stopPropagation();
@@ -1918,12 +1978,21 @@ function setToolMode(mode) {
   if (mode !== 'select') {
     exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   }
+  if (state.readOnly && mode !== 'select') {
+    state.toolMode = 'select';
+    renderToolMode();
+    setStatus(readonlyProjectMessage());
+    return;
+  }
   state.toolMode = mode;
   renderToolMode();
 }
 
 function setSafeAreaEnabled(enabled) {
-  if (!state.manifest) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   const safeArea = configuredSafeAreaInsets();
@@ -1938,7 +2007,10 @@ function setSafeAreaEnabled(enabled) {
 }
 
 function setSafeAreaSettingsOpen(open) {
-  if (!state.manifest) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   if (!open && state.safeAreaSettingsOpen) {
@@ -1954,7 +2026,10 @@ function setSafeAreaSettingsOpen(open) {
 }
 
 function saveSafeAreaSettings() {
-  if (!state.manifest) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   const current = configuredSafeAreaInsets();
@@ -1977,7 +2052,10 @@ function saveSafeAreaSettings() {
 }
 
 function addNode() {
-  if (!state.manifest) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
@@ -2000,6 +2078,12 @@ function addNode() {
 }
 
 function addTextNote(worldPoint) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
+    return;
+  }
   state.manifest.canvas.notes.push({
     id: `note-${Date.now()}`,
     text: '补充说明',
@@ -2011,7 +2095,10 @@ function addTextNote(worldPoint) {
 }
 
 function deleteSelected() {
-  if (!state.manifest) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   if (state.selectedNodeId) {
@@ -2061,7 +2148,8 @@ async function loadBundledExample() {
     await loadManifestText(text, {
       projectBaseUrl: baseUrl.toString(),
       projectDirectoryName: 'examples/pictale',
-      readOnly: true
+      readOnly: true,
+      shareId: null
     });
     setStatus('已加载示例项目');
   } catch (error) {
@@ -2077,6 +2165,59 @@ async function loadBundledExample() {
     state.activePageSortDrag = null;
     renderCanvas();
     setStatus('选择工作目录开始');
+  }
+}
+
+function isValidShareId(value) {
+  return /^[a-zA-Z0-9_-]{6,80}$/.test(value || '');
+}
+
+function shareIdFromLocation() {
+  const params = new URLSearchParams(window.location.search);
+  const queryShareId = params.get('share');
+  if (isValidShareId(queryShareId)) {
+    return queryShareId;
+  }
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  if (pathParts[0] === 's' && isValidShareId(pathParts[1])) {
+    return pathParts[1];
+  }
+  return null;
+}
+
+async function loadSharedProject(shareId) {
+  try {
+    const baseUrl = new URL(`/shares/${encodeURIComponent(shareId)}/`, window.location.origin);
+    const manifestUrl = new URL(MANIFEST_FILE, baseUrl);
+    const response = await fetch(manifestUrl, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('分享项目不存在');
+    }
+    const text = await response.text();
+    await loadManifestText(text, {
+      projectBaseUrl: baseUrl.toString(),
+      projectDirectoryName: `share:${shareId}`,
+      readOnly: true,
+      shareId
+    });
+    setStatus('已加载分享预览');
+  } catch (error) {
+    console.error(error);
+    state.manifest = null;
+    state.projectHandle = null;
+    state.manifestHandle = null;
+    state.projectBaseUrl = null;
+    state.projectDirectoryName = null;
+    state.shareId = null;
+    state.readOnly = true;
+    state.dirty = false;
+    state.selectedNodeId = null;
+    state.selectedEdgeId = null;
+    state.selectedNoteId = null;
+    state.editingEdgeLabelId = null;
+    state.activeEdgeDrag = null;
+    renderCanvas();
+    setStatus(`分享链接无法加载：${error.message || '项目包不可用'}`);
   }
 }
 
@@ -2101,6 +2242,7 @@ async function loadManifestText(text, options = {}) {
   state.manifestHandle = options.manifestHandle || null;
   state.projectBaseUrl = options.projectBaseUrl || null;
   state.projectDirectoryName = options.projectDirectoryName || null;
+  state.shareId = options.shareId || null;
   state.readOnly = !!options.readOnly;
   state.manifestHash = await hashText(text);
   state.dirty = false;
@@ -2400,6 +2542,10 @@ async function saveProject() {
 }
 
 async function reloadProject() {
+  if (state.shareId) {
+    await loadSharedProject(state.shareId);
+    return;
+  }
   if (state.projectHandle && state.manifestHandle) {
     const text = await (await state.manifestHandle.getFile()).text();
     await loadManifestText(text, {
@@ -2537,7 +2683,10 @@ function centerNode(nodeId) {
 }
 
 function setPageSortMode(enabled) {
-  if (!state.manifest) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
     return;
   }
   state.pageSortMode = !!enabled;
@@ -2574,7 +2723,7 @@ function moveNodeInOrder(sourceId, targetId = null, placement = 'before') {
 }
 
 function beginPageSortDrag(event) {
-  if (!state.pageSortMode || event.button !== 0) {
+  if (state.readOnly || !state.pageSortMode || event.button !== 0) {
     return;
   }
   const item = event.target.closest('[data-page-node]');
@@ -2658,6 +2807,7 @@ async function goHome() {
   state.manifestHandle = null;
   state.projectBaseUrl = null;
   state.projectDirectoryName = null;
+  state.shareId = null;
   state.readOnly = true;
   state.manifestHash = null;
   state.dirty = false;
@@ -2858,6 +3008,7 @@ window.ProtoDock = {
     return {
       projectId: state.manifest?.project?.id || null,
       projectName: state.manifest?.project?.name || null,
+      shareId: state.shareId,
       selectedNodeId: state.selectedNodeId,
       selectedEdgeId: state.selectedEdgeId,
       selectedNoteId: state.selectedNoteId,
@@ -2883,6 +3034,7 @@ window.ProtoDock = {
   openProjectDirectory,
   saveProject,
   reloadProject,
+  loadSharedProject,
   zoomByWheel(deltaY = -360, clientX, clientY) {
     const rect = els.canvasShell.getBoundingClientRect();
     zoomAt(deltaY < 0 ? 0.08 : -0.08, clientX ?? rect.left + rect.width / 2, clientY ?? rect.top + rect.height / 2);
@@ -2900,5 +3052,10 @@ initMarkdownEditor();
 bindGlobalEvents();
 restoreInspectorWidth();
 renderToolMode();
-loadBundledExample();
+const initialShareId = shareIdFromLocation();
+if (initialShareId) {
+  loadSharedProject(initialShareId);
+} else {
+  loadBundledExample();
+}
 window.lucide?.createIcons();
