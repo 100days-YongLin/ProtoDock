@@ -8,6 +8,7 @@ const MAX_INSPECTOR_WIDTH = 760;
 
 const els = {
   workspace: document.querySelector('.workspace'),
+  inspector: document.querySelector('.inspector'),
   canvasShell: document.getElementById('canvasShell'),
   canvasTransform: document.getElementById('canvasTransform'),
   edgeLayer: document.getElementById('edgeLayer'),
@@ -31,6 +32,12 @@ const els = {
   markdownMount: document.getElementById('pageMarkdown'),
   markdownFallback: document.getElementById('pageMarkdownFallback'),
   inspectorResizer: document.getElementById('inspectorResizer'),
+  playbackPanel: document.getElementById('playbackPanel'),
+  playbackTitle: document.getElementById('playbackTitle'),
+  playbackMeta: document.getElementById('playbackMeta'),
+  playbackStage: document.getElementById('playbackStage'),
+  playbackMount: document.getElementById('playbackMount'),
+  playbackCounter: document.getElementById('playbackCounter'),
   statusLabel: document.querySelector('.status span:last-child'),
   projectModal: document.getElementById('projectModal'),
   projectName: document.getElementById('projectName'),
@@ -59,6 +66,9 @@ const buttons = {
   resetView: document.getElementById('resetView'),
   zoomIn: document.getElementById('zoomIn'),
   zoomOut: document.getElementById('zoomOut'),
+  closePlayback: document.getElementById('closePlayback'),
+  playbackPrev: document.getElementById('playbackPrev'),
+  playbackNext: document.getElementById('playbackNext'),
   conflictReload: document.getElementById('conflictReload'),
   conflictOverwrite: document.getElementById('conflictOverwrite'),
   conflictCancel: document.getElementById('conflictCancel')
@@ -152,6 +162,8 @@ const state = {
   activeEdgeDraft: null,
   playbackTimer: null,
   playbackIndex: 0,
+  playbackActive: false,
+  playbackJobId: null,
   isSettingEditorValue: false,
   markdownEditor: null
 };
@@ -230,12 +242,12 @@ function presetFor() {
   return canvasPresets[id] || canvasPresets['iphone-portrait'];
 }
 
-function previewStyleFor(preset) {
+function previewStyleFor(preset, previewWidth = preset.thumbnailWidth || 124) {
   const width = preset.width || 390;
   const height = preset.height || 844;
   const frameWidth = preset.frameWidth || width;
   const frameHeight = preset.frameHeight || height;
-  const scale = (preset.thumbnailWidth || 124) / frameWidth;
+  const scale = previewWidth / frameWidth;
   const viewportWidth = frameWidth * scale;
   const viewportHeight = frameHeight * scale;
   return [
@@ -247,6 +259,18 @@ function previewStyleFor(preset) {
     `--viewport-width:${viewportWidth.toFixed(2)}px`,
     `--viewport-height:${viewportHeight.toFixed(2)}px`
   ].join(';');
+}
+
+function playbackStyleFor(preset) {
+  const width = preset.width || 390;
+  const height = preset.height || 844;
+  const frameWidth = preset.frameWidth || width;
+  const frameHeight = preset.frameHeight || height;
+  const stageRect = els.playbackStage?.getBoundingClientRect();
+  const widthScale = stageRect?.width ? (stageRect.width - 24) / frameWidth : 0.82;
+  const heightScale = stageRect?.height ? (stageRect.height - 20) / frameHeight : 0.82;
+  const scale = Math.min(1, Math.max(0.46, widthScale), Math.max(0.46, heightScale));
+  return previewStyleFor(preset, Math.round(frameWidth * scale));
 }
 
 function nodeStyleFor(node) {
@@ -523,6 +547,23 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId) {
   return `<!doctype html>\n${documentForPreview.documentElement.outerHTML}`;
 }
 
+async function buildPreviewIframe(node, className = 'prototype-frame') {
+  const page = pageForNode(node);
+  const iframe = document.createElement('iframe');
+  iframe.className = className;
+  iframe.title = `${page.title || node.pageId} preview`;
+  iframe.loading = 'lazy';
+
+  if (state.projectBaseUrl) {
+    iframe.src = new URL(page.entry, state.projectBaseUrl).toString();
+  } else {
+    const html = await readTextFile(page.entry);
+    iframe.srcdoc = await rewriteHtmlForLocalPreview(html, page.entry, node.id);
+  }
+
+  return iframe;
+}
+
 async function hydratePreview(node) {
   const page = pageForNode(node);
   const mount = document.querySelector(`[data-preview-node="${CSS.escape(node.id)}"]`);
@@ -535,17 +576,7 @@ async function hydratePreview(node) {
   mount.innerHTML = '<div class="preview-loading">加载中</div>';
 
   try {
-    const iframe = document.createElement('iframe');
-    iframe.className = 'prototype-frame';
-    iframe.title = `${page.title || node.pageId} preview`;
-    iframe.loading = 'lazy';
-
-    if (state.projectBaseUrl) {
-      iframe.src = new URL(page.entry, state.projectBaseUrl).toString();
-    } else {
-      const html = await readTextFile(page.entry);
-      iframe.srcdoc = await rewriteHtmlForLocalPreview(html, page.entry, node.id);
-    }
+    const iframe = await buildPreviewIframe(node);
 
     if (state.previewJobs.get(node.id) !== jobId) {
       return;
@@ -567,7 +598,6 @@ async function hydratePreview(node) {
 
 function renderPreviewShell(node, page) {
   const preset = presetFor();
-  const previewStyle = previewStyleFor(preset);
   if (preset.deviceClass) {
     return `
       <div class="prototype-shell device-backed">
@@ -602,6 +632,74 @@ function renderPreviewShell(node, page) {
       </div>
     </div>
   `;
+}
+
+function renderPlaybackShell(node, page) {
+  const preset = presetFor();
+  if (preset.deviceClass) {
+    return `
+      <div class="prototype-shell playback-shell device-backed">
+        <div class="prototype-device-viewport">
+          <div class="prototype-device device ${escapeHtml(preset.deviceClass)}">
+            <div class="device-frame">
+              <div class="device-screen" data-playback-preview="${escapeHtml(node.id)}">
+                <div class="preview-loading">加载中</div>
+              </div>
+            </div>
+            <div class="device-stripe"></div>
+            <div class="device-header"></div>
+            <div class="device-sensors"></div>
+            <div class="device-btns"></div>
+            <div class="device-power"></div>
+            <div class="device-home"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="prototype-shell playback-shell ${escapeHtml(preset.shellClass)}">
+      <div class="shell-bar">
+        <span>${escapeHtml(preset.label)}</span>
+        <span>${escapeHtml(page.entry || '未设置入口')}</span>
+      </div>
+      <div class="shell-viewport">
+        <div class="prototype-frame-stage" data-playback-preview="${escapeHtml(node.id)}">
+          <div class="preview-loading">加载中</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function hydratePlaybackPreview(node) {
+  const mount = els.playbackMount?.querySelector('[data-playback-preview]');
+  if (!mount) {
+    return;
+  }
+  const page = pageForNode(node);
+  const jobId = `${node.id}-${Date.now()}-${Math.random()}`;
+  state.playbackJobId = jobId;
+  mount.innerHTML = '<div class="preview-loading">加载中</div>';
+
+  try {
+    const iframe = await buildPreviewIframe(node, 'playback-frame');
+    if (state.playbackJobId !== jobId) {
+      return;
+    }
+    mount.replaceChildren(iframe);
+  } catch (error) {
+    if (state.playbackJobId !== jobId) {
+      return;
+    }
+    mount.innerHTML = `
+      <div class="preview-error">
+        <strong>无法预览</strong>
+        <span>${escapeHtml(page.entry || '缺少入口')}</span>
+      </div>
+    `;
+    console.error(error);
+  }
 }
 
 function reloadNodePreview(nodeId) {
@@ -1221,6 +1319,7 @@ function endActiveDrags() {
     }
     state.activeInspectorResize = null;
     els.workspace.classList.remove('is-resizing-inspector');
+    renderPlayback();
   }
 }
 
@@ -1366,6 +1465,7 @@ async function loadBundledExample() {
 }
 
 async function loadManifestText(text, options = {}) {
+  stopPlayback();
   state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
   state.previewUrls.clear();
   state.previewResetNodeIds.clear();
@@ -1702,19 +1802,16 @@ function startPlayback() {
   if (!state.manifest?.canvas.nodes.length) {
     return;
   }
-  stopPlayback();
+  exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
+  state.playbackActive = true;
   state.playbackIndex = 0;
+  els.inspector?.classList.add('is-playback');
+  if (els.playbackPanel) {
+    els.playbackPanel.hidden = false;
+  }
   buttons.playFlow?.classList.add('active');
-  state.playbackTimer = window.setInterval(() => {
-    if (state.playbackIndex >= state.manifest.canvas.nodes.length) {
-      stopPlayback();
-      return;
-    }
-    const node = state.manifest.canvas.nodes[state.playbackIndex];
-    selectNode(node.id);
-    centerNode(node.id);
-    state.playbackIndex += 1;
-  }, 1200);
+  renderPlayback();
+  setStatus('已打开原型播放');
 }
 
 function stopPlayback() {
@@ -1722,7 +1819,66 @@ function stopPlayback() {
     window.clearInterval(state.playbackTimer);
     state.playbackTimer = null;
   }
+  state.playbackActive = false;
+  state.playbackJobId = null;
+  els.inspector?.classList.remove('is-playback');
+  if (els.playbackPanel) {
+    els.playbackPanel.hidden = true;
+  }
+  if (els.playbackMount) {
+    els.playbackMount.innerHTML = '';
+    els.playbackMount.removeAttribute('style');
+  }
   buttons.playFlow?.classList.remove('active');
+}
+
+function activePlaybackNode() {
+  const nodes = state.manifest?.canvas.nodes || [];
+  if (!nodes.length) {
+    return null;
+  }
+  state.playbackIndex = Math.min(Math.max(state.playbackIndex, 0), nodes.length - 1);
+  return nodes[state.playbackIndex];
+}
+
+function renderPlayback() {
+  if (!state.playbackActive || !state.manifest) {
+    return;
+  }
+  const nodes = state.manifest.canvas.nodes;
+  const node = activePlaybackNode();
+  if (!node) {
+    stopPlayback();
+    return;
+  }
+  const page = pageForNode(node);
+  const current = state.playbackIndex + 1;
+  const total = nodes.length;
+  const preset = presetFor();
+
+  els.playbackTitle.textContent = page.title || node.pageId;
+  els.playbackMeta.textContent = `${page.sourceDir || dirname(page.entry || '') || node.pageId}`;
+  els.playbackCounter.textContent = `${current} / ${total}`;
+  buttons.playbackPrev.disabled = state.playbackIndex <= 0;
+  buttons.playbackNext.disabled = state.playbackIndex >= total - 1;
+  els.playbackMount.style.cssText = playbackStyleFor(preset);
+  els.playbackMount.innerHTML = renderPlaybackShell(node, page);
+  selectNode(node.id);
+  hydratePlaybackPreview(node);
+  window.lucide?.createIcons();
+}
+
+function stepPlayback(delta) {
+  if (!state.playbackActive || !state.manifest?.canvas.nodes.length) {
+    return;
+  }
+  const maxIndex = state.manifest.canvas.nodes.length - 1;
+  const nextIndex = Math.min(Math.max(state.playbackIndex + delta, 0), maxIndex);
+  if (nextIndex === state.playbackIndex) {
+    return;
+  }
+  state.playbackIndex = nextIndex;
+  renderPlayback();
 }
 
 function centerNode(nodeId) {
@@ -1754,6 +1910,9 @@ function bindGlobalEvents() {
   buttons.addText?.addEventListener('click', () => setToolMode('text'));
   buttons.addNode?.addEventListener('click', addNode);
   buttons.playFlow?.addEventListener('click', startPlayback);
+  buttons.closePlayback?.addEventListener('click', stopPlayback);
+  buttons.playbackPrev?.addEventListener('click', () => stepPlayback(-1));
+  buttons.playbackNext?.addEventListener('click', () => stepPlayback(1));
   buttons.resetView?.addEventListener('click', () => {
     state.zoom = 1;
     state.panX = 0;
@@ -1783,6 +1942,7 @@ function bindGlobalEvents() {
     const currentWidth = document.querySelector('.inspector')?.getBoundingClientRect().width || MIN_INSPECTOR_WIDTH;
     const delta = event.shiftKey ? 48 : 16;
     setInspectorWidth(currentWidth + (event.key === 'ArrowLeft' ? delta : -delta), true);
+    renderPlayback();
     event.preventDefault();
   });
   window.addEventListener('resize', () => {
@@ -1790,6 +1950,7 @@ function bindGlobalEvents() {
     if (Number.isFinite(currentWidth)) {
       setInspectorWidth(currentWidth);
     }
+    renderPlayback();
   });
 
   els.projectPresetGrid?.addEventListener('click', (event) => {
@@ -1869,6 +2030,16 @@ function bindGlobalEvents() {
       setToolMode('select');
       stopPlayback();
     }
+    if (state.playbackActive && !event.target.closest('input, textarea, [contenteditable="true"]')) {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        stepPlayback(-1);
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        stepPlayback(1);
+      }
+    }
   });
 }
 
@@ -1882,6 +2053,8 @@ window.ProtoDock = {
       selectedNoteId: state.selectedNoteId,
       activePreviewNodeId: state.activePreviewNodeId,
       previewResetNodeIds: Array.from(state.previewResetNodeIds),
+      playbackActive: state.playbackActive,
+      playbackIndex: state.playbackIndex,
       readOnly: state.readOnly,
       dirty: state.dirty,
       zoom: state.zoom,

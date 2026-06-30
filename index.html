@@ -105,6 +105,26 @@
       <div class="inspector-resizer" id="inspectorResizer" role="separator" tabindex="0" aria-label="调整右侧文档宽度" aria-orientation="vertical"></div>
 
       <aside class="inspector">
+        <section class="playback-panel" id="playbackPanel" hidden>
+          <header class="playback-head">
+            <div>
+              <strong id="playbackTitle">原型播放</strong>
+              <span id="playbackMeta">1 / 1</span>
+            </div>
+            <button class="tool-button" id="closePlayback" title="关闭播放" aria-label="关闭播放"><i data-lucide="x"></i></button>
+          </header>
+
+          <div class="playback-stage" id="playbackStage">
+            <div class="playback-mount" id="playbackMount"></div>
+          </div>
+
+          <footer class="playback-controls">
+            <button class="tool-button" id="playbackPrev" title="上一页" aria-label="上一页"><i data-lucide="chevron-left"></i></button>
+            <span id="playbackCounter">1 / 1</span>
+            <button class="tool-button" id="playbackNext" title="下一页" aria-label="下一页"><i data-lucide="chevron-right"></i></button>
+          </footer>
+        </section>
+
         <section class="panel-section inspector-summary">
           <div class="inspector-title">
             <strong id="inspectorName">绑定摄像头</strong>

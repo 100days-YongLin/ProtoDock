@@ -1261,6 +1261,105 @@ select {
   line-height: 1.45;
 }
 
+.inspector.is-playback .inspector-summary,
+.inspector.is-playback .markdown-panel {
+  display: none;
+}
+
+.playback-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  background: #fff;
+}
+
+.playback-panel[hidden] {
+  display: none;
+}
+
+.playback-head,
+.playback-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 16px;
+}
+
+.playback-head > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.playback-head strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playback-head span,
+.playback-controls span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.playback-panel .tool-button {
+  flex: 0 0 auto;
+  border-color: var(--line);
+  background: #fff;
+  color: var(--text);
+}
+
+.playback-panel .tool-button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: #f5f5f7;
+}
+
+.playback-panel .tool-button:disabled {
+  opacity: 0.36;
+}
+
+.playback-stage {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.playback-mount {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+}
+
+.playback-shell {
+  margin: 0;
+}
+
+.playback-frame {
+  display: block;
+  width: var(--preview-width);
+  height: var(--preview-height);
+  border: 0;
+  background: #fff;
+  pointer-events: auto;
+}
+
+.playback-controls {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  padding: 12px 16px 14px;
+}
+
 .inspector-summary {
   display: grid;
   grid-template-columns: minmax(120px, 0.72fr) minmax(0, 1.28fr);
@@ -1580,8 +1679,24 @@ select {
     border-radius: 18px;
   }
 
+  .inspector.is-playback {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+
   .inspector .panel-section {
     padding: 10px;
+  }
+
+  .playback-head,
+  .playback-controls {
+    padding: 10px 12px;
+  }
+
+  .playback-stage {
+    padding: 12px;
   }
 
   .inspector-summary {
