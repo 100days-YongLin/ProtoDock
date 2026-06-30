@@ -16,7 +16,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -193,6 +193,73 @@ def share_item_from_directory(directory: Path, url_for=None) -> dict | None:
     }
 
 
+def share_directory_for(share_id: str) -> Path:
+    if not is_valid_share_id(share_id):
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+    directory = SHARES_DIR / share_id
+    if not (directory / MANIFEST_FILE).is_file():
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+    return directory
+
+
+def project_name_for_directory(directory: Path, fallback: str) -> str:
+    try:
+        with (directory / MANIFEST_FILE).open("r", encoding="utf-8") as file:
+            manifest = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return fallback
+    project = manifest.get("project") if isinstance(manifest, dict) else {}
+    if not isinstance(project, dict):
+        return fallback
+    return str(project.get("name") or fallback)
+
+
+def download_filename_for_share(directory: Path, share_id: str) -> str:
+    raw_name = project_name_for_directory(directory, f"protodock-{share_id}")
+    safe_name = "".join(
+        char if char.isalnum() or char in {" ", "-", "_", "."} else "-"
+        for char in raw_name
+    ).strip(" .-_")
+    return f"{safe_name or 'protodock-project'}-{share_id}.zip"
+
+
+def iter_share_files(directory: Path):
+    manifest_path = directory / MANIFEST_FILE
+    if manifest_path.is_file() and not manifest_path.is_symlink():
+        yield manifest_path, MANIFEST_FILE
+    for root_name in sorted(ALLOWED_ROOT_DIRS):
+        root = directory / root_name
+        if not root.is_dir() or root.is_symlink():
+            continue
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.is_symlink():
+                continue
+            relative = PurePosixPath(path.relative_to(directory).as_posix())
+            if allowed_project_path(relative):
+                yield path, relative.as_posix()
+
+
+def build_share_archive(share_id: str) -> tuple[Path, str]:
+    directory = share_directory_for(share_id)
+    download_name = download_filename_for_share(directory, share_id)
+    handle = tempfile.NamedTemporaryFile(prefix=f"protodock-{share_id}-", suffix=".zip", delete=False)
+    archive_path = Path(handle.name)
+    handle.close()
+    total_size = 0
+    try:
+        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for file_path, archive_name in iter_share_files(directory):
+                file_size = file_path.stat().st_size
+                total_size += file_size
+                if total_size > MAX_EXTRACTED_BYTES:
+                    raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "项目包体积过大")
+                archive.write(file_path, archive_name)
+    except Exception:
+        archive_path.unlink(missing_ok=True)
+        raise
+    return archive_path, download_name
+
+
 def request_path_to_file(root: Path, request_path: str) -> Path:
     decoded = unquote(request_path).replace("\\", "/")
     normalized = posixpath.normpath(decoded.lstrip("/"))
@@ -252,6 +319,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/shares":
                 self.handle_share_list()
+                return
+            if path.startswith("/api/shares/"):
+                self.handle_share_download(path)
                 return
             if path.startswith("/s/"):
                 self.serve_share_index(path)
@@ -322,6 +392,16 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         items.sort(key=lambda item: item.get("updatedAt") or 0, reverse=True)
         self.send_json(HTTPStatus.OK, {"items": items})
 
+    def handle_share_download(self, path: str) -> None:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) != 4 or parts[0] != "api" or parts[1] != "shares" or parts[3] != "download":
+            raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
+        archive_path, download_name = build_share_archive(parts[2])
+        try:
+            self.serve_file(archive_path, content_type="application/zip", download_name=download_name)
+        finally:
+            archive_path.unlink(missing_ok=True)
+
     def create_share_id(self) -> str:
         while True:
             share_id = secrets.token_urlsafe(8)
@@ -367,13 +447,18 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
         self.serve_file(file_path)
 
-    def serve_file(self, file_path: Path) -> None:
+    def serve_file(self, file_path: Path, content_type: str | None = None, download_name: str | None = None) -> None:
         if not file_path.is_file():
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
-        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        content_type = content_type or mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(file_path.stat().st_size))
+        if download_name:
+            self.send_header(
+                "Content-Disposition",
+                f"attachment; filename=\"protodock-project.zip\"; filename*=UTF-8''{quote(download_name)}"
+            )
         self.end_headers()
         if self.command != "HEAD":
             with file_path.open("rb") as file:

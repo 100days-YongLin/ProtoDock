@@ -18,11 +18,55 @@
 
   let selectedFile = null;
   let isUploading = false;
+  const activeShareId = shareIdFromLocation();
 
   function setStatus(message) {
     if (els.status) {
       els.status.textContent = message;
     }
+  }
+
+  function isValidShareId(value) {
+    return /^[a-zA-Z0-9_-]{6,80}$/.test(value || '');
+  }
+
+  function shareIdFromLocation() {
+    const params = new URLSearchParams(window.location.search);
+    const queryShareId = params.get('share');
+    if (isValidShareId(queryShareId)) {
+      return queryShareId;
+    }
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    if (pathParts[0] === 's' && isValidShareId(pathParts[1])) {
+      return pathParts[1];
+    }
+    return null;
+  }
+
+  function downloadActiveShare() {
+    if (!activeShareId) {
+      return;
+    }
+    window.location.href = new URL(`/api/shares/${encodeURIComponent(activeShareId)}/download`, window.location.origin).toString();
+  }
+
+  function configureDownloadMode() {
+    if (!activeShareId || !els.open) {
+      return false;
+    }
+    const icon = els.open.querySelector('i');
+    const label = els.open.querySelector('span');
+    if (icon) {
+      icon.setAttribute('data-lucide', 'download');
+    }
+    if (label) {
+      label.textContent = '下载';
+    }
+    els.open.title = '下载项目包';
+    els.open.setAttribute('aria-label', '下载项目包');
+    els.open.addEventListener('click', downloadActiveShare);
+    window.lucide?.createIcons();
+    return true;
   }
 
   function formatPercent(value) {
@@ -194,7 +238,9 @@
     }
   }
 
-  els.open?.addEventListener('click', openModal);
+  if (!configureDownloadMode()) {
+    els.open?.addEventListener('click', openModal);
+  }
   els.close?.addEventListener('click', closeModal);
   els.choose?.addEventListener('click', () => els.input?.click());
   els.dropzone?.addEventListener('click', () => {
