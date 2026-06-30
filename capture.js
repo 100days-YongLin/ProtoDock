@@ -21,12 +21,73 @@
     }
   }
 
-  function cssTextForDocument(documentRef) {
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('无法读取图片资源'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function resourceToDataUrl(value, baseUrl, cache) {
+    if (!value || value.startsWith('#') || value.startsWith('data:')) {
+      return value;
+    }
+    const url = absolutizeUrl(value, baseUrl);
+    if (cache.has(url)) {
+      return cache.get(url);
+    }
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`资源读取失败：${url}`);
+      }
+      const dataUrl = await blobToDataUrl(await response.blob());
+      cache.set(url, dataUrl);
+      return dataUrl;
+    } catch (error) {
+      console.warn('ProtoDock: capture asset inline failed', url, error);
+      cache.set(url, url);
+      return url;
+    }
+  }
+
+  async function inlineCssUrls(cssText, baseUrl, cache) {
+    const matches = Array.from(String(cssText || '').matchAll(/url\(\s*(['"]?)([^"')]+)\1\s*\)/g));
+    let output = String(cssText || '');
+    for (const match of matches) {
+      const raw = match[2].trim();
+      if (!raw || raw.startsWith('#') || raw.startsWith('data:')) {
+        continue;
+      }
+      const dataUrl = await resourceToDataUrl(raw, baseUrl, cache);
+      output = output.split(match[0]).join(`url("${dataUrl}")`);
+    }
+    return output;
+  }
+
+  async function inlineSrcset(value, baseUrl, cache) {
+    const items = String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+    const rewritten = [];
+    for (const item of items) {
+      const parts = item.split(/\s+/);
+      const url = parts.shift();
+      if (!url) {
+        continue;
+      }
+      rewritten.push([await resourceToDataUrl(url, baseUrl, cache), ...parts].join(' '));
+    }
+    return rewritten.join(', ');
+  }
+
+  async function cssTextForDocument(documentRef, cache) {
     const chunks = [];
     for (const sheet of Array.from(documentRef.styleSheets || [])) {
       try {
         const rules = Array.from(sheet.cssRules || []);
-        chunks.push(rules.map((rule) => rule.cssText).join('\n'));
+        const baseUrl = sheet.href || documentRef.baseURI || documentRef.location?.href || window.location.href;
+        chunks.push(await inlineCssUrls(rules.map((rule) => rule.cssText).join('\n'), baseUrl, cache));
       } catch (error) {
         // Cross-origin sheets are ignored; local ProtoDock previews rewrite assets to same-origin/blob URLs.
       }
@@ -34,25 +95,45 @@
     return chunks.filter(Boolean).join('\n');
   }
 
-  function prepareHtmlForSvg(documentRef, width, height) {
+  async function inlineElementAssets(clone, documentRef, cache) {
+    const baseUrl = documentRef.baseURI || documentRef.location?.href || window.location.href;
+
+    for (const element of Array.from(clone.querySelectorAll('[src], [href], [poster], [srcset], [style]'))) {
+      if (element.hasAttribute('src')) {
+        element.setAttribute('src', await resourceToDataUrl(element.getAttribute('src'), baseUrl, cache));
+      }
+      if (element.hasAttribute('poster')) {
+        element.setAttribute('poster', await resourceToDataUrl(element.getAttribute('poster'), baseUrl, cache));
+      }
+      if (element.hasAttribute('srcset')) {
+        element.setAttribute('srcset', await inlineSrcset(element.getAttribute('srcset'), baseUrl, cache));
+      }
+      if (element.hasAttribute('style')) {
+        element.setAttribute('style', await inlineCssUrls(element.getAttribute('style'), baseUrl, cache));
+      }
+
+      const tagName = element.tagName.toLowerCase();
+      if (tagName === 'image' && element.hasAttribute('href')) {
+        element.setAttribute('href', await resourceToDataUrl(element.getAttribute('href'), baseUrl, cache));
+      } else if (tagName !== 'a' && element.hasAttribute('href')) {
+        element.setAttribute('href', absolutizeUrl(element.getAttribute('href'), baseUrl));
+      }
+    }
+  }
+
+  async function prepareHtmlForSvg(documentRef, width, height) {
+    const assetCache = new Map();
     const clone = documentRef.documentElement.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
     clone.querySelectorAll('script').forEach((script) => script.remove());
     clone.querySelectorAll('link[rel~="stylesheet" i]').forEach((link) => link.remove());
 
-    const baseUrl = documentRef.baseURI || documentRef.location?.href || window.location.href;
-    clone.querySelectorAll('[src], [href], [poster]').forEach((element) => {
-      for (const attr of ['src', 'href', 'poster']) {
-        if (element.hasAttribute(attr)) {
-          element.setAttribute(attr, absolutizeUrl(element.getAttribute(attr), baseUrl));
-        }
-      }
-    });
+    await inlineElementAssets(clone, documentRef, assetCache);
 
     const head = clone.querySelector('head') || clone.insertBefore(documentRef.createElement('head'), clone.firstChild);
     const style = documentRef.createElement('style');
     style.textContent = `
-      ${cssTextForDocument(documentRef)}
+      ${await cssTextForDocument(documentRef, assetCache)}
       html, body {
         width: ${width}px !important;
         min-width: ${width}px !important;
@@ -90,7 +171,7 @@
     if (documentRef.fonts?.ready) {
       await documentRef.fonts.ready.catch(() => {});
     }
-    const html = prepareHtmlForSvg(documentRef, width, height);
+    const html = await prepareHtmlForSvg(documentRef, width, height);
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
         <foreignObject x="0" y="0" width="${width}" height="${height}">
