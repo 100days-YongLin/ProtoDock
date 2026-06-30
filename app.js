@@ -596,6 +596,15 @@ function renderPreviewShell(node, page) {
   `;
 }
 
+function reloadNodePreview(nodeId) {
+  const node = state.manifest?.canvas.nodes.find((item) => item.id === nodeId);
+  if (!node) {
+    return;
+  }
+  hydratePreview(node);
+  setStatus('已刷新页面预览');
+}
+
 function renderNode(node, index) {
   const page = pageForNode(node);
   const selected = node.id === state.selectedNodeId;
@@ -606,7 +615,12 @@ function renderNode(node, index) {
           <strong>${escapeHtml(page.title || node.pageId)}</strong>
           <span>${escapeHtml(page.sourceDir || dirname(page.entry || ''))}</span>
         </div>
-        <span class="node-index">${index + 1}</span>
+        <div class="node-actions">
+          <button class="node-refresh" type="button" data-refresh-node="${escapeHtml(node.id)}" title="刷新页面预览" aria-label="刷新页面预览">
+            <i data-lucide="rotate-cw"></i>
+          </button>
+          <span class="node-index">${index + 1}</span>
+        </div>
       </header>
       <div class="screen">${renderPreviewShell(node, page)}</div>
       <div class="node-anchors" aria-hidden="true">
@@ -696,6 +710,7 @@ function renderCanvas() {
   renderChrome();
   updateInspector();
   updateZoom();
+  window.lucide?.createIcons();
   state.manifest.canvas.nodes.forEach(hydratePreview);
 }
 
@@ -788,6 +803,13 @@ function renderEdges() {
 function bindRenderedCanvas() {
   document.querySelectorAll('.page-node').forEach((element) => {
     element.addEventListener('pointerdown', handleNodePointerDown);
+    element.querySelector('[data-refresh-node]')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      reloadNodePreview(event.currentTarget.dataset.refreshNode);
+    });
+    element.querySelector('[data-refresh-node]')?.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+    });
     element.querySelectorAll('.node-anchor').forEach((anchor) => {
       anchor.addEventListener('click', handleAnchorClick);
       anchor.addEventListener('pointerdown', (event) => event.stopPropagation());
@@ -965,6 +987,10 @@ function screenToWorld(clientX, clientY) {
 
 function handleNodePointerDown(event) {
   if (event.button !== 0 || state.toolMode !== 'select') {
+    return;
+  }
+  if (event.target.closest('.prototype-frame, .device-screen, .node-refresh')) {
+    selectNode(event.currentTarget.dataset.id);
     return;
   }
   const element = event.currentTarget;

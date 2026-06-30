@@ -794,12 +794,51 @@ select {
 }
 
 .node-index,
+.node-refresh,
 .tag {
   flex: 0 0 auto;
   border-radius: 999px;
   padding: 3px 7px;
   font-size: 10px;
   font-weight: 760;
+}
+
+.node-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.node-refresh {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  padding: 0;
+  transition: opacity 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.node-refresh svg {
+  width: 14px;
+  height: 14px;
+}
+
+.page-node:hover .node-refresh,
+.page-node.selected .node-refresh {
+  opacity: 1;
+}
+
+.node-refresh:hover,
+.node-refresh:focus-visible {
+  background: #f5f5f7;
+  color: var(--primary);
+  outline: none;
 }
 
 .node-index {
@@ -836,7 +875,9 @@ select {
 .screen {
   display: grid;
   gap: 8px;
-  padding: 12px;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
 }
 
 .phone-frame,
@@ -1015,7 +1056,7 @@ select {
   height: var(--preview-height);
   border: 0;
   background: #fff;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .prototype-frame-stage {
