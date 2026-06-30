@@ -331,7 +331,7 @@ select {
 
 .setting-toggle {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   margin-top: 10px;
@@ -342,16 +342,21 @@ select {
   cursor: pointer;
 }
 
-.setting-toggle input {
+.safe-area-toggle-control {
+  cursor: default;
+}
+
+.toggle-switch input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.setting-toggle > span {
+.setting-copy {
   display: grid;
   gap: 3px;
   min-width: 0;
+  cursor: pointer;
 }
 
 .setting-toggle strong {
@@ -369,8 +374,17 @@ select {
   white-space: nowrap;
 }
 
-.setting-toggle i {
+.toggle-switch {
   position: relative;
+  display: block;
+  width: 34px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle-switch i {
+  position: relative;
+  display: block;
   width: 34px;
   height: 20px;
   border-radius: 999px;
@@ -378,7 +392,7 @@ select {
   transition: background 0.16s ease;
 }
 
-.setting-toggle i::after {
+.toggle-switch i::after {
   content: "";
   position: absolute;
   top: 2px;
@@ -391,11 +405,11 @@ select {
   transition: transform 0.16s ease;
 }
 
-.setting-toggle input:checked ~ i {
+.toggle-switch input:checked ~ i {
   background: var(--primary);
 }
 
-.setting-toggle input:checked ~ i::after {
+.toggle-switch input:checked ~ i::after {
   transform: translateX(14px);
 }
 
@@ -404,11 +418,53 @@ select {
   outline-offset: 2px;
 }
 
+.setting-icon-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.setting-icon-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.setting-icon-button:hover,
+.setting-icon-button.active {
+  border-color: var(--primary-focus);
+  background: rgba(0, 113, 227, 0.08);
+  color: var(--primary);
+}
+
+.setting-icon-button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.safe-area-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 8px;
+}
+
+.safe-area-panel[hidden] {
+  display: none;
+}
+
 .safe-area-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-top: 8px;
 }
 
 .safe-area-field {
@@ -451,6 +507,22 @@ select {
 
 .safe-area-field:has(input:disabled) {
   opacity: 0.48;
+}
+
+.safe-area-save {
+  height: 30px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.safe-area-save:disabled {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .preset-grid {
@@ -741,12 +813,43 @@ select {
   fill: var(--text);
   font-size: 12px;
   font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
   paint-order: stroke;
   stroke: #fff;
   stroke-width: 5px;
   stroke-linejoin: round;
   pointer-events: auto;
   cursor: pointer;
+}
+
+.edge-label-editor-mount {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.edge-label-editor {
+  position: absolute;
+  min-width: 96px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.edge-label-editor input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--primary-focus);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 10px 26px rgba(23, 32, 51, 0.16);
+  font-size: 12px;
+  font-weight: 650;
+  outline: none;
+  padding: 7px 9px;
+  text-align: center;
 }
 
 .edge-delete {

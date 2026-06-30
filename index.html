@@ -57,25 +57,33 @@
               <span id="canvasPresetDesc">390 × 844，移动端小程序外壳</span>
             </div>
           </div>
-          <label class="setting-toggle">
-            <input id="safeAreaToggle" type="checkbox" data-requires-project>
-            <span>
+          <div class="setting-toggle safe-area-toggle-control">
+            <label class="setting-copy" for="safeAreaToggle">
               <strong>安全区</strong>
               <small>按项目自定义刘海和手势条</small>
-            </span>
-            <i aria-hidden="true"></i>
-          </label>
-          <div class="safe-area-fields" aria-label="安全区尺寸">
-            <label class="safe-area-field" for="safeAreaTopInput">
-              <span>刘海</span>
-              <input id="safeAreaTopInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
-              <small>px</small>
             </label>
-            <label class="safe-area-field" for="safeAreaBottomInput">
-              <span>手势条</span>
-              <input id="safeAreaBottomInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
-              <small>px</small>
+            <button class="setting-icon-button" id="safeAreaSettingsButton" type="button" title="设置安全区" aria-label="设置安全区" aria-expanded="false" aria-controls="safeAreaPanel" data-requires-project>
+              <i data-lucide="settings-2"></i>
+            </button>
+            <label class="toggle-switch" for="safeAreaToggle">
+              <input id="safeAreaToggle" type="checkbox" data-requires-project>
+              <i aria-hidden="true"></i>
             </label>
+          </div>
+          <div class="safe-area-panel" id="safeAreaPanel" hidden>
+            <div class="safe-area-fields" aria-label="安全区尺寸">
+              <label class="safe-area-field" for="safeAreaTopInput">
+                <span>刘海</span>
+                <input id="safeAreaTopInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
+                <small>px</small>
+              </label>
+              <label class="safe-area-field" for="safeAreaBottomInput">
+                <span>手势条</span>
+                <input id="safeAreaBottomInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
+                <small>px</small>
+              </label>
+            </div>
+            <button class="safe-area-save" id="saveSafeAreaSettings" type="button" data-requires-project>保存</button>
           </div>
         </section>
 
@@ -112,6 +120,7 @@
           </svg>
 
           <div class="alignment-guides" id="alignmentGuides" aria-hidden="true"></div>
+          <div class="edge-label-editor-mount" id="edgeLabelEditorMount"></div>
           <div id="nodeMount"></div>
           <div id="noteMount"></div>
         </div>

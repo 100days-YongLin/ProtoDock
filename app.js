@@ -15,6 +15,7 @@ const els = {
   canvasTransform: document.getElementById('canvasTransform'),
   edgeLayer: document.getElementById('edgeLayer'),
   alignmentGuides: document.getElementById('alignmentGuides'),
+  edgeLabelEditorMount: document.getElementById('edgeLabelEditorMount'),
   nodeMount: document.getElementById('nodeMount'),
   noteMount: document.getElementById('noteMount'),
   zoomValue: document.getElementById('zoomValue'),
@@ -23,8 +24,11 @@ const els = {
   canvasPresetName: document.getElementById('canvasPresetName'),
   canvasPresetDesc: document.getElementById('canvasPresetDesc'),
   safeAreaToggle: document.getElementById('safeAreaToggle'),
+  safeAreaSettingsButton: document.getElementById('safeAreaSettingsButton'),
+  safeAreaPanel: document.getElementById('safeAreaPanel'),
   safeAreaTopInput: document.getElementById('safeAreaTopInput'),
   safeAreaBottomInput: document.getElementById('safeAreaBottomInput'),
+  saveSafeAreaSettings: document.getElementById('saveSafeAreaSettings'),
   canvasProductName: document.getElementById('canvasProductName'),
   canvasProductDesc: document.getElementById('canvasProductDesc'),
   startScreen: document.getElementById('startScreen'),
@@ -158,7 +162,10 @@ const state = {
   selectedNodeId: null,
   selectedEdgeId: null,
   selectedNoteId: null,
+  editingEdgeLabelId: null,
+  edgeClickCandidate: null,
   activePreviewNodeId: null,
+  safeAreaSettingsOpen: false,
   selectedPresetId: 'iphone-portrait',
   selectedProjectDirectoryHandle: null,
   toolMode: 'select',
@@ -175,7 +182,6 @@ const state = {
   playbackActive: false,
   playbackJobId: null,
   edgeFrameId: null,
-  safeAreaInputTimer: null,
   isSettingEditorValue: false,
   markdownEditor: null
 };
@@ -920,16 +926,46 @@ function renderPageList() {
 
 function renderProjectActions() {
   const hasProject = !!state.manifest;
-  const safeAreaInputDisabled = !hasProject || !safeAreaEnabled();
   document.querySelectorAll('[data-requires-project]').forEach((button) => {
     button.disabled = !hasProject;
   });
   buttons.saveProject?.toggleAttribute('disabled', !hasProject || state.readOnly);
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
   els.safeAreaToggle?.toggleAttribute('disabled', !hasProject);
-  els.safeAreaTopInput?.toggleAttribute('disabled', safeAreaInputDisabled);
-  els.safeAreaBottomInput?.toggleAttribute('disabled', safeAreaInputDisabled);
   els.productSelect.disabled = !hasProject;
+}
+
+function syncSafeAreaInputs() {
+  if (!state.manifest) {
+    return;
+  }
+  const safeArea = configuredSafeAreaInsets();
+  if (els.safeAreaTopInput) {
+    els.safeAreaTopInput.value = safeArea.top;
+  }
+  if (els.safeAreaBottomInput) {
+    els.safeAreaBottomInput.value = safeArea.bottom;
+  }
+}
+
+function renderSafeAreaSettingsControls() {
+  const hasProject = !!state.manifest;
+  if (!hasProject) {
+    state.safeAreaSettingsOpen = false;
+  }
+  if (els.safeAreaPanel) {
+    els.safeAreaPanel.hidden = !hasProject || !state.safeAreaSettingsOpen;
+  }
+  if (els.safeAreaSettingsButton) {
+    els.safeAreaSettingsButton.classList.toggle('active', state.safeAreaSettingsOpen);
+    els.safeAreaSettingsButton.setAttribute('aria-expanded', String(state.safeAreaSettingsOpen));
+  }
+  els.safeAreaTopInput?.toggleAttribute('disabled', !hasProject);
+  els.safeAreaBottomInput?.toggleAttribute('disabled', !hasProject);
+  els.saveSafeAreaSettings?.toggleAttribute('disabled', !hasProject);
+  if (!state.safeAreaSettingsOpen) {
+    syncSafeAreaInputs();
+  }
 }
 
 function renderChrome() {
@@ -944,6 +980,7 @@ function renderChrome() {
     els.canvasPresetName.textContent = '未选择';
     els.canvasPresetDesc.textContent = '打开项目后显示设备壳';
     els.productSelect.innerHTML = '';
+    renderSafeAreaSettingsControls();
     return;
   }
 
@@ -955,24 +992,18 @@ function renderChrome() {
   if (els.safeAreaToggle) {
     els.safeAreaToggle.checked = safeAreaEnabled();
   }
-  const safeArea = configuredSafeAreaInsets(preset);
-  if (els.safeAreaTopInput) {
-    els.safeAreaTopInput.value = safeArea.top;
-    els.safeAreaTopInput.disabled = !safeAreaEnabled();
-  }
-  if (els.safeAreaBottomInput) {
-    els.safeAreaBottomInput.value = safeArea.bottom;
-    els.safeAreaBottomInput.disabled = !safeAreaEnabled();
-  }
+  renderSafeAreaSettingsControls();
   els.productSelect.innerHTML = `<option>${escapeHtml(state.manifest.project.name)}</option>`;
   renderPageList();
 }
 
 function renderCanvas() {
   if (!state.manifest) {
+    state.editingEdgeLabelId = null;
     els.nodeMount.innerHTML = '';
     els.noteMount.innerHTML = '';
     els.edgeLayer.innerHTML = markerDefs();
+    renderEdgeLabelEditor();
     renderChrome();
     return;
   }
@@ -1053,6 +1084,26 @@ function edgePath(from, to, fromSide, toSide) {
   return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
 }
 
+function edgeGeometry(edge) {
+  const fromRect = getRectForNodeId(edge.from);
+  const toRect = getRectForNodeId(edge.to);
+  if (!fromRect || !toRect) {
+    return null;
+  }
+  const [autoFromSide, autoToSide] = preferredSides(fromRect, toRect);
+  const fromSide = edge.fromSide || autoFromSide;
+  const toSide = edge.toSide || autoToSide;
+  const from = connectorPoint(fromRect, fromSide);
+  const to = connectorPoint(toRect, toSide);
+  return {
+    from,
+    to,
+    path: edgePath(from, to, fromSide, toSide),
+    labelX: (from.x + to.x) / 2,
+    labelY: (from.y + to.y) / 2 - 8
+  };
+}
+
 function scheduleRenderEdges() {
   if (state.edgeFrameId) {
     return;
@@ -1063,30 +1114,112 @@ function scheduleRenderEdges() {
   });
 }
 
+function renderEdgeLabelEditor() {
+  if (!els.edgeLabelEditorMount) {
+    return;
+  }
+  const edgeId = state.editingEdgeLabelId;
+  if (!state.manifest || !edgeId) {
+    els.edgeLabelEditorMount.innerHTML = '';
+    return;
+  }
+  const edge = state.manifest.canvas.edges.find((item) => item.id === edgeId);
+  const geometry = edge ? edgeGeometry(edge) : null;
+  if (!edge || !geometry) {
+    state.editingEdgeLabelId = null;
+    els.edgeLabelEditorMount.innerHTML = '';
+    return;
+  }
+  els.edgeLabelEditorMount.innerHTML = `
+    <div class="edge-label-editor" style="left:${geometry.labelX}px;top:${geometry.labelY}px;">
+      <input id="edgeLabelInput" value="${escapeHtml(edge.label || '')}" aria-label="连线文本">
+    </div>
+  `;
+  const input = els.edgeLabelEditorMount.querySelector('input');
+  input?.addEventListener('pointerdown', (event) => event.stopPropagation());
+  input?.addEventListener('click', (event) => event.stopPropagation());
+  input?.addEventListener('dblclick', (event) => event.stopPropagation());
+  input?.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitEdgeLabelEdit();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelEdgeLabelEdit();
+    }
+  });
+  input?.addEventListener('blur', () => commitEdgeLabelEdit());
+  window.setTimeout(() => {
+    input?.focus();
+    input?.select();
+  });
+}
+
+function beginEdgeLabelEdit(edgeId) {
+  if (!state.manifest) {
+    return;
+  }
+  const edge = state.manifest.canvas.edges.find((item) => item.id === edgeId);
+  if (!edge) {
+    return;
+  }
+  if (state.editingEdgeLabelId && state.editingEdgeLabelId !== edgeId) {
+    commitEdgeLabelEdit();
+  }
+  exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
+  state.editingEdgeLabelId = edgeId;
+  state.selectedEdgeId = edgeId;
+  state.selectedNodeId = null;
+  state.selectedNoteId = null;
+  document.querySelectorAll('.page-node').forEach((node) => node.classList.remove('selected'));
+  document.querySelectorAll('.text-note').forEach((note) => note.classList.remove('selected'));
+  renderEdges();
+  updateInspector();
+  setStatus('正在编辑连线文本');
+}
+
+function commitEdgeLabelEdit() {
+  const edgeId = state.editingEdgeLabelId;
+  const input = els.edgeLabelEditorMount?.querySelector('input');
+  if (!state.manifest || !edgeId) {
+    return;
+  }
+  const edge = state.manifest.canvas.edges.find((item) => item.id === edgeId);
+  const nextLabel = (input?.value || '').trim();
+  state.editingEdgeLabelId = null;
+  if (edge && edge.label !== nextLabel) {
+    edge.label = nextLabel;
+    markDirty('连线文本已修改');
+  }
+  renderEdges();
+}
+
+function cancelEdgeLabelEdit() {
+  if (!state.editingEdgeLabelId) {
+    return;
+  }
+  state.editingEdgeLabelId = null;
+  renderEdges();
+  setStatus('已取消编辑连线文本');
+}
+
 function renderEdges() {
   if (!state.manifest) {
     return;
   }
   const edgeSvg = state.manifest.canvas.edges.map((edge) => {
-    const fromRect = getRectForNodeId(edge.from);
-    const toRect = getRectForNodeId(edge.to);
-    if (!fromRect || !toRect) {
+    const geometry = edgeGeometry(edge);
+    if (!geometry) {
       return '';
     }
-    const [autoFromSide, autoToSide] = preferredSides(fromRect, toRect);
-    const fromSide = edge.fromSide || autoFromSide;
-    const toSide = edge.toSide || autoToSide;
-    const from = connectorPoint(fromRect, fromSide);
-    const to = connectorPoint(toRect, toSide);
-    const path = edgePath(from, to, fromSide, toSide);
-    const labelX = (from.x + to.x) / 2;
-    const labelY = (from.y + to.y) / 2 - 8;
     const selected = edge.id === state.selectedEdgeId;
     return `
       <g data-edge-id="${escapeHtml(edge.id)}">
-        <path class="edge-path ${selected ? 'selected' : ''}" marker-end="url(#arrow)" d="${path}"></path>
-        <path class="edge-hit" d="${path}"></path>
-        <text class="edge-label" x="${labelX}" y="${labelY}">${escapeHtml(edge.label || '')}</text>
+        <path class="edge-path ${selected ? 'selected' : ''}" marker-end="url(#arrow)" d="${geometry.path}"></path>
+        <path class="edge-hit" d="${geometry.path}"></path>
+        <text class="edge-label" x="${geometry.labelX}" y="${geometry.labelY}">${escapeHtml(edge.label || '')}</text>
       </g>
     `;
   }).join('');
@@ -1094,9 +1227,32 @@ function renderEdges() {
   els.edgeLayer.querySelectorAll('[data-edge-id]').forEach((edgeGroup) => {
     edgeGroup.addEventListener('click', (event) => {
       event.stopPropagation();
-      selectEdge(edgeGroup.dataset.edgeId);
+      const edgeId = edgeGroup.dataset.edgeId;
+      const previousClick = state.edgeClickCandidate;
+      const repeatedClick = previousClick
+        && previousClick.id === edgeId
+        && Date.now() - previousClick.time < 420
+        && Math.abs(previousClick.x - event.clientX) < 10
+        && Math.abs(previousClick.y - event.clientY) < 10;
+      state.edgeClickCandidate = {
+        id: edgeId,
+        time: Date.now(),
+        x: event.clientX,
+        y: event.clientY
+      };
+      if (event.detail >= 2 || repeatedClick) {
+        beginEdgeLabelEdit(edgeId);
+        return;
+      }
+      selectEdge(edgeId);
+    });
+    edgeGroup.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      beginEdgeLabelEdit(edgeGroup.dataset.edgeId);
     });
   });
+  renderEdgeLabelEditor();
 }
 
 function bindRenderedCanvas() {
@@ -1125,6 +1281,9 @@ function bindRenderedCanvas() {
 }
 
 function selectNode(id) {
+  if (state.editingEdgeLabelId) {
+    commitEdgeLabelEdit();
+  }
   if (state.activePreviewNodeId && state.activePreviewNodeId !== id) {
     exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   }
@@ -1141,6 +1300,9 @@ function selectNode(id) {
 }
 
 function selectEdge(id) {
+  if (state.editingEdgeLabelId && state.editingEdgeLabelId !== id) {
+    commitEdgeLabelEdit();
+  }
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.selectedEdgeId = id;
   state.selectedNodeId = null;
@@ -1152,6 +1314,9 @@ function selectEdge(id) {
 }
 
 function selectNote(id) {
+  if (state.editingEdgeLabelId) {
+    commitEdgeLabelEdit();
+  }
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.selectedNoteId = id;
   state.selectedNodeId = null;
@@ -1165,6 +1330,9 @@ function selectNote(id) {
 }
 
 function clearSelection(options = {}) {
+  if (state.editingEdgeLabelId) {
+    commitEdgeLabelEdit();
+  }
   if (state.activePreviewNodeId) {
     exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   }
@@ -1573,21 +1741,30 @@ function setSafeAreaEnabled(enabled) {
   markDirty(enabled ? '已开启安全区' : '已关闭安全区');
 }
 
-function setSafeAreaInsetsFromInputs() {
+function setSafeAreaSettingsOpen(open) {
   if (!state.manifest) {
     return;
   }
-  if (state.safeAreaInputTimer) {
-    clearTimeout(state.safeAreaInputTimer);
-    state.safeAreaInputTimer = null;
+  state.safeAreaSettingsOpen = !!open;
+  if (state.safeAreaSettingsOpen) {
+    syncSafeAreaInputs();
+  }
+  renderSafeAreaSettingsControls();
+  window.lucide?.createIcons();
+}
+
+function saveSafeAreaSettings() {
+  if (!state.manifest) {
+    return;
   }
   const current = configuredSafeAreaInsets();
   const next = {
     top: clampSafeAreaInset(els.safeAreaTopInput?.value, current.top),
     bottom: clampSafeAreaInset(els.safeAreaBottomInput?.value, current.bottom)
   };
+  state.safeAreaSettingsOpen = false;
   if (next.top === current.top && next.bottom === current.bottom) {
-    renderChrome();
+    renderSafeAreaSettingsControls();
     return;
   }
   state.manifest.project.safeAreaTop = next.top;
@@ -1596,17 +1773,7 @@ function setSafeAreaInsetsFromInputs() {
   if (state.playbackActive) {
     renderPlayback();
   }
-  markDirty(`安全区已更新：刘海 ${next.top}px / 手势条 ${next.bottom}px`);
-}
-
-function scheduleSafeAreaInsetsFromInputs() {
-  if (!state.manifest) {
-    return;
-  }
-  if (state.safeAreaInputTimer) {
-    clearTimeout(state.safeAreaInputTimer);
-  }
-  state.safeAreaInputTimer = window.setTimeout(setSafeAreaInsetsFromInputs, 180);
+  markDirty(`安全区已保存：刘海 ${next.top}px / 手势条 ${next.bottom}px`);
 }
 
 function addNode() {
@@ -1653,6 +1820,7 @@ function deleteSelected() {
     }
     state.manifest.canvas.nodes = state.manifest.canvas.nodes.filter((item) => item.id !== state.selectedNodeId);
     state.manifest.canvas.edges = state.manifest.canvas.edges.filter((edge) => edge.from !== state.selectedNodeId && edge.to !== state.selectedNodeId);
+    state.editingEdgeLabelId = null;
     revokePreviewUrls(state.selectedNodeId);
     state.previewResetNodeIds.delete(state.selectedNodeId);
     if (state.activePreviewNodeId === state.selectedNodeId) {
@@ -1665,6 +1833,7 @@ function deleteSelected() {
   }
   if (state.selectedEdgeId) {
     state.manifest.canvas.edges = state.manifest.canvas.edges.filter((edge) => edge.id !== state.selectedEdgeId);
+    state.editingEdgeLabelId = null;
     state.selectedEdgeId = null;
     renderCanvas();
     markDirty('已删除连线');
@@ -1696,6 +1865,8 @@ async function loadBundledExample() {
   } catch (error) {
     console.warn(error);
     state.manifest = null;
+    state.editingEdgeLabelId = null;
+    state.safeAreaSettingsOpen = false;
     renderCanvas();
     setStatus('选择工作目录开始');
   }
@@ -1707,6 +1878,8 @@ async function loadManifestText(text, options = {}) {
   state.previewUrls.clear();
   state.previewResetNodeIds.clear();
   state.activePreviewNodeId = null;
+  state.editingEdgeLabelId = null;
+  state.safeAreaSettingsOpen = false;
   state.docCache.clear();
   state.docDirty.clear();
   state.manifest = normalizeManifest(JSON.parse(text));
@@ -2159,10 +2332,10 @@ function bindGlobalEvents() {
   els.safeAreaToggle?.addEventListener('change', (event) => {
     setSafeAreaEnabled(event.currentTarget.checked);
   });
-  els.safeAreaTopInput?.addEventListener('input', scheduleSafeAreaInsetsFromInputs);
-  els.safeAreaBottomInput?.addEventListener('input', scheduleSafeAreaInsetsFromInputs);
-  els.safeAreaTopInput?.addEventListener('change', setSafeAreaInsetsFromInputs);
-  els.safeAreaBottomInput?.addEventListener('change', setSafeAreaInsetsFromInputs);
+  els.safeAreaSettingsButton?.addEventListener('click', () => {
+    setSafeAreaSettingsOpen(!state.safeAreaSettingsOpen);
+  });
+  els.saveSafeAreaSettings?.addEventListener('click', saveSafeAreaSettings);
   buttons.resetView?.addEventListener('click', () => {
     state.zoom = 1;
     state.panX = 0;
