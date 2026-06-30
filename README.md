@@ -131,7 +131,12 @@ PROTODOCK_PORT=6080 python3 server.py
 http://<server-ip>:6080/index.html
 ```
 
-右上角“分享”按钮会上传 `.zip` 项目包到后端。压缩包根目录可以直接包含 `protodock.project.json`，也可以外层包一层项目文件夹；服务端只解压 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，生成 `/s/<share-id>` 只读预览链接。
+右上角“分享”按钮会上传 `.zip` 项目包到后端。压缩包根目录可以直接包含 `protodock.project.json`，也可以外层包一层项目文件夹；服务端只解压 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`。
+
+分享弹窗支持两种模式：
+
+- `新建`：生成新的 `/s/<share-id>` 只读预览链接。
+- `更新`：从已有公开预览列表中选择一个项目，用新上传的 zip 替换对应 `shares/<share-id>/` 内容，原分享链接保持不变。
 
 分享链接中的项目会从 `shares/<share-id>/` 读取，不会写回上传者本地文件，也不会允许浏览者编辑 canvas、docs 或页面信息。
 

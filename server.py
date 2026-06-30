@@ -154,7 +154,7 @@ def safe_extract_project_zip(archive_bytes: bytes, destination: Path) -> None:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "protodock.project.json 不是合法 JSON") from error
 
 
-def parse_multipart_archive(headers, body: bytes) -> tuple[str, bytes]:
+def parse_multipart_upload(headers, body: bytes) -> tuple[str, bytes, dict[str, str]]:
     content_type = headers.get("Content-Type", "")
     if "multipart/form-data" not in content_type:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请使用 multipart/form-data 上传 zip")
@@ -165,16 +165,48 @@ def parse_multipart_archive(headers, body: bytes) -> tuple[str, bytes]:
     message = BytesParser(policy=policy.default).parsebytes(raw)
     if not message.is_multipart():
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "上传表单格式不正确")
+    fields = {}
+    archive_file = None
     for part in message.iter_parts():
         name = part.get_param("name", header="content-disposition")
+        if not name:
+            continue
         if name != "archive":
+            if part.get_filename():
+                continue
+            payload = part.get_payload(decode=True)
+            if payload is None:
+                fields[name] = str(part.get_content()).strip()
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            fields[name] = payload.decode(charset, "replace").strip()
             continue
         filename = part.get_filename() or "project.zip"
         payload = part.get_payload(decode=True)
         if not payload:
             raise ProtoDockError(HTTPStatus.BAD_REQUEST, "上传的 zip 为空")
-        return filename, payload
-    raise ProtoDockError(HTTPStatus.BAD_REQUEST, "缺少 archive 文件字段")
+        archive_file = (filename, payload)
+    if archive_file is None:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "缺少 archive 文件字段")
+    return archive_file[0], archive_file[1], fields
+
+
+def replace_share_directory(final_dir: Path, temp_dir: Path, share_id: str) -> None:
+    if not final_dir.exists():
+        temp_dir.rename(final_dir)
+        return
+
+    backup_dir = SHARES_DIR / f".replace-{share_id}-{secrets.token_urlsafe(6)}"
+    final_dir.rename(backup_dir)
+    try:
+        temp_dir.rename(final_dir)
+    except Exception:
+        if backup_dir.exists() and not final_dir.exists():
+            backup_dir.rename(final_dir)
+        raise
+    finally:
+        if backup_dir.exists() and final_dir.exists():
+            shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def share_item_from_directory(directory: Path, url_for=None) -> dict | None:
@@ -407,26 +439,35 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         if length > MAX_UPLOAD_BYTES:
             raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "zip 上传体积过大")
         body = self.rfile.read(length)
-        filename, archive = parse_multipart_archive(self.headers, body)
+        filename, archive, fields = parse_multipart_upload(self.headers, body)
         if not filename.lower().endswith(".zip"):
             raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请上传 .zip 文件")
 
         SHARES_DIR.mkdir(parents=True, exist_ok=True)
-        share_id = self.create_share_id()
-        final_dir = SHARES_DIR / share_id
+        requested_share_id = fields.get("shareId", "").strip()
+        is_update = bool(requested_share_id)
+        if is_update:
+            share_id = requested_share_id
+            final_dir = share_directory_for(share_id)
+            status = HTTPStatus.OK
+        else:
+            share_id = self.create_share_id()
+            final_dir = SHARES_DIR / share_id
+            status = HTTPStatus.CREATED
         temp_dir = Path(tempfile.mkdtemp(prefix=".upload-", dir=SHARES_DIR))
         try:
             safe_extract_project_zip(archive, temp_dir)
-            temp_dir.rename(final_dir)
+            replace_share_directory(final_dir, temp_dir, share_id)
         except Exception:
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise
 
         path = f"/s/{share_id}"
-        self.send_json(HTTPStatus.CREATED, {
+        self.send_json(status, {
             "id": share_id,
             "path": path,
-            "url": self.absolute_url(path)
+            "url": self.absolute_url(path),
+            "action": "updated" if is_update else "created"
         })
 
     def handle_share_list(self) -> None:

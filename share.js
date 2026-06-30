@@ -3,6 +3,10 @@
     open: document.getElementById('openShareModal'),
     modal: document.getElementById('shareModal'),
     close: document.getElementById('closeShareModal'),
+    modeButtons: Array.from(document.querySelectorAll('[data-share-mode]')),
+    updatePanel: document.getElementById('shareUpdatePanel'),
+    updateList: document.getElementById('shareTargetList'),
+    refreshTargets: document.getElementById('refreshShareTargets'),
     dropzone: document.getElementById('shareDropZone'),
     input: document.getElementById('shareFileInput'),
     choose: document.getElementById('chooseShareFile'),
@@ -18,6 +22,10 @@
 
   let selectedFile = null;
   let isUploading = false;
+  let shareMode = 'create';
+  let shareTargets = [];
+  let selectedShareId = null;
+  let isLoadingTargets = false;
   const activeShareId = shareIdFromLocation();
 
   function setStatus(message) {
@@ -101,17 +109,32 @@
     }
   }
 
-  function setUploading(uploading) {
-    isUploading = uploading;
+  function canUpload() {
+    return !!selectedFile && !isUploading && (shareMode !== 'update' || !!selectedShareId);
+  }
+
+  function updateUploadState() {
     if (els.upload) {
-      els.upload.disabled = uploading || !selectedFile;
+      els.upload.disabled = !canUpload();
+      els.upload.textContent = shareMode === 'update' ? '上传并更新链接' : '上传并生成链接';
     }
     if (els.choose) {
-      els.choose.disabled = uploading;
+      els.choose.disabled = isUploading;
     }
+    if (els.refreshTargets) {
+      els.refreshTargets.disabled = isUploading || isLoadingTargets;
+    }
+    els.modeButtons.forEach((button) => {
+      button.disabled = isUploading;
+    });
     if (els.dropzone) {
-      els.dropzone.setAttribute('aria-disabled', String(uploading));
+      els.dropzone.setAttribute('aria-disabled', String(isUploading));
     }
+  }
+
+  function setUploading(uploading) {
+    isUploading = uploading;
+    updateUploadState();
   }
 
   function parseJsonResponse(text) {
@@ -130,12 +153,12 @@
       request.upload.addEventListener('progress', (event) => {
         if (!event.lengthComputable) {
           setProgress(0, { indeterminate: true });
-          setStatus('正在上传...');
+          setStatus(shareMode === 'update' ? '正在上传更新包...' : '正在上传...');
           return;
         }
         if (event.loaded >= event.total) {
           setProgress(100, { indeterminate: true });
-          setStatus('上传完成，服务器正在解压...');
+          setStatus(shareMode === 'update' ? '上传完成，服务器正在替换...' : '上传完成，服务器正在解压...');
           return;
         }
         const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
@@ -178,11 +201,126 @@
     return new URL(path, window.location.href).toString();
   }
 
+  function shareUrlForItem(item) {
+    const path = item.path || (item.id ? `/s/${encodeURIComponent(item.id)}` : item.url || '');
+    if (!path) {
+      return '';
+    }
+    return new URL(path, window.location.href).toString();
+  }
+
+  function renderShareTargets() {
+    if (!els.updateList) {
+      return;
+    }
+    els.updateList.textContent = '';
+    if (isLoadingTargets) {
+      const empty = document.createElement('div');
+      empty.className = 'share-target-empty';
+      empty.textContent = '正在读取公开预览...';
+      els.updateList.append(empty);
+      return;
+    }
+    if (!shareTargets.length) {
+      const empty = document.createElement('div');
+      empty.className = 'share-target-empty';
+      empty.textContent = '暂无可更新的公开预览';
+      els.updateList.append(empty);
+      return;
+    }
+
+    shareTargets.forEach((item) => {
+      const button = document.createElement('button');
+      button.className = 'share-target-item';
+      button.type = 'button';
+      button.dataset.shareId = item.id || '';
+      button.setAttribute('aria-pressed', String(item.id === selectedShareId));
+      if (item.id === selectedShareId) {
+        button.classList.add('is-selected');
+      }
+
+      const name = document.createElement('strong');
+      name.textContent = item.name || '未命名项目';
+      const url = document.createElement('span');
+      url.textContent = shareUrlForItem(item);
+      button.append(name, url);
+      els.updateList.append(button);
+    });
+  }
+
+  async function loadShareTargets(options = {}) {
+    if (!els.updateList) {
+      return;
+    }
+    isLoadingTargets = true;
+    updateUploadState();
+    renderShareTargets();
+    try {
+      const response = await fetch('/api/shares', { cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || '无法读取公开预览');
+      }
+      shareTargets = Array.isArray(payload.items) ? payload.items : [];
+      const preferredId = options.preferredId || selectedShareId;
+      selectedShareId = shareTargets.some((item) => item.id === preferredId) ? preferredId : null;
+    } catch (error) {
+      console.warn('ProtoDock: unable to load share targets', error);
+      shareTargets = [];
+      selectedShareId = null;
+      setStatus(`读取公开预览失败：${error.message || '无法连接服务器'}`);
+    } finally {
+      isLoadingTargets = false;
+      renderShareTargets();
+      updateUploadState();
+    }
+  }
+
+  function setMode(mode) {
+    if (isUploading) {
+      return;
+    }
+    shareMode = mode === 'update' ? 'update' : 'create';
+    els.modeButtons.forEach((button) => {
+      const active = button.dataset.shareMode === shareMode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    if (els.updatePanel) {
+      els.updatePanel.hidden = shareMode !== 'update';
+    }
+    if (els.result) {
+      els.result.hidden = true;
+    }
+    resetProgress();
+    updateUploadState();
+    if (shareMode === 'update') {
+      setStatus(selectedShareId ? '已选择公开预览，可上传 zip 更新原链接' : '请选择要更新的公开预览');
+      if (!shareTargets.length && !isLoadingTargets) {
+        loadShareTargets();
+      }
+      return;
+    }
+    setStatus(selectedFile ? '新建模式：点击上传生成新链接' : '等待上传项目压缩包');
+  }
+
+  function selectShareTarget(shareId) {
+    if (isUploading || !isValidShareId(shareId)) {
+      return;
+    }
+    selectedShareId = shareId;
+    renderShareTargets();
+    updateUploadState();
+    const item = shareTargets.find((target) => target.id === selectedShareId);
+    setStatus(item ? `将更新：${item.name || selectedShareId}` : '已选择公开预览');
+  }
+
   function openModal() {
     if (!els.modal) {
       return;
     }
     els.modal.hidden = false;
+    setMode('create');
     window.lucide?.createIcons();
   }
 
@@ -198,27 +336,39 @@
     }
     selectedFile = file && file.name.toLowerCase().endsWith('.zip') ? file : null;
     if (els.fileName) {
-      els.fileName.textContent = selectedFile ? selectedFile.name : '拖入项目 zip，或点击选择';
-    }
-    if (els.upload) {
-      els.upload.disabled = !selectedFile;
+      els.fileName.textContent = selectedFile ? file.name : '拖入项目 zip，或点击选择';
     }
     if (els.result) {
       els.result.hidden = true;
     }
     resetProgress();
-    setStatus(selectedFile ? '已选择压缩包，点击上传生成链接' : '请选择 .zip 项目压缩包');
+    updateUploadState();
+    if (!selectedFile) {
+      setStatus('请选择 .zip 项目压缩包');
+      return;
+    }
+    setStatus(shareMode === 'update'
+      ? (selectedShareId ? '已选择压缩包，点击上传更新链接' : '已选择压缩包，请选择要更新的公开预览')
+      : '已选择压缩包，点击上传生成链接');
   }
 
   async function uploadFile() {
     if (!selectedFile || !els.upload || isUploading) {
       return;
     }
+    if (shareMode === 'update' && !selectedShareId) {
+      setStatus('请选择要更新的公开预览');
+      return;
+    }
+
     setUploading(true);
     setProgress(0);
-    setStatus('准备上传...');
+    setStatus(shareMode === 'update' ? '准备更新...' : '准备上传...');
     const body = new FormData();
     body.append('archive', selectedFile);
+    if (shareMode === 'update') {
+      body.append('shareId', selectedShareId);
+    }
     try {
       const payload = await uploadArchive(body);
       setProgress(100);
@@ -230,7 +380,10 @@
       if (els.result) {
         els.result.hidden = false;
       }
-      setStatus('分享链接已生成');
+      setStatus(payload.action === 'updated' ? '公开预览已更新，原链接继续有效' : '分享链接已生成');
+      if (payload.action === 'updated') {
+        await loadShareTargets({ preferredId: payload.id });
+      }
     } catch (error) {
       setStatus(`上传失败：${error.message || '服务器无法处理压缩包'}`);
     } finally {
@@ -242,6 +395,16 @@
     els.open?.addEventListener('click', openModal);
   }
   els.close?.addEventListener('click', closeModal);
+  els.modeButtons.forEach((button) => {
+    button.addEventListener('click', () => setMode(button.dataset.shareMode));
+  });
+  els.refreshTargets?.addEventListener('click', () => loadShareTargets());
+  els.updateList?.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-share-id]');
+    if (item?.dataset.shareId) {
+      selectShareTarget(item.dataset.shareId);
+    }
+  });
   els.choose?.addEventListener('click', () => els.input?.click());
   els.dropzone?.addEventListener('click', () => {
     if (!isUploading) {
@@ -284,4 +447,6 @@
     }
     selectFile(event.dataTransfer?.files?.[0] || null);
   });
+
+  setMode('create');
 })();

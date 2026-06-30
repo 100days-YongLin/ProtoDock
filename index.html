@@ -336,10 +336,37 @@
       <header class="modal-head">
         <div>
           <strong id="shareModalTitle">分享原型项目</strong>
-          <span>上传包含 protodock.project.json、pages、docs 和 assets 的 zip，生成只读预览链接。</span>
+          <span>上传包含 protodock.project.json、pages、docs 和 assets 的 zip，生成或更新只读预览链接。</span>
         </div>
         <button class="tool-button" id="closeShareModal" title="关闭" aria-label="关闭">×</button>
       </header>
+
+      <div class="share-mode-switch" role="tablist" aria-label="分享方式">
+        <button class="share-mode-button is-active" type="button" data-share-mode="create" aria-pressed="true">
+          <i data-lucide="plus"></i>
+          <span>
+            <strong>新建</strong>
+            <small>生成新的链接</small>
+          </span>
+        </button>
+        <button class="share-mode-button" type="button" data-share-mode="update" aria-pressed="false">
+          <i data-lucide="refresh-cw"></i>
+          <span>
+            <strong>更新</strong>
+            <small>沿用已有链接</small>
+          </span>
+        </button>
+      </div>
+
+      <div class="share-update-panel" id="shareUpdatePanel" hidden>
+        <div class="share-update-head">
+          <strong>选择要更新的公开预览</strong>
+          <button class="tool-button" id="refreshShareTargets" type="button" title="刷新列表" aria-label="刷新列表">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+        </div>
+        <div class="share-target-list" id="shareTargetList"></div>
+      </div>
 
       <div class="share-dropzone" id="shareDropZone" role="button" tabindex="0" aria-label="上传 ProtoDock 项目压缩包">
         <i data-lucide="upload-cloud"></i>
