@@ -2060,13 +2060,6 @@ select {
   max-width: 560px;
 }
 
-.public-preview-status {
-  min-height: 18px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .public-preview-list {
   display: grid;
   gap: 8px;

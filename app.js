@@ -66,7 +66,6 @@ const els = {
   conflictModal: document.getElementById('conflictModal'),
   unsavedHomeModal: document.getElementById('unsavedHomeModal'),
   publicPreviewModal: document.getElementById('publicPreviewModal'),
-  publicPreviewStatus: document.getElementById('publicPreviewStatus'),
   publicPreviewList: document.getElementById('publicPreviewList')
 };
 
@@ -81,8 +80,6 @@ const buttons = {
   startOpenPublicProject: document.getElementById('startOpenPublicProject'),
   closeProjectModal: document.getElementById('closeProjectModal'),
   closePublicPreviewModal: document.getElementById('closePublicPreviewModal'),
-  refreshPublicPreviews: document.getElementById('refreshPublicPreviews'),
-  cancelPublicPreview: document.getElementById('cancelPublicPreview'),
   chooseProjectDirectory: document.getElementById('chooseProjectDirectory'),
   createProject: document.getElementById('createProject'),
   cancelProject: document.getElementById('cancelProject'),
@@ -2361,12 +2358,6 @@ function closeProjectModal() {
   els.projectModal.hidden = true;
 }
 
-function setPublicPreviewStatus(message) {
-  if (els.publicPreviewStatus) {
-    els.publicPreviewStatus.textContent = message;
-  }
-}
-
 function renderPublicPreviewList(items = []) {
   if (!els.publicPreviewList) {
     return;
@@ -2384,11 +2375,9 @@ function renderPublicPreviewList(items = []) {
 }
 
 async function loadPublicPreviews() {
-  setPublicPreviewStatus('正在读取公开项目...');
   if (els.publicPreviewList) {
     els.publicPreviewList.innerHTML = '';
   }
-  buttons.refreshPublicPreviews?.toggleAttribute('disabled', true);
   try {
     const response = await fetch('/api/shares', { cache: 'no-store' });
     const payload = await response.json().catch(() => ({}));
@@ -2397,12 +2386,9 @@ async function loadPublicPreviews() {
     }
     const items = Array.isArray(payload.items) ? payload.items : [];
     renderPublicPreviewList(items);
-    setPublicPreviewStatus(items.length ? `共 ${items.length} 个公开预览` : '没有公开预览项目');
   } catch (error) {
+    console.warn('ProtoDock: unable to load public previews', error);
     renderPublicPreviewList([]);
-    setPublicPreviewStatus(`读取失败：${error.message || '当前服务未启用公开预览'}`);
-  } finally {
-    buttons.refreshPublicPreviews?.toggleAttribute('disabled', false);
   }
 }
 
@@ -2945,8 +2931,6 @@ function bindGlobalEvents() {
   buttons.closeProjectModal?.addEventListener('click', closeProjectModal);
   buttons.cancelProject?.addEventListener('click', closeProjectModal);
   buttons.closePublicPreviewModal?.addEventListener('click', closePublicPreviewModal);
-  buttons.cancelPublicPreview?.addEventListener('click', closePublicPreviewModal);
-  buttons.refreshPublicPreviews?.addEventListener('click', loadPublicPreviews);
   buttons.chooseProjectDirectory?.addEventListener('click', chooseProjectDirectory);
   buttons.createProject?.addEventListener('click', createProject);
   buttons.modeSelect?.addEventListener('click', () => setToolMode('select'));
