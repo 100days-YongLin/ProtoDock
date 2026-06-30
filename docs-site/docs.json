@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
   "name": "ProtoDock 原型舱",
-  "description": "ProtoDock 使用文档：本地项目、画布协作、只读分享和 Agent 写入边界。",
+  "description": "ProtoDock 使用文档：本地项目、AI Agent 协作、画布编排、只读分享和 Agent 写入边界。",
   "colors": {
     "primary": "#0066CC",
     "light": "#2997FF",
@@ -38,6 +38,7 @@
         "pages": [
           "docs",
           "quickstart",
+          "ai-agent-workflow",
           "project-structure"
         ]
       },

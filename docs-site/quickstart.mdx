@@ -21,9 +21,22 @@ http://localhost:4175/index.html
 
 点击首页的 **新建项目**，选择工作目录和设备规格。ProtoDock 会在目录中创建最小项目结构，并以 `protodock.project.json` 的 `project.id` 作为唯一项目身份。
 
+新建项目后，可以把这个目录交给 Codex、Claude Code 或其他 AI Agent，让它根据需求生成 `pages/`、`docs/` 和 `assets/`。ProtoDock 会读取 Agent 注册到 manifest 里的静态页面入口，并在画布中预览。
+
 ## 打开已有项目
 
 点击 **打开已有项目**，选择包含 `protodock.project.json` 的目录。ProtoDock 会读取 manifest 中声明的页面入口，并在画布节点中用 iframe 渲染静态页面。
+
+## 接入 AI Agent
+
+把需求交给 Agent 前，建议让它先阅读：
+
+- `README.md`
+- `DESIGN_AGENT_CONTRACT.md`
+- `protodock.project.schema.json`
+- 当前项目的 `protodock.project.json`
+
+Agent 负责生成页面和文档，ProtoDock 负责展示和编排这些结果。更完整的协作方式见 [AI Agent 协作](/ai-agent-workflow)。
 
 ## 保存
 
