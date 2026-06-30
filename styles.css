@@ -61,8 +61,8 @@ select {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-width: 220px;
+  gap: 8px;
+  min-width: 240px;
 }
 
 .app-icon {
@@ -75,6 +75,28 @@ select {
   font-family: "SF Pro Display", system-ui, -apple-system, sans-serif;
   font-size: 14px;
   font-weight: 600;
+}
+
+.home-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+
+.home-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.home-button:hover {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .toolbar {

@@ -58,6 +58,7 @@ const els = {
 };
 
 const buttons = {
+  homeProject: document.getElementById('homeProject'),
   newProject: document.getElementById('newProject'),
   openProject: document.getElementById('openProject'),
   saveProject: document.getElementById('saveProject'),
@@ -2310,7 +2311,42 @@ function centerNode(nodeId) {
   updateZoom();
 }
 
+function goHome() {
+  if (state.dirty && !confirm('当前项目有未保存修改，返回首页会丢失这些修改。继续返回？')) {
+    return;
+  }
+  stopPlayback();
+  state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
+  state.previewUrls.clear();
+  state.previewJobs.clear();
+  state.previewResetNodeIds.clear();
+  state.docCache.clear();
+  state.docDirty.clear();
+  state.manifest = null;
+  state.projectHandle = null;
+  state.manifestHandle = null;
+  state.projectBaseUrl = null;
+  state.projectDirectoryName = null;
+  state.readOnly = true;
+  state.manifestHash = null;
+  state.dirty = false;
+  state.selectedNodeId = null;
+  state.selectedEdgeId = null;
+  state.selectedNoteId = null;
+  state.editingEdgeLabelId = null;
+  state.edgeClickCandidate = null;
+  state.activePreviewNodeId = null;
+  state.activeEdgeDraft = null;
+  state.safeAreaSettingsOpen = false;
+  state.panX = 0;
+  state.panY = 0;
+  state.zoom = window.innerWidth < 760 ? 0.78 : 1;
+  renderCanvas();
+  setStatus('已返回首页');
+}
+
 function bindGlobalEvents() {
+  buttons.homeProject?.addEventListener('click', goHome);
   buttons.openProject?.addEventListener('click', openProjectDirectory);
   buttons.startOpenProject?.addEventListener('click', openProjectDirectory);
   buttons.newProject?.addEventListener('click', openProjectModal);
