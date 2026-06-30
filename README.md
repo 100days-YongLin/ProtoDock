@@ -6,6 +6,7 @@ ProtoDock 是一个本地静态原型工作台。它不负责替设计 Agent 生
 
 - ProtoDock 自身是纯静态前端，可以通过 `http://localhost` 打开。
 - 每个原型项目必须包含 `protodock.project.json`。
+- 新建项目会生成 `README.md`，但项目 ID 仍以 `protodock.project.json` 的 `project.id` 为唯一来源。
 - 页面源码由设计 Agent 维护，入口通常是 `pages/<page-id>/index.html`。
 - ProtoDock 通过 manifest 中的 `page.entry` 读取页面，并在画布节点中用 iframe 预览。
 - iframe 会按设备真实尺寸渲染，例如 iPhone 竖版是 `390 x 844`，再整体缩放成画布缩略图。

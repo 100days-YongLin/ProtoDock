@@ -1327,6 +1327,51 @@ function starterHtml(name) {
 `;
 }
 
+function starterProjectReadme(manifest) {
+  const project = manifest.project;
+  const pages = Object.entries(manifest.pages).map(([pageId, page]) => (
+    `| ${pageId} | ${page.title || pageId} | \`${page.sourceDir || '-'}\` | \`${page.entry}\` | \`${page.doc || '-'}\` |`
+  )).join('\n');
+
+  return `# ${project.name}
+
+这是一个 ProtoDock 原型项目工作目录。
+
+## 项目元信息
+
+- ProtoDock 项目 ID：${project.id}
+- 项目名称：${project.name}
+- 设备壳：${project.devicePreset}
+- Manifest：\`${MANIFEST_FILE}\`
+
+> 项目 ID 以 \`${MANIFEST_FILE}\` 里的 \`project.id\` 为唯一来源。不要在 README、文档或页面源码里另行编造项目 ID。
+
+## 目录约定
+
+\`\`\`text
+.
+├── ${MANIFEST_FILE}
+├── pages/
+├── docs/
+├── assets/
+└── exports/
+\`\`\`
+
+## 页面清单
+
+| Page ID | 标题 | 源码目录 | 预览入口 | 文档 |
+| --- | --- | --- | --- | --- |
+${pages}
+
+## 给设计 Agent
+
+- 页面源码统一放在 \`pages/<page-id>/\`。
+- 每个页面必须提供静态入口，通常是 \`pages/<page-id>/index.html\`。
+- 页面说明放在 \`docs/<page-id>.md\`。
+- 可以更新 \`${MANIFEST_FILE}\` 中的 \`pages\` 字段，但不要改 \`canvas.nodes[].x\`、\`canvas.nodes[].y\` 或 \`canvas.edges\`，除非用户要求调整 flow。
+`;
+}
+
 async function createProject() {
   if (!state.selectedProjectDirectoryHandle) {
     setStatus('请先选择一个本地工作目录');
@@ -1338,6 +1383,7 @@ async function createProject() {
   try {
     const root = state.selectedProjectDirectoryHandle;
     await writeInitialFile(root, MANIFEST_FILE, text);
+    await writeInitialFile(root, 'README.md', starterProjectReadme(manifest));
     await writeInitialFile(root, 'pages/home/index.html', starterHtml(name));
     await writeInitialFile(root, 'docs/home.md', buildDefaultDoc('home', manifest.pages.home));
     const manifestHandle = await root.getFileHandle(MANIFEST_FILE);

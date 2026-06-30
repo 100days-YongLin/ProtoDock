@@ -22,10 +22,11 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 4. Build output should be self-contained or use simple relative assets that live inside the project directory.
 5. If using React/Vue/Vite, compile the design before handing it to ProtoDock.
 6. Prefer single-page static bundles for v1. Avoid runtime dev servers, API calls, or assets outside the project directory.
-7. Do not change `canvas.nodes[].x`, `canvas.nodes[].y`, or `canvas.edges` unless the user asked you to change the flow.
-8. Do not delete or overwrite user-authored pages, docs, or assets without explicit instruction.
-9. Keep the project-level `devicePreset` consistent. v1 assumes one device shell per project.
-10. Use `docs/<page-id>.md` for page intent, states, and acceptance notes.
+7. Treat `protodock.project.json > project.id` as the only source of truth for project identity.
+8. Do not change `canvas.nodes[].x`, `canvas.nodes[].y`, or `canvas.edges` unless the user asked you to change the flow.
+9. Do not delete or overwrite user-authored pages, docs, or assets without explicit instruction.
+10. Keep the project-level `devicePreset` consistent. v1 assumes one device shell per project.
+11. Use `docs/<page-id>.md` for page intent, states, and acceptance notes.
 
 ## React / Vue Recommended Build
 
