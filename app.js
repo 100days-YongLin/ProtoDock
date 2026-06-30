@@ -979,7 +979,7 @@ function renderProjectActions() {
   buttons.saveProject?.toggleAttribute('disabled', !hasProject || state.readOnly);
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
   els.safeAreaToggle?.toggleAttribute('disabled', !hasProject);
-  els.productSelect.disabled = !hasProject;
+  els.productSelect?.setAttribute('aria-disabled', String(!hasProject));
 }
 
 function syncSafeAreaInputs() {
