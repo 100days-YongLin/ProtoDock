@@ -33,7 +33,15 @@ ALLOWED_ROOT_DIRS = {"pages", "docs", "assets"}
 PRIVATE_ROOT_NAMES = {".git", "shares", "protodock", "node_modules", "exports", "docs-site", "docs-dist"}
 PRIVATE_STATIC_FILES = {"server.py", "protodock.log", "protodock.pid"}
 DOCS_ASSET_ROOTS = {"_next", "favicons", "images", "logo"}
-DOCS_PAGE_ROOTS = {"quickstart", "project-structure", "canvas-workflow", "sharing", "deployment", "agent-boundaries"}
+DOCS_PAGE_ROOTS = {
+    "quickstart",
+    "project-structure",
+    "ai-agent-workflow",
+    "canvas-workflow",
+    "sharing",
+    "deployment",
+    "agent-boundaries",
+}
 
 
 class ProtoDockError(Exception):
