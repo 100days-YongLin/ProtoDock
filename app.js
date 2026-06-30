@@ -1,7 +1,10 @@
 const MANIFEST_FILE = 'protodock.project.json';
+const INSPECTOR_WIDTH_STORAGE_KEY = 'protodock.inspectorWidth';
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.8;
 const VIRTUAL_CANVAS_LIMIT = 100000;
+const MIN_INSPECTOR_WIDTH = 320;
+const MAX_INSPECTOR_WIDTH = 760;
 
 const els = {
   workspace: document.querySelector('.workspace'),
@@ -27,6 +30,7 @@ const els = {
   nodeInspectorPanel: document.getElementById('nodeInspectorPanel'),
   markdownMount: document.getElementById('pageMarkdown'),
   markdownFallback: document.getElementById('pageMarkdownFallback'),
+  inspectorResizer: document.getElementById('inspectorResizer'),
   statusLabel: document.querySelector('.status span:last-child'),
   projectModal: document.getElementById('projectModal'),
   projectName: document.getElementById('projectName'),
@@ -135,6 +139,7 @@ const state = {
   panY: 0,
   activeDrag: null,
   activePan: null,
+  activeInspectorResize: null,
   activeNoteDrag: null,
   activeEdgeDraft: null,
   playbackTimer: null,
@@ -175,6 +180,35 @@ async function hashText(text) {
 
 function setStatus(message) {
   els.statusLabel.textContent = message;
+}
+
+function clampInspectorWidth(width) {
+  const workspaceWidth = els.workspace.getBoundingClientRect().width || window.innerWidth;
+  const sidebarWidth = window.matchMedia('(max-width: 760px)').matches ? 0 : 248;
+  const resizerWidth = window.matchMedia('(max-width: 760px)').matches ? 0 : 8;
+  const canvasMinimum = window.matchMedia('(max-width: 1180px)').matches ? 360 : 480;
+  const maxByViewport = Math.max(MIN_INSPECTOR_WIDTH, workspaceWidth - sidebarWidth - resizerWidth - canvasMinimum);
+  const maxWidth = Math.min(MAX_INSPECTOR_WIDTH, maxByViewport);
+  return Math.round(Math.max(MIN_INSPECTOR_WIDTH, Math.min(maxWidth, width)));
+}
+
+function setInspectorWidth(width, persist = false) {
+  if (!els.workspace || window.matchMedia('(max-width: 760px)').matches) {
+    return;
+  }
+  const nextWidth = clampInspectorWidth(width);
+  els.workspace.style.setProperty('--inspector-width', `${nextWidth}px`);
+  els.inspectorResizer?.setAttribute('aria-valuenow', String(nextWidth));
+  if (persist) {
+    localStorage.setItem(INSPECTOR_WIDTH_STORAGE_KEY, String(nextWidth));
+  }
+}
+
+function restoreInspectorWidth() {
+  const stored = Number.parseFloat(localStorage.getItem(INSPECTOR_WIDTH_STORAGE_KEY));
+  if (Number.isFinite(stored)) {
+    setInspectorWidth(stored);
+  }
 }
 
 function markDirty(message = '未保存') {
@@ -965,6 +999,11 @@ function moveActiveDrags(event) {
     state.panY = state.activePan.originalY + event.clientY - state.activePan.startY;
     updateZoom();
   }
+  if (state.activeInspectorResize) {
+    const dx = event.clientX - state.activeInspectorResize.startX;
+    setInspectorWidth(state.activeInspectorResize.originalWidth - dx);
+    event.preventDefault();
+  }
 }
 
 function endActiveDrags() {
@@ -979,6 +1018,14 @@ function endActiveDrags() {
   if (state.activePan) {
     state.activePan = null;
     els.canvasShell.classList.remove('is-panning');
+  }
+  if (state.activeInspectorResize) {
+    const width = Number.parseFloat(getComputedStyle(els.workspace).getPropertyValue('--inspector-width'));
+    if (Number.isFinite(width)) {
+      setInspectorWidth(width, true);
+    }
+    state.activeInspectorResize = null;
+    els.workspace.classList.remove('is-resizing-inspector');
   }
 }
 
@@ -1464,6 +1511,35 @@ function bindGlobalEvents() {
   });
   buttons.zoomIn?.addEventListener('click', () => zoomFromCenter(0.1));
   buttons.zoomOut?.addEventListener('click', () => zoomFromCenter(-0.1));
+  els.inspectorResizer?.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    const inspectorWidth = document.querySelector('.inspector')?.getBoundingClientRect().width || MIN_INSPECTOR_WIDTH;
+    state.activeInspectorResize = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      originalWidth: inspectorWidth
+    };
+    els.inspectorResizer.setPointerCapture(event.pointerId);
+    els.workspace.classList.add('is-resizing-inspector');
+    event.preventDefault();
+  });
+  els.inspectorResizer?.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      return;
+    }
+    const currentWidth = document.querySelector('.inspector')?.getBoundingClientRect().width || MIN_INSPECTOR_WIDTH;
+    const delta = event.shiftKey ? 48 : 16;
+    setInspectorWidth(currentWidth + (event.key === 'ArrowLeft' ? delta : -delta), true);
+    event.preventDefault();
+  });
+  window.addEventListener('resize', () => {
+    const currentWidth = Number.parseFloat(getComputedStyle(els.workspace).getPropertyValue('--inspector-width'));
+    if (Number.isFinite(currentWidth)) {
+      setInspectorWidth(currentWidth);
+    }
+  });
 
   els.projectPresetGrid?.addEventListener('click', (event) => {
     const card = event.target.closest('[data-preset]');
@@ -1577,6 +1653,7 @@ window.ProtoDock = {
 
 initMarkdownEditor();
 bindGlobalEvents();
+restoreInspectorWidth();
 renderToolMode();
 loadBundledExample();
 window.lucide?.createIcons();
