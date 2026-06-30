@@ -5,7 +5,9 @@
     "name": "PicTale 微信小程序",
     "description": "家长端故事相册原型",
     "devicePreset": "iphone-portrait",
-    "safeAreaEnabled": true
+    "safeAreaEnabled": true,
+    "safeAreaTop": 59,
+    "safeAreaBottom": 34
   },
   "pages": {
     "home": {

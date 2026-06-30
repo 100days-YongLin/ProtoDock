@@ -19,6 +19,8 @@
         "name": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "safeAreaEnabled": { "type": "boolean" },
+        "safeAreaTop": { "type": "number", "minimum": 0, "maximum": 240 },
+        "safeAreaBottom": { "type": "number", "minimum": 0, "maximum": 240 },
         "devicePreset": {
           "type": "string",
           "enum": [

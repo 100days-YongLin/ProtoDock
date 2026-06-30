@@ -11,6 +11,7 @@ ProtoDock 是一个本地静态原型工作台。它不负责替设计 Agent 生
 - ProtoDock 通过 manifest 中的 `page.entry` 读取页面，并在画布节点中用 iframe 预览。
 - iframe 会按设备真实尺寸渲染，例如 iPhone 14 Pro 是 `390 x 830`，再整体缩放成画布缩略图。
 - 手机和平板设备壳使用 vendored `picturepan2/devices.css`，避免依赖外部 CDN。
+- 安全区由 `project.safeAreaEnabled`、`project.safeAreaTop` 和 `project.safeAreaBottom` 控制，单位是 px。
 - 画布节点、连线、文本说明和项目设备壳由 `protodock.project.json` 持久化。
 - 右侧 Markdown 文档可以绑定到 `docs/<page-id>.md`。
 
@@ -44,7 +45,9 @@ prototype-project/
     "name": "PicTale 微信小程序",
     "description": "家长端移动原型",
     "devicePreset": "iphone-portrait",
-    "safeAreaEnabled": true
+    "safeAreaEnabled": true,
+    "safeAreaTop": 59,
+    "safeAreaBottom": 34
   },
   "pages": {
     "home": {

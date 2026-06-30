@@ -6,6 +6,7 @@ const VIRTUAL_CANVAS_LIMIT = 100000;
 const MIN_INSPECTOR_WIDTH = 320;
 const MAX_INSPECTOR_WIDTH = 760;
 const ALIGN_SNAP_THRESHOLD = 10;
+const MAX_SAFE_AREA_INSET = 240;
 
 const els = {
   workspace: document.querySelector('.workspace'),
@@ -22,6 +23,8 @@ const els = {
   canvasPresetName: document.getElementById('canvasPresetName'),
   canvasPresetDesc: document.getElementById('canvasPresetDesc'),
   safeAreaToggle: document.getElementById('safeAreaToggle'),
+  safeAreaTopInput: document.getElementById('safeAreaTopInput'),
+  safeAreaBottomInput: document.getElementById('safeAreaBottomInput'),
   canvasProductName: document.getElementById('canvasProductName'),
   canvasProductDesc: document.getElementById('canvasProductDesc'),
   startScreen: document.getElementById('startScreen'),
@@ -172,6 +175,7 @@ const state = {
   playbackActive: false,
   playbackJobId: null,
   edgeFrameId: null,
+  safeAreaInputTimer: null,
   isSettingEditorValue: false,
   markdownEditor: null
 };
@@ -254,8 +258,41 @@ function safeAreaEnabled() {
   return state.manifest?.project?.safeAreaEnabled !== false;
 }
 
+function safeAreaDefaultsFor(presetOrId = presetFor()) {
+  const preset = typeof presetOrId === 'string' ? canvasPresets[presetOrId] : presetOrId;
+  return {
+    top: preset?.safeTop || 0,
+    bottom: preset?.safeBottom || 0
+  };
+}
+
+function clampSafeAreaInset(value, fallback = 0) {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.round(Math.max(0, Math.min(MAX_SAFE_AREA_INSET, parsed)));
+}
+
+function configuredSafeAreaInsets(preset = presetFor()) {
+  const defaults = safeAreaDefaultsFor(preset);
+  const project = state.manifest?.project || {};
+  return {
+    top: clampSafeAreaInset(project.safeAreaTop, defaults.top),
+    bottom: clampSafeAreaInset(project.safeAreaBottom, defaults.bottom)
+  };
+}
+
+function effectiveSafeAreaInsets(preset = presetFor()) {
+  if (!safeAreaEnabled()) {
+    return { top: 0, bottom: 0 };
+  }
+  return configuredSafeAreaInsets(preset);
+}
+
 function safeAreaClassFor(preset) {
-  return safeAreaEnabled() && ((preset.safeTop || 0) > 0 || (preset.safeBottom || 0) > 0) ? ' safe-area-on' : '';
+  const safeArea = effectiveSafeAreaInsets(preset);
+  return safeArea.top > 0 || safeArea.bottom > 0 ? ' safe-area-on' : '';
 }
 
 function previewStyleFor(preset, previewWidth = preset.thumbnailWidth || 124) {
@@ -263,8 +300,7 @@ function previewStyleFor(preset, previewWidth = preset.thumbnailWidth || 124) {
   const height = preset.height || 844;
   const frameWidth = preset.frameWidth || width;
   const frameHeight = preset.frameHeight || height;
-  const safeTop = safeAreaEnabled() ? preset.safeTop || 0 : 0;
-  const safeBottom = safeAreaEnabled() ? preset.safeBottom || 0 : 0;
+  const safeArea = effectiveSafeAreaInsets(preset);
   const scale = previewWidth / frameWidth;
   const viewportWidth = frameWidth * scale;
   const viewportHeight = frameHeight * scale;
@@ -273,8 +309,8 @@ function previewStyleFor(preset, previewWidth = preset.thumbnailWidth || 124) {
     `--preview-height:${height}px`,
     `--device-frame-width:${frameWidth}px`,
     `--device-frame-height:${frameHeight}px`,
-    `--safe-top:${safeTop}px`,
-    `--safe-bottom:${safeBottom}px`,
+    `--safe-top:${safeArea.top}px`,
+    `--safe-bottom:${safeArea.bottom}px`,
     `--preview-scale:${scale.toFixed(5)}`,
     `--viewport-width:${viewportWidth.toFixed(2)}px`,
     `--viewport-height:${viewportHeight.toFixed(2)}px`
@@ -305,13 +341,17 @@ function manifestText(manifest = state.manifest) {
 
 function normalizeManifest(input) {
   const manifest = structuredClone(input || {});
+  const devicePreset = manifest.project?.devicePreset || manifest.canvasType || 'iphone-portrait';
+  const safeAreaDefaults = safeAreaDefaultsFor(devicePreset);
   manifest.schemaVersion = manifest.schemaVersion || 1;
   manifest.project = {
     id: manifest.project?.id || `project-${Date.now()}`,
     name: manifest.project?.name || '未命名 ProtoDock 项目',
     description: manifest.project?.description || '本地原型工作台',
-    devicePreset: manifest.project?.devicePreset || manifest.canvasType || 'iphone-portrait',
-    safeAreaEnabled: manifest.project?.safeAreaEnabled ?? true
+    devicePreset,
+    safeAreaEnabled: manifest.project?.safeAreaEnabled ?? true,
+    safeAreaTop: clampSafeAreaInset(manifest.project?.safeAreaTop, safeAreaDefaults.top),
+    safeAreaBottom: clampSafeAreaInset(manifest.project?.safeAreaBottom, safeAreaDefaults.bottom)
   };
   manifest.pages = manifest.pages || {};
   manifest.canvas = manifest.canvas || {};
@@ -880,12 +920,15 @@ function renderPageList() {
 
 function renderProjectActions() {
   const hasProject = !!state.manifest;
+  const safeAreaInputDisabled = !hasProject || !safeAreaEnabled();
   document.querySelectorAll('[data-requires-project]').forEach((button) => {
     button.disabled = !hasProject;
   });
   buttons.saveProject?.toggleAttribute('disabled', !hasProject || state.readOnly);
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
   els.safeAreaToggle?.toggleAttribute('disabled', !hasProject);
+  els.safeAreaTopInput?.toggleAttribute('disabled', safeAreaInputDisabled);
+  els.safeAreaBottomInput?.toggleAttribute('disabled', safeAreaInputDisabled);
   els.productSelect.disabled = !hasProject;
 }
 
@@ -911,6 +954,15 @@ function renderChrome() {
   els.canvasPresetDesc.textContent = preset.desc;
   if (els.safeAreaToggle) {
     els.safeAreaToggle.checked = safeAreaEnabled();
+  }
+  const safeArea = configuredSafeAreaInsets(preset);
+  if (els.safeAreaTopInput) {
+    els.safeAreaTopInput.value = safeArea.top;
+    els.safeAreaTopInput.disabled = !safeAreaEnabled();
+  }
+  if (els.safeAreaBottomInput) {
+    els.safeAreaBottomInput.value = safeArea.bottom;
+    els.safeAreaBottomInput.disabled = !safeAreaEnabled();
   }
   els.productSelect.innerHTML = `<option>${escapeHtml(state.manifest.project.name)}</option>`;
   renderPageList();
@@ -1510,12 +1562,51 @@ function setSafeAreaEnabled(enabled) {
   if (!state.manifest) {
     return;
   }
+  const safeArea = configuredSafeAreaInsets();
   state.manifest.project.safeAreaEnabled = enabled;
+  state.manifest.project.safeAreaTop = safeArea.top;
+  state.manifest.project.safeAreaBottom = safeArea.bottom;
   renderCanvas();
   if (state.playbackActive) {
     renderPlayback();
   }
   markDirty(enabled ? '已开启安全区' : '已关闭安全区');
+}
+
+function setSafeAreaInsetsFromInputs() {
+  if (!state.manifest) {
+    return;
+  }
+  if (state.safeAreaInputTimer) {
+    clearTimeout(state.safeAreaInputTimer);
+    state.safeAreaInputTimer = null;
+  }
+  const current = configuredSafeAreaInsets();
+  const next = {
+    top: clampSafeAreaInset(els.safeAreaTopInput?.value, current.top),
+    bottom: clampSafeAreaInset(els.safeAreaBottomInput?.value, current.bottom)
+  };
+  if (next.top === current.top && next.bottom === current.bottom) {
+    renderChrome();
+    return;
+  }
+  state.manifest.project.safeAreaTop = next.top;
+  state.manifest.project.safeAreaBottom = next.bottom;
+  renderCanvas();
+  if (state.playbackActive) {
+    renderPlayback();
+  }
+  markDirty(`安全区已更新：刘海 ${next.top}px / 手势条 ${next.bottom}px`);
+}
+
+function scheduleSafeAreaInsetsFromInputs() {
+  if (!state.manifest) {
+    return;
+  }
+  if (state.safeAreaInputTimer) {
+    clearTimeout(state.safeAreaInputTimer);
+  }
+  state.safeAreaInputTimer = window.setTimeout(setSafeAreaInsetsFromInputs, 180);
 }
 
 function addNode() {
@@ -1714,6 +1805,7 @@ async function chooseProjectDirectory() {
 }
 
 function starterManifest(name, devicePreset) {
+  const safeAreaDefaults = safeAreaDefaultsFor(devicePreset);
   return {
     schemaVersion: 1,
     project: {
@@ -1721,7 +1813,9 @@ function starterManifest(name, devicePreset) {
       name,
       description: '本地静态原型工作台',
       devicePreset,
-      safeAreaEnabled: true
+      safeAreaEnabled: true,
+      safeAreaTop: safeAreaDefaults.top,
+      safeAreaBottom: safeAreaDefaults.bottom
     },
     pages: {
       home: {
@@ -1794,7 +1888,7 @@ function starterProjectReadme(manifest) {
 - ProtoDock 项目 ID：${project.id}
 - 项目名称：${project.name}
 - 设备壳：${project.devicePreset}
-- 安全区：${project.safeAreaEnabled === false ? '关闭' : '开启'}
+- 安全区：${project.safeAreaEnabled === false ? '关闭' : `开启（刘海 ${project.safeAreaTop ?? 0}px / 手势条 ${project.safeAreaBottom ?? 0}px）`}
 - Manifest：\`${MANIFEST_FILE}\`
 
 > 项目 ID 以 \`${MANIFEST_FILE}\` 里的 \`project.id\` 为唯一来源。不要在 README、文档或页面源码里另行编造项目 ID。
@@ -2065,6 +2159,10 @@ function bindGlobalEvents() {
   els.safeAreaToggle?.addEventListener('change', (event) => {
     setSafeAreaEnabled(event.currentTarget.checked);
   });
+  els.safeAreaTopInput?.addEventListener('input', scheduleSafeAreaInsetsFromInputs);
+  els.safeAreaBottomInput?.addEventListener('input', scheduleSafeAreaInsetsFromInputs);
+  els.safeAreaTopInput?.addEventListener('change', setSafeAreaInsetsFromInputs);
+  els.safeAreaBottomInput?.addEventListener('change', setSafeAreaInsetsFromInputs);
   buttons.resetView?.addEventListener('click', () => {
     state.zoom = 1;
     state.panX = 0;
@@ -2197,6 +2295,7 @@ function bindGlobalEvents() {
 
 window.ProtoDock = {
   getState() {
+    const safeArea = state.manifest ? configuredSafeAreaInsets() : { top: null, bottom: null };
     return {
       projectId: state.manifest?.project?.id || null,
       projectName: state.manifest?.project?.name || null,
@@ -2208,6 +2307,8 @@ window.ProtoDock = {
       playbackActive: state.playbackActive,
       playbackIndex: state.playbackIndex,
       safeAreaEnabled: safeAreaEnabled(),
+      safeAreaTop: safeArea.top,
+      safeAreaBottom: safeArea.bottom,
       readOnly: state.readOnly,
       dirty: state.dirty,
       zoom: state.zoom,
