@@ -581,7 +581,7 @@ select {
 .page-node {
   position: absolute;
   z-index: 2;
-  width: 236px;
+  width: 280px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: #fff;
@@ -875,23 +875,14 @@ select {
   display: grid;
   grid-template-rows: auto 1fr;
   overflow: hidden;
+  width: fit-content;
   margin: 0 auto;
   border: 1px solid #cfd6e1;
   background: #f8fafc;
 }
 
 .prototype-shell.web {
-  width: 100%;
   border-radius: 8px;
-}
-
-.prototype-shell.web-landscape {
-  aspect-ratio: 16 / 9;
-}
-
-.prototype-shell.web-portrait {
-  width: 72%;
-  aspect-ratio: 9 / 16;
 }
 
 .prototype-shell.iphone {
@@ -901,14 +892,7 @@ select {
   padding: 6px;
 }
 
-.prototype-shell.iphone-portrait {
-  width: 116px;
-  aspect-ratio: 390 / 844;
-}
-
 .prototype-shell.iphone-landscape {
-  width: 100%;
-  aspect-ratio: 844 / 390;
   border-radius: 18px;
 }
 
@@ -917,16 +901,6 @@ select {
   border-radius: 16px;
   background: #333333;
   padding: 6px;
-}
-
-.prototype-shell.ipad-portrait {
-  width: 142px;
-  aspect-ratio: 820 / 1180;
-}
-
-.prototype-shell.ipad-landscape {
-  width: 100%;
-  aspect-ratio: 1180 / 820;
 }
 
 .shell-bar {
@@ -955,9 +929,9 @@ select {
 
 .shell-viewport {
   position: relative;
-  display: grid;
-  place-items: stretch;
   overflow: hidden;
+  width: var(--viewport-width);
+  height: var(--viewport-height);
   min-height: 0;
   background: #f8fafc;
 }
@@ -967,31 +941,28 @@ select {
   border-radius: 0 0 10px 10px;
 }
 
-.shell-viewport .ai-frame {
-  height: 100%;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.shell-viewport .ai-frame-body {
-  height: calc(100% - 24px);
-  min-height: 0;
-}
-
 .prototype-frame {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: var(--preview-width);
+  height: var(--preview-height);
   border: 0;
   background: #fff;
   pointer-events: none;
 }
 
+.prototype-frame-stage {
+  width: var(--preview-width);
+  height: var(--preview-height);
+  overflow: hidden;
+  transform: scale(var(--preview-scale));
+  transform-origin: 0 0;
+}
+
 .preview-loading,
 .preview-error {
   display: grid;
-  min-height: 72px;
+  width: var(--preview-width);
+  height: var(--preview-height);
   place-items: center;
   background: #fff;
   color: var(--muted);

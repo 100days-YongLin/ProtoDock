@@ -44,7 +44,7 @@
       { "id": "edge-home-report", "from": "node-home", "to": "node-report", "label": "今日总结" }
     ],
     "notes": [
-      { "id": "note-agent", "text": "页面源码在 pages/*；ProtoDock 只负责预览、连线和文档。", "x": 100, "y": 430 }
+      { "id": "note-agent", "text": "页面源码在 pages/*；ProtoDock 只负责预览、连线和文档。", "x": 110, "y": 760 }
     ]
   }
 }

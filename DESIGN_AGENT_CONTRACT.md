@@ -72,4 +72,4 @@ Design pages for the project `devicePreset`:
 - `web-landscape`: desktop web.
 - `web-portrait`: tall web pages.
 
-Use responsive CSS. ProtoDock renders pages as thumbnails inside device shells on the canvas.
+Use responsive CSS for the target device viewport. ProtoDock renders the page at the real preset size first, then scales that viewport down inside the canvas node. For example, `iphone-portrait` pages should look correct at `390 x 844`; do not design for the small thumbnail size shown on the canvas.

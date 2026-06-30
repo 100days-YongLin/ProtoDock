@@ -64,32 +64,50 @@ const canvasPresets = {
   'web-landscape': {
     label: 'Web 横版',
     desc: '1440 x 900，后台和桌面 Web',
-    shellClass: 'web web-landscape'
+    shellClass: 'web web-landscape',
+    width: 1440,
+    height: 900,
+    thumbnailWidth: 236
   },
   'web-portrait': {
     label: 'Web 竖版',
     desc: '900 x 1440，竖向 Web 或长页面',
-    shellClass: 'web web-portrait'
+    shellClass: 'web web-portrait',
+    width: 900,
+    height: 1440,
+    thumbnailWidth: 158
   },
   'iphone-portrait': {
     label: 'iPhone 竖版',
     desc: '390 x 844，移动端小程序',
-    shellClass: 'iphone iphone-portrait'
+    shellClass: 'iphone iphone-portrait',
+    width: 390,
+    height: 844,
+    thumbnailWidth: 156
   },
   'iphone-landscape': {
     label: 'iPhone 横版',
     desc: '844 x 390，横屏移动场景',
-    shellClass: 'iphone iphone-landscape'
+    shellClass: 'iphone iphone-landscape',
+    width: 844,
+    height: 390,
+    thumbnailWidth: 236
   },
   'ipad-portrait': {
     label: 'iPad 竖版',
     desc: '820 x 1180，平板竖屏业务',
-    shellClass: 'ipad ipad-portrait'
+    shellClass: 'ipad ipad-portrait',
+    width: 820,
+    height: 1180,
+    thumbnailWidth: 150
   },
   'ipad-landscape': {
     label: 'iPad 横版',
     desc: '1180 x 820，平板横屏工作台',
-    shellClass: 'ipad ipad-landscape'
+    shellClass: 'ipad ipad-landscape',
+    width: 1180,
+    height: 820,
+    thumbnailWidth: 236
   }
 };
 
@@ -168,6 +186,21 @@ function markDirty(message = '未保存') {
 function presetFor() {
   const id = state.manifest?.project?.devicePreset || 'iphone-portrait';
   return canvasPresets[id] || canvasPresets['iphone-portrait'];
+}
+
+function previewStyleFor(preset) {
+  const width = preset.width || 390;
+  const height = preset.height || 844;
+  const scale = (preset.thumbnailWidth || 124) / width;
+  const viewportWidth = width * scale;
+  const viewportHeight = height * scale;
+  return [
+    `--preview-width:${width}px`,
+    `--preview-height:${height}px`,
+    `--preview-scale:${scale.toFixed(5)}`,
+    `--viewport-width:${viewportWidth.toFixed(2)}px`,
+    `--viewport-height:${viewportHeight.toFixed(2)}px`
+  ].join(';');
 }
 
 function manifestText(manifest = state.manifest) {
@@ -305,7 +338,7 @@ async function readTextFile(path) {
     const handle = await getFileHandleByPath(state.projectHandle, path);
     return (await handle.getFile()).text();
   }
-  const response = await fetch(new URL(path, state.projectBaseUrl));
+  const response = await fetch(new URL(path, state.projectBaseUrl), { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`无法读取 ${path}`);
   }
@@ -482,14 +515,17 @@ async function hydratePreview(node) {
 
 function renderPreviewShell(node, page) {
   const preset = presetFor();
+  const previewStyle = previewStyleFor(preset);
   return `
-    <div class="prototype-shell ${escapeHtml(preset.shellClass)}">
+    <div class="prototype-shell ${escapeHtml(preset.shellClass)}" style="${previewStyle}">
       <div class="shell-bar">
         <span>${escapeHtml(preset.label)}</span>
         <span>${escapeHtml(page.entry || '未设置入口')}</span>
       </div>
-      <div class="shell-viewport" data-preview-node="${escapeHtml(node.id)}">
-        <div class="preview-loading">等待预览</div>
+      <div class="shell-viewport">
+        <div class="prototype-frame-stage" data-preview-node="${escapeHtml(node.id)}">
+          <div class="preview-loading">等待预览</div>
+        </div>
       </div>
     </div>
   `;
@@ -1060,7 +1096,7 @@ async function loadBundledExample() {
   try {
     const baseUrl = new URL('examples/pictale/', window.location.href);
     const manifestUrl = new URL(MANIFEST_FILE, baseUrl);
-    const response = await fetch(manifestUrl);
+    const response = await fetch(manifestUrl, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error('示例项目不存在');
     }
