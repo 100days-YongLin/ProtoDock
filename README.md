@@ -105,6 +105,8 @@ http://localhost:4175/index.html
 
 打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json` 与 `docs/*.md`。
 
+选中页面后，右侧标题区的“复制页面 PNG”按钮会把当前页面首屏和设备壳合成为 PNG 写入剪贴板。浏览器不支持图片剪贴板写入时，会自动下载 PNG。
+
 ## 使用文档
 
 顶部“使用文档”入口指向 `/docs`。文档源码使用 Mintlify 官方模板结构维护在 `docs-site/`，不是手写静态页面。

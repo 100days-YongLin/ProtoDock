@@ -169,9 +169,14 @@
                 <strong id="inspectorName">绑定摄像头</strong>
                 <span id="inspectorType">小程序 / 首次使用</span>
               </div>
-              <button class="panel-icon-button" id="pageSettingsButton" type="button" title="设置页面信息" aria-label="设置页面信息" aria-expanded="false" aria-controls="pageSettingsPanel" data-requires-project>
-                <i data-lucide="settings-2"></i>
-              </button>
+              <div class="inspector-title-actions">
+                <button class="panel-icon-button" id="copyPagePngButton" type="button" title="复制页面 PNG" aria-label="复制页面 PNG" data-requires-project>
+                  <i data-lucide="copy"></i>
+                </button>
+                <button class="panel-icon-button" id="pageSettingsButton" type="button" title="设置页面信息" aria-label="设置页面信息" aria-expanded="false" aria-controls="pageSettingsPanel" data-requires-project>
+                  <i data-lucide="settings-2"></i>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -408,6 +413,7 @@
   <script src="./vendor/lucide.min.js"></script>
   <script src="./placement.js"></script>
   <script src="./zip.js"></script>
+  <script src="./capture.js"></script>
   <script src="./app.js"></script>
   <script src="./share.js"></script>
 </body>

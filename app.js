@@ -49,6 +49,7 @@ const els = {
   sourcePath: document.getElementById('sourcePath'),
   entryPath: document.getElementById('entryPath'),
   docPath: document.getElementById('docPath'),
+  copyPagePngButton: document.getElementById('copyPagePngButton'),
   nodeInspectorPanel: document.getElementById('nodeInspectorPanel'),
   markdownMount: document.getElementById('pageMarkdown'),
   markdownFallback: document.getElementById('pageMarkdownFallback'),
@@ -804,6 +805,129 @@ async function createShareArchive(options = {}) {
   return window.ProtoDockZip.createZipFile(entries, safeShareArchiveFileName());
 }
 
+function safePngFileName(page) {
+  const rawName = page?.title || activeNode()?.pageId || 'protodock-page';
+  const safeName = String(rawName)
+    .replace(/[^\p{L}\p{N} ._-]+/gu, '-')
+    .replace(/^[ ._-]+|[ ._-]+$/g, '')
+    .slice(0, 80);
+  return `${safeName || 'protodock-page'}.png`;
+}
+
+function captureFrameSizeForPreset(preset) {
+  const safeArea = configuredSafeAreaInsets();
+  const top = safeAreaEnabled() ? safeArea.top : 0;
+  const bottom = safeAreaEnabled() ? safeArea.bottom : 0;
+  return {
+    width: preset.width,
+    height: Math.max(1, preset.height - top - bottom)
+  };
+}
+
+function waitForIframeReady(iframe) {
+  return new Promise((resolve, reject) => {
+    const done = () => {
+      const doc = iframe.contentDocument;
+      if (!doc?.documentElement) {
+        reject(new Error('无法读取页面预览'));
+        return;
+      }
+      const finish = () => resolve(iframe);
+      if (doc.readyState === 'complete') {
+        finish();
+      } else {
+        window.setTimeout(finish, 150);
+      }
+    };
+
+    iframe.addEventListener('load', done, { once: true });
+    iframe.addEventListener('error', () => reject(new Error('页面预览加载失败')), { once: true });
+    window.setTimeout(() => {
+      if (iframe.contentDocument?.documentElement) {
+        resolve(iframe);
+      } else {
+        reject(new Error('页面预览加载超时'));
+      }
+    }, 8000);
+  });
+}
+
+async function createCaptureIframe(node) {
+  const preset = presetFor();
+  const size = captureFrameSizeForPreset(preset);
+  const captureNode = {
+    ...node,
+    id: `capture-${node.id}-${Date.now()}`
+  };
+  const iframe = await buildPreviewIframe(captureNode, 'capture-frame');
+  iframe.loading = 'eager';
+  iframe.style.cssText = [
+    'position:fixed',
+    'left:-100000px',
+    'top:0',
+    'border:0',
+    `width:${size.width}px`,
+    `height:${size.height}px`,
+    'pointer-events:none'
+  ].join(';');
+  document.body.append(iframe);
+  try {
+    await waitForIframeReady(iframe);
+    return { iframe, captureNodeId: captureNode.id };
+  } catch (error) {
+    iframe.remove();
+    revokePreviewUrls(captureNode.id);
+    throw error;
+  }
+}
+
+async function copySelectedPagePng() {
+  const node = activeNode();
+  const page = activePage();
+  if (!node || !page) {
+    setStatus('请先选择一个页面节点');
+    return;
+  }
+  if (!window.ProtoDockCapture?.capturePagePng) {
+    setStatus('缺少 PNG 生成模块');
+    return;
+  }
+
+  const previousDisabled = els.copyPagePngButton?.disabled;
+  if (els.copyPagePngButton) {
+    els.copyPagePngButton.disabled = true;
+  }
+  setStatus('正在生成页面 PNG...');
+
+  let capture = null;
+  try {
+    capture = await createCaptureIframe(node);
+    const preset = presetFor();
+    const safeArea = configuredSafeAreaInsets();
+    const blob = await window.ProtoDockCapture.capturePagePng({
+      iframe: capture.iframe,
+      preset,
+      safeAreaEnabled: safeAreaEnabled(),
+      safeAreaTop: safeArea.top,
+      safeAreaBottom: safeArea.bottom
+    });
+    const result = await window.ProtoDockCapture.copyPngBlob(blob, safePngFileName(page));
+    setStatus(result.copied ? '已复制页面 PNG' : '当前浏览器不能直接复制图片，已下载 PNG');
+  } catch (error) {
+    console.error(error);
+    setStatus(`复制 PNG 失败：${error.message || '无法生成图片'}`);
+  } finally {
+    if (capture) {
+      capture.iframe.remove();
+      revokePreviewUrls(capture.captureNodeId);
+    }
+    if (els.copyPagePngButton) {
+      els.copyPagePngButton.disabled = previousDisabled;
+    }
+    renderPageSettingsControls();
+  }
+}
+
 async function createBlobUrlFromFile(path, baseDir = '') {
   const resolvedPath = resolvePath(baseDir, path);
   const fileHandle = await getFileHandleByPath(state.projectHandle, resolvedPath);
@@ -1333,6 +1457,10 @@ function renderPageSettingsControls() {
     els.pageSettingsButton.disabled = !canEdit;
     els.pageSettingsButton.classList.toggle('active', state.pageSettingsOpen);
     els.pageSettingsButton.setAttribute('aria-expanded', String(state.pageSettingsOpen));
+  }
+  if (els.copyPagePngButton) {
+    els.copyPagePngButton.hidden = !hasActivePage;
+    els.copyPagePngButton.disabled = !hasActivePage;
   }
   [
     els.pageTitleInput,
@@ -3214,6 +3342,7 @@ function bindGlobalEvents() {
   els.pageSettingsButton?.addEventListener('click', () => {
     setPageSettingsOpen(!state.pageSettingsOpen);
   });
+  els.copyPagePngButton?.addEventListener('click', copySelectedPagePng);
   els.savePageSettings?.addEventListener('click', savePageSettings);
   els.sortPagesButton?.addEventListener('click', () => {
     setPageSortMode(!state.pageSortMode);
@@ -3408,6 +3537,7 @@ window.ProtoDock = {
   reloadProject,
   checkExternalManifestChange,
   createShareArchive,
+  copySelectedPagePng,
   loadSharedProject,
   zoomByWheel(deltaY = -360, clientX, clientY) {
     const rect = els.canvasShell.getBoundingClientRect();

@@ -1823,6 +1823,12 @@ select {
   align-items: center;
 }
 
+.inspector-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .inspector-title strong {
   display: block;
   overflow: hidden;
