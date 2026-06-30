@@ -1,0 +1,61 @@
+---
+title: Skill 与文件契约
+description: 理解 Skill 如何约束 Agent，让不同工具交付同一种项目结构。
+---
+
+Skill 可以理解为给 AI Agent 的项目说明书。它不是给产品经理手动点击的功能，而是一组让 Agent 遵守的工作规则。
+
+## Skill 解决什么问题
+
+在 ProtoDock 场景里，Skill 会告诉 Agent：
+
+- 这个项目是原型工作台，不是普通页面项目
+- 哪些文件可以生成或修改
+- 哪些画布状态必须保护
+- 修改 `protodock.project.json` 前需要备份
+- 最终页面必须能被浏览器作为静态入口加载
+
+这样 Codex、Claude Code 或其他 Agent 即使使用不同的实现方式，也能把结果交付成 ProtoDock 可以读取的项目结构。
+
+## 文件契约
+
+每个 ProtoDock 项目至少需要这些文件：
+
+```text
+prototype-project/
+├── protodock.project.json
+├── pages/<page-id>/index.html
+└── docs/<page-id>.md
+```
+
+`protodock.project.json` 是项目清单。它告诉 ProtoDock 项目有哪些页面、每个页面的入口在哪里，以及画布节点和连线应该如何恢复。
+
+## Agent 应该更新什么
+
+Agent 通常可以更新：
+
+- `pages/**`
+- `docs/**`
+- `assets/**`
+- `protodock.project.json` 中的 `project` 和 `pages`
+
+Agent 默认不应该整体重写：
+
+- `canvas.nodes`
+- `canvas.edges`
+- `canvas.notes`
+- 节点坐标
+- 锚点方向
+- 未知字段
+
+更完整的字段级规则见 [Agent 写入边界](/agent-boundaries)。
+
+## 为什么要保护 canvas
+
+页面源码是可生成资产，画布排布是产品经理的工作成果。产品经理在 ProtoDock 里拖动节点、连接流程、补充说明后，这些信息会沉淀在 `canvas` 中。
+
+如果 Agent 每次生成页面时都重写 `canvas`，产品经理整理过的流程关系就会丢失。因此普通页面迭代默认只更新页面、文档、素材和必要的页面注册信息。
+
+<Warning>
+  只有用户明确说“重排画布”“重建 flow”或“覆盖 canvas”时，Agent 才能重写画布数据。
+</Warning>

@@ -1,0 +1,59 @@
+---
+title: 接入 AI 工具
+description: 让 Codex、Claude Code 或其他 Agent 读取项目目录并产出页面。
+---
+
+接入 Codex、Claude Code 或其他 AI 工具的本质不是复杂 API 对接，而是让 Agent 读取项目目录并遵守文件契约。
+
+<Note>
+  Agent 负责生成页面和文档，ProtoDock 负责展示、编排和保存这些结果。
+</Note>
+
+## 准备上下文
+
+把需求交给 Agent 前，建议让它先阅读：
+
+- `README.md`
+- `DESIGN_AGENT_CONTRACT.md`
+- `protodock.project.schema.json`
+- 当前项目的 `protodock.project.json`
+- 需要修改的 `pages/`、`docs/` 和 `assets/`
+
+如果只是修改某个页面，可以只给它对应的页面目录、页面文档和当前 manifest。
+
+## 新增页面
+
+当你希望 Agent 新增页面时，让它同时完成三件事：
+
+1. 在 `pages/<page-id>/index.html` 生成静态页面
+2. 在 `docs/<page-id>.md` 补充页面目标、状态和验收说明
+3. 在 `protodock.project.json` 的 `pages` 中注册页面
+
+如果需要让新页面出现在画布上，Agent 只能增量追加缺失节点，不能整体重写 `canvas`。
+
+## 修改页面
+
+当你希望 Agent 修改已有页面时，给它这些文件：
+
+- `pages/<page-id>/`
+- `docs/<page-id>.md`
+- 当前 `protodock.project.json`
+
+同时明确告诉它：只修改页面、文档和必要的页面元信息，不要重排画布，不要覆盖已有连线。
+
+## 交付要求
+
+Agent 可以使用 React、Vue、Svelte、Vite 或纯 HTML 生成页面，但交给 ProtoDock 的结果必须是浏览器可直接加载的静态入口，通常是：
+
+```text
+pages/<page-id>/index.html
+```
+
+框架项目需要先构建成静态产物，再交给 ProtoDock 读取。页面资源建议放在项目目录内部，并通过相对路径引用。
+
+## 协作建议
+
+- 让 Agent 一次只处理一个明确页面或一组相关页面。
+- 让 Agent 先说明会修改哪些文件，再开始写入。
+- 页面迭代完成后，回到 ProtoDock 查看 iframe 预览和画布关系。
+- 如果 ProtoDock 提示 manifest 被外部修改，先阅读 [冲突处理](/conflict-handling) 再决定读取或覆盖。

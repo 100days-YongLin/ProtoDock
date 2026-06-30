@@ -1,6 +1,6 @@
 ---
-title: AI Agent 协作
-description: 让 Codex、Claude Code 或其他 Agent 为 ProtoDock 产出可预览的静态页面。
+title: 协作概览
+description: 先理解产品经理、AI Agent 和 ProtoDock 的分工。
 ---
 
 ProtoDock 是产品经理和 AI Agent 之间的原型协作工作台。AI Agent 负责生成页面、页面说明和素材，ProtoDock 负责把这些结果组织成可预览、可连线、可评审、可分享的产品原型。
@@ -19,7 +19,7 @@ ProtoDock 是产品经理和 AI Agent 之间的原型协作工作台。AI Agent 
 
 画布是产品经理的工作区，不是 Agent 的临时生成结果。`canvas.nodes`、`canvas.edges` 和 `canvas.notes` 记录的是用户在 ProtoDock 里整理出来的流程关系，Agent 默认必须保护它们。
 
-## 标准工作流
+## 协作流程
 
 ```text
 新建 ProtoDock 项目
@@ -39,81 +39,6 @@ ProtoDock 读取静态页面入口
 分享给团队评审
 ```
 
-## Skill 是什么
-
-Skill 可以理解为给 AI Agent 的项目说明书。它不是给产品经理手动点击的功能，而是一组让 Agent 遵守的工作规则。
-
-在 ProtoDock 场景里，Skill 会告诉 Agent：
-
-- 这个项目是原型工作台，不是普通页面项目
-- 哪些文件可以生成或修改
-- 哪些画布状态必须保护
-- 修改 `protodock.project.json` 前需要备份
-- 最终页面必须能被浏览器作为静态入口加载
-
-这样 Codex、Claude Code 或其他 Agent 即使使用不同的实现方式，也能把结果交付成 ProtoDock 可以读取的项目结构。
-
-## 接入 AI 工具
-
-接入 Codex、Claude Code 或其他 AI 工具的本质不是复杂 API 对接，而是让 Agent 读取项目目录并遵守文件契约。
-
-开始前，建议把这些上下文交给 Agent：
-
-- `README.md`
-- `DESIGN_AGENT_CONTRACT.md`
-- `protodock.project.schema.json`
-- 当前项目的 `protodock.project.json`
-- 需要修改的 `pages/`、`docs/` 和 `assets/`
-
-Agent 可以使用 React、Vue、Svelte、Vite 或纯 HTML 生成页面，但交给 ProtoDock 的结果必须是浏览器可直接加载的静态入口，通常是 `pages/<page-id>/index.html`。
-
-## 常见任务
-
-### 新增页面
-
-当你希望 Agent 新增一个页面时，让它同时完成三件事：
-
-1. 在 `pages/<page-id>/index.html` 生成静态页面
-2. 在 `docs/<page-id>.md` 补充页面目标、状态和验收说明
-3. 在 `protodock.project.json` 的 `pages` 中注册页面
-
-如果需要在画布上出现这个页面，Agent 只能增量追加缺失节点，不能整体重写 `canvas`。
-
-### 修改页面
-
-当你希望 Agent 修改已有页面时，给它对应页面目录和文档：
-
-- `pages/<page-id>/`
-- `docs/<page-id>.md`
-- 当前 `protodock.project.json`
-
-同时明确告诉它：只修改页面、文档和必要的页面元信息，不要重排画布，不要覆盖已有连线。
-
-## 提示词模板
-
-可以把下面这段直接交给 Codex、Claude Code 或其他 Agent：
-
-```text
-你现在是 ProtoDock 项目的设计 Agent。
-
-请先阅读：
-- README.md
-- DESIGN_AGENT_CONTRACT.md
-- protodock.project.schema.json
-- protodock.project.json
-
-请为项目新增一个「用户详情」页面。
-
-要求：
-- 页面放到 pages/user-detail/index.html
-- 页面文档放到 docs/user-detail.md
-- 在 protodock.project.json 的 pages 中注册页面
-- 如需新增 canvas node，只能增量追加
-- 禁止重写 canvas.nodes、canvas.edges、canvas.notes
-- 修改 protodock.project.json 前必须创建备份
-- 最终页面必须是静态浏览器入口
-```
-
 ## 产品经理日常使用
 
 产品经理可以把 ProtoDock 当成一个原型指挥台：
@@ -125,9 +50,13 @@ Agent 可以使用 React、Vue、Svelte、Vite 或纯 HTML 生成页面，但交
 - 继续把反馈交给 Agent 迭代页面
 - 需要评审时，生成只读分享链接给团队
 
-<Warning>
-  如果你要求 Agent “重建 flow”“重排画布”或“覆盖 canvas”，它才可以重写画布数据。普通页面迭代默认只更新页面、文档、素材和必要的页面注册信息。
-</Warning>
+## 接下来阅读
+
+- [接入 AI 工具](/ai-agent-tools)：把 Codex、Claude Code 或其他 Agent 接入项目目录。
+- [Skill 与文件契约](/ai-agent-skills)：理解 Skill、项目契约和静态页面交付要求。
+- [提示词模板](/ai-agent-prompts)：复制常用提示词，让 Agent 新增或修改页面。
+- [Agent 写入边界](/agent-boundaries)：明确哪些文件能改，哪些画布状态必须保护。
+- [冲突处理](/conflict-handling)：理解 ProtoDock 如何处理 Agent 外部修改 manifest 的情况。
 
 ## 常见误区
 

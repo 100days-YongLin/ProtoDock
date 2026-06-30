@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
   "name": "ProtoDock 原型舱",
-  "description": "ProtoDock 使用文档：本地项目、AI Agent 协作、画布编排、只读分享和 Agent 写入边界。",
+  "description": "ProtoDock 使用文档：本地项目、AI Agent 协作、画布编排、冲突处理和只读分享。",
   "colors": {
     "primary": "#0066CC",
     "light": "#2997FF",
@@ -38,26 +38,37 @@
         "pages": [
           "docs",
           "quickstart",
-          "ai-agent-workflow",
           "project-structure"
         ]
       },
       {
-        "group": "协作与分享",
+        "group": "AI Agent 协作",
+        "icon": "bot",
+        "expanded": true,
+        "pages": [
+          "ai-agent-workflow",
+          "ai-agent-tools",
+          "ai-agent-skills",
+          "ai-agent-prompts",
+          "agent-boundaries"
+        ]
+      },
+      {
+        "group": "工作台操作",
         "icon": "workflow",
         "expanded": true,
         "pages": [
           "canvas-workflow",
-          "sharing",
-          "deployment"
+          "conflict-handling"
         ]
       },
       {
-        "group": "Agent 契约",
-        "icon": "shield-check",
+        "group": "分享与部署",
+        "icon": "share-2",
         "expanded": true,
         "pages": [
-          "agent-boundaries"
+          "sharing",
+          "deployment"
         ]
       }
     ]
