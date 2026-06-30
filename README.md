@@ -145,7 +145,14 @@ http://<server-ip>:6080/index.html
 
 ## 冲突处理
 
-保存前如果磁盘上的 `protodock.project.json` 已经被其他工具或 Agent 修改，ProtoDock 会弹窗提示：
+打开本地项目后，ProtoDock 会轻量监测 `protodock.project.json` 是否被其他工具或 Agent 修改。检测只读取项目清单文件，不递归扫描 `pages/**`、`docs/**` 或 `assets/**`。当窗口重新获得焦点时会检查一次；如果当前画布有未保存改动，会额外低频检查。
+
+如果编辑过程中检测到本地清单有更新，ProtoDock 会弹窗提示：
+
+- `读取本地变更`：放弃当前内存状态，重新读取磁盘文件。
+- `继续编辑` / `稍后处理`：保留当前界面状态，不重复提示同一次外部变更；后续保存时仍会再次确认冲突。
+
+保存前如果磁盘上的 `protodock.project.json` 已经被其他工具或 Agent 修改，ProtoDock 也会弹窗提示：
 
 - `读取本地变更`：放弃当前内存状态，重新读取磁盘文件。
 - `覆盖本地文件`：用当前 ProtoDock 状态写回磁盘。

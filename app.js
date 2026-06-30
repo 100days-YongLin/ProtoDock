@@ -7,6 +7,7 @@ const MIN_INSPECTOR_WIDTH = 320;
 const MAX_INSPECTOR_WIDTH = 760;
 const ALIGN_SNAP_THRESHOLD = 10;
 const MAX_SAFE_AREA_INSET = 240;
+const MANIFEST_WATCH_DIRTY_INTERVAL_MS = 6000;
 
 const els = {
   workspace: document.querySelector('.workspace'),
@@ -64,6 +65,8 @@ const els = {
   projectDirectoryPreview: document.getElementById('projectDirectoryPreview'),
   projectPresetGrid: document.getElementById('projectPresetGrid'),
   conflictModal: document.getElementById('conflictModal'),
+  conflictModalTitle: document.getElementById('conflictModalTitle'),
+  conflictModalDescription: document.getElementById('conflictModalDescription'),
   unsavedHomeModal: document.getElementById('unsavedHomeModal'),
   publicPreviewModal: document.getElementById('publicPreviewModal'),
   publicPreviewList: document.getElementById('publicPreviewList')
@@ -204,7 +207,11 @@ const state = {
   playbackJobId: null,
   edgeFrameId: null,
   isSettingEditorValue: false,
-  markdownEditor: null
+  markdownEditor: null,
+  manifestWatchTimer: null,
+  manifestCheckInFlight: false,
+  manifestExternalDialogOpen: false,
+  ignoredExternalManifestHash: null
 };
 
 function escapeHtml(value) {
@@ -287,6 +294,97 @@ function markDirty(message = '未保存') {
   state.dirty = true;
   setStatus(message);
   renderProjectActions();
+}
+
+function canWatchLocalManifest() {
+  return !!state.manifest && !!state.manifestHandle && !state.readOnly && !!state.manifestHash;
+}
+
+function stopManifestWatcher() {
+  if (state.manifestWatchTimer) {
+    window.clearInterval(state.manifestWatchTimer);
+  }
+  state.manifestWatchTimer = null;
+  state.manifestCheckInFlight = false;
+  state.manifestExternalDialogOpen = false;
+  state.ignoredExternalManifestHash = null;
+}
+
+function startManifestWatcher() {
+  if (state.manifestWatchTimer) {
+    window.clearInterval(state.manifestWatchTimer);
+  }
+  state.manifestWatchTimer = null;
+  if (!canWatchLocalManifest()) {
+    return;
+  }
+  state.manifestWatchTimer = window.setInterval(() => {
+    if (state.dirty && !document.hidden) {
+      checkExternalManifestChange('timer');
+    }
+  }, MANIFEST_WATCH_DIRTY_INTERVAL_MS);
+}
+
+async function manifestFileSnapshot() {
+  const file = await state.manifestHandle.getFile();
+  const text = await file.text();
+  return {
+    hash: await hashText(text),
+    text
+  };
+}
+
+async function checkExternalManifestChange(reason = 'manual') {
+  if (!canWatchLocalManifest() || state.manifestCheckInFlight || state.manifestExternalDialogOpen) {
+    return false;
+  }
+  if (els.conflictModal && !els.conflictModal.hidden) {
+    return false;
+  }
+  if (reason === 'timer' && (!state.dirty || document.hidden)) {
+    return false;
+  }
+
+  state.manifestCheckInFlight = true;
+  try {
+    const snapshot = await manifestFileSnapshot();
+    if (snapshot.hash === state.manifestHash) {
+      state.ignoredExternalManifestHash = null;
+      return false;
+    }
+    if (snapshot.hash === state.ignoredExternalManifestHash) {
+      return false;
+    }
+
+    state.manifestExternalDialogOpen = true;
+    const choice = await showConflictDialog({
+      title: '本地项目有更新',
+      description: state.dirty
+        ? '检测到 protodock.project.json 已被其他工具或 Agent 修改。当前画布也有未保存改动，请选择读取最新文件，或继续保留当前编辑。'
+        : '检测到 protodock.project.json 已被其他工具或 Agent 修改。当前没有未保存改动，可以读取本地最新文件。',
+      reloadLabel: '读取本地变更',
+      overwriteLabel: null,
+      cancelLabel: state.dirty ? '继续编辑' : '稍后处理'
+    });
+
+    if (choice === 'reload') {
+      await reloadProject();
+      return true;
+    }
+
+    state.ignoredExternalManifestHash = snapshot.hash;
+    setStatus(state.dirty ? '已保留当前编辑，保存时会再次确认冲突' : '已暂不读取本地更新');
+    return false;
+  } catch (error) {
+    console.warn('ProtoDock: failed to check external manifest changes', error);
+    if (reason !== 'timer') {
+      setStatus(`检测本地更新失败：${error.message || '无法读取项目清单'}`);
+    }
+    return false;
+  } finally {
+    state.manifestCheckInFlight = false;
+    state.manifestExternalDialogOpen = false;
+  }
 }
 
 function presetFor() {
@@ -2265,6 +2363,7 @@ async function loadSharedProject(shareId) {
 }
 
 async function loadManifestText(text, options = {}) {
+  stopManifestWatcher();
   stopPlayback();
   state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
   state.previewUrls.clear();
@@ -2288,6 +2387,7 @@ async function loadManifestText(text, options = {}) {
   state.shareId = options.shareId || null;
   state.readOnly = !!options.readOnly;
   state.manifestHash = await hashText(text);
+  state.ignoredExternalManifestHash = null;
   state.dirty = false;
   state.selectedNodeId = state.manifest.canvas.nodes[0]?.id || null;
   state.selectedEdgeId = null;
@@ -2296,6 +2396,7 @@ async function loadManifestText(text, options = {}) {
   state.panY = 0;
   state.zoom = window.innerWidth < 760 ? 0.78 : 1;
   renderCanvas();
+  startManifestWatcher();
 }
 
 async function openProjectDirectory() {
@@ -2608,7 +2709,13 @@ async function saveProject() {
     const currentText = await (await state.manifestHandle.getFile()).text();
     const currentHash = await hashText(currentText);
     if (state.manifestHash && currentHash !== state.manifestHash) {
-      const choice = await showConflictDialog();
+      const choice = await showConflictDialog({
+        title: '保存前发现本地项目有更新',
+        description: 'ProtoDock 准备保存时发现磁盘上的项目清单已经变化。请选择读取本地最新文件，或用当前画布状态覆盖本地文件。',
+        reloadLabel: '读取本地变更',
+        overwriteLabel: '覆盖本地文件',
+        cancelLabel: '取消'
+      });
       if (choice === 'reload') {
         await reloadProject();
         return;
@@ -2630,6 +2737,7 @@ async function saveProject() {
     await writable.write(text);
     await writable.close();
     state.manifestHash = await hashText(text);
+    state.ignoredExternalManifestHash = null;
     state.dirty = false;
     state.docDirty.clear();
     setStatus('已保存到本地文件');
@@ -2659,12 +2767,31 @@ async function reloadProject() {
   showStartScreen();
 }
 
-function showConflictDialog() {
+function showConflictDialog(options = {}) {
   return new Promise((resolve) => {
+    const title = options.title || '本地文档有更新';
+    const description = options.description || 'ProtoDock 准备保存时发现磁盘上的项目清单已经变化。请选择如何处理当前画布状态。';
+    const reloadLabel = options.reloadLabel || '读取本地变更';
+    const overwriteLabel = options.overwriteLabel === undefined ? '覆盖本地文件' : options.overwriteLabel;
+    const cancelLabel = options.cancelLabel || '取消';
+
     const close = (choice) => {
       els.conflictModal.hidden = true;
       resolve(choice);
     };
+
+    if (els.conflictModalTitle) {
+      els.conflictModalTitle.textContent = title;
+    }
+    if (els.conflictModalDescription) {
+      els.conflictModalDescription.textContent = description;
+    }
+    buttons.conflictReload.textContent = reloadLabel;
+    buttons.conflictOverwrite.hidden = !overwriteLabel;
+    if (overwriteLabel) {
+      buttons.conflictOverwrite.textContent = overwriteLabel;
+    }
+    buttons.conflictCancel.textContent = cancelLabel;
     buttons.conflictReload.onclick = () => close('reload');
     buttons.conflictOverwrite.onclick = () => close('overwrite');
     buttons.conflictCancel.onclick = () => close('cancel');
@@ -2894,6 +3021,7 @@ async function goHome() {
       return;
     }
   }
+  stopManifestWatcher();
   stopPlayback();
   state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
   state.previewUrls.clear();
@@ -2909,6 +3037,7 @@ async function goHome() {
   state.shareId = null;
   state.readOnly = true;
   state.manifestHash = null;
+  state.ignoredExternalManifestHash = null;
   state.dirty = false;
   state.selectedNodeId = null;
   state.selectedEdgeId = null;
@@ -3003,6 +3132,14 @@ function bindGlobalEvents() {
     }
     event.preventDefault();
     event.returnValue = '';
+  });
+  window.addEventListener('focus', () => {
+    checkExternalManifestChange('focus');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      checkExternalManifestChange('visible');
+    }
   });
 
   els.projectPresetGrid?.addEventListener('click', (event) => {
@@ -3128,6 +3265,8 @@ window.ProtoDock = {
       safeAreaBottom: safeArea.bottom,
       readOnly: state.readOnly,
       dirty: state.dirty,
+      manifestWatcherActive: !!state.manifestWatchTimer,
+      ignoredExternalManifestChange: !!state.ignoredExternalManifestHash,
       zoom: state.zoom,
       panX: state.panX,
       panY: state.panY,
@@ -3141,6 +3280,7 @@ window.ProtoDock = {
   openProjectDirectory,
   saveProject,
   reloadProject,
+  checkExternalManifestChange,
   loadSharedProject,
   zoomByWheel(deltaY = -360, clientX, clientY) {
     const rect = els.canvasShell.getBoundingClientRect();
