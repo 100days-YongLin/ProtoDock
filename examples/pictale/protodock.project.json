@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "project-pictale",
+    "name": "PicTale 微信小程序",
+    "description": "家长端故事相册原型",
+    "devicePreset": "iphone-portrait"
+  },
+  "pages": {
+    "home": {
+      "title": "首页",
+      "kind": "微信小程序 / 首页",
+      "tag": "入口",
+      "sourceDir": "pages/home",
+      "entry": "pages/home/index.html",
+      "doc": "docs/home.md"
+    },
+    "clips": {
+      "title": "精彩片段",
+      "kind": "微信小程序 / 列表",
+      "tag": "片段",
+      "sourceDir": "pages/clips",
+      "entry": "pages/clips/index.html",
+      "doc": "docs/clips.md"
+    },
+    "report": {
+      "title": "日报详情",
+      "kind": "微信小程序 / 报告",
+      "tag": "日报",
+      "sourceDir": "pages/report",
+      "entry": "pages/report/index.html",
+      "doc": "docs/report.md"
+    }
+  },
+  "canvas": {
+    "nodes": [
+      { "id": "node-home", "pageId": "home", "x": 110, "y": 120 },
+      { "id": "node-clips", "pageId": "clips", "x": 420, "y": 100 },
+      { "id": "node-report", "pageId": "report", "x": 740, "y": 280 }
+    ],
+    "edges": [
+      { "id": "edge-home-clips", "from": "node-home", "to": "node-clips", "label": "查看片段" },
+      { "id": "edge-clips-report", "from": "node-clips", "to": "node-report", "label": "生成日报" },
+      { "id": "edge-home-report", "from": "node-home", "to": "node-report", "label": "今日总结" }
+    ],
+    "notes": [
+      { "id": "note-agent", "text": "页面源码在 pages/*；ProtoDock 只负责预览、连线和文档。", "x": 100, "y": 430 }
+    ]
+  }
+}

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProtoDock 原型舱</title>
+  <link rel="icon" type="image/png" href="./assets/protodock-icon.png">
+  <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
+  <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <img class="app-icon" src="./assets/protodock-icon.png" alt="">
+        <div class="brand-title">
+          <strong>ProtoDock 原型舱</strong>
+        </div>
+      </div>
+      <nav class="toolbar" aria-label="画布工具">
+        <div class="tool-group" aria-label="项目">
+          <button class="tool-button" id="newProject" title="新建项目" aria-label="新建项目"><i data-lucide="folder-plus"></i></button>
+          <button class="tool-button" id="openProject" title="打开项目" aria-label="打开项目"><i data-lucide="folder-open"></i></button>
+          <button class="tool-button" id="saveProject" title="保存项目" aria-label="保存项目" data-requires-project><i data-lucide="save"></i></button>
+          <button class="tool-button" id="reloadProject" title="读取本地变更" aria-label="读取本地变更" data-requires-project><i data-lucide="refresh-cw"></i></button>
+        </div>
+        <div class="tool-group primary-tools" aria-label="编辑">
+          <button class="tool-button active" id="modeSelect" title="选择" aria-label="选择" data-requires-project><i data-lucide="mouse-pointer-2"></i></button>
+          <button class="tool-button" id="addNode" title="新增页面" aria-label="新增页面" data-requires-project><i data-lucide="square-plus"></i></button>
+          <button class="tool-button" id="addEdge" title="连线" aria-label="连线" data-requires-project><i data-lucide="git-branch-plus"></i></button>
+          <button class="tool-button" id="addText" title="文本" aria-label="文本" data-requires-project><i data-lucide="type"></i></button>
+        </div>
+        <div class="tool-group" aria-label="演示">
+          <button class="tool-button" id="playFlow" title="播放原型" aria-label="播放原型" data-requires-project><i data-lucide="play"></i></button>
+        </div>
+        <div class="tool-group" aria-label="视图">
+          <button class="tool-button" id="resetView" title="重置视图" aria-label="重置视图" data-requires-project><i data-lucide="home"></i></button>
+        </div>
+      </nav>
+      <select class="product-select" id="productSelect" aria-label="选择产品">
+      </select>
+      <div class="status">
+        <span class="dot"></span>
+        <span>本地预览</span>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <aside class="sidebar">
+        <section class="panel-section">
+          <h2 class="panel-heading">画布规格</h2>
+          <div class="doc-list">
+            <div class="doc-item active">
+              <strong id="canvasPresetName">iPhone 竖版</strong>
+              <span id="canvasPresetDesc">390 × 844，移动端小程序外壳</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <h2 class="panel-heading">原型页面</h2>
+          <ul class="doc-list page-list" id="pageList">
+          </ul>
+        </section>
+      </aside>
+
+      <section class="canvas-shell" id="canvasShell">
+        <section class="start-screen" id="startScreen">
+          <img src="./assets/protodock-icon.png" alt="">
+          <strong>ProtoDock 原型舱</strong>
+          <span>选择一个工作目录开始，画布、PRD 和原型文件会围绕这个目录协作。</span>
+          <div class="start-actions">
+            <button class="primary" id="startNewProject" type="button">新建项目</button>
+            <button class="secondary" id="startOpenProject" type="button">打开已有项目</button>
+          </div>
+        </section>
+
+        <div class="canvas-meta">
+          <strong id="canvasProductName">未打开项目</strong>
+          <span id="canvasProductDesc">选择工作目录开始</span>
+        </div>
+
+        <div class="canvas-transform" id="canvasTransform">
+          <svg class="edge-layer" id="edgeLayer" aria-hidden="true">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#667085"></path>
+              </marker>
+            </defs>
+          </svg>
+
+          <div id="nodeMount"></div>
+          <div id="noteMount"></div>
+        </div>
+
+        <div class="zoom-readout">
+          <button class="tool-button" id="zoomOut" title="缩小" aria-label="缩小"><i data-lucide="minus"></i></button>
+          <span id="zoomValue">100%</span>
+          <button class="tool-button" id="zoomIn" title="放大" aria-label="放大"><i data-lucide="plus"></i></button>
+        </div>
+      </section>
+      <input id="openProjectDirectoryPicker" type="file" webkitdirectory directory multiple hidden>
+
+      <aside class="inspector">
+        <section class="panel-section inspector-summary">
+          <div class="inspector-title">
+            <strong id="inspectorName">绑定摄像头</strong>
+            <span id="inspectorType">小程序 / 首次使用</span>
+          </div>
+        </section>
+
+        <section class="panel-section source-panel" id="sourceMeta">
+          <h2 class="panel-heading">源码位置</h2>
+          <dl class="source-list">
+            <div>
+              <dt>目录</dt>
+              <dd id="sourcePath">-</dd>
+            </div>
+            <div>
+              <dt>入口</dt>
+              <dd id="entryPath">-</dd>
+            </div>
+            <div>
+              <dt>文档</dt>
+              <dd id="docPath">-</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="panel-section markdown-panel" id="nodeInspectorPanel">
+          <div class="field">
+            <label class="sr-only" id="pageMarkdownLabel">Markdown</label>
+            <div class="markdown-editor-shell" id="pageMarkdown"></div>
+            <textarea class="markdown-fallback" id="pageMarkdownFallback" aria-labelledby="pageMarkdownLabel" hidden></textarea>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <div class="project-modal-backdrop" id="projectModal" hidden>
+    <section class="project-modal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="projectModalTitle">新建项目</strong>
+          <span>选择项目原型规格后，页面节点里的原型预览会固定在对应设备外壳里。</span>
+        </div>
+        <button class="tool-button" id="closeProjectModal" title="关闭">×</button>
+      </header>
+
+      <div class="field">
+        <label for="projectName">项目名称</label>
+        <input id="projectName" value="新产品项目">
+      </div>
+
+      <div class="field">
+        <label for="projectDirectory">工作目录</label>
+        <div class="directory-input-row">
+          <input id="projectDirectory" value="产品需求文档/prototypes/">
+          <button class="secondary directory-picker-button" id="chooseProjectDirectory" type="button">选择目录</button>
+        </div>
+        <input id="projectDirectoryPicker" type="file" webkitdirectory directory multiple hidden>
+        <div class="directory-preview" id="projectDirectoryPreview" aria-live="polite">
+          <div>
+            <span>工作目录</span>
+            <strong>产品需求文档/prototypes/</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>画布外壳</label>
+        <div class="preset-grid" id="projectPresetGrid"></div>
+      </div>
+
+      <div class="action-row">
+        <button class="primary" id="createProject">创建项目</button>
+        <button class="secondary" id="cancelProject">取消</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="project-modal-backdrop" id="conflictModal" hidden>
+    <section class="project-modal conflict-modal" role="dialog" aria-modal="true" aria-labelledby="conflictModalTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="conflictModalTitle">本地文档有更新</strong>
+          <span>ProtoDock 准备保存时发现磁盘上的项目清单已经变化。请选择如何处理当前画布状态。</span>
+        </div>
+      </header>
+
+      <div class="action-row">
+        <button class="secondary" id="conflictReload" type="button">读取本地变更</button>
+        <button class="primary" id="conflictOverwrite" type="button">覆盖本地文件</button>
+        <button class="secondary" id="conflictCancel" type="button">取消</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

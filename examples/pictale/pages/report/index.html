@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>日报详情</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #fff;
+      color: #182230;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    main { min-height: 100vh; display: grid; gap: 14px; align-content: start; padding: 18px; background: linear-gradient(#edf7ff, #fff 38%); }
+    .summary {
+      display: grid;
+      gap: 14px;
+      border-radius: 26px;
+      background: #172033;
+      color: #fff;
+      padding: 20px;
+      box-shadow: 0 18px 44px rgba(23, 32, 51, 0.18);
+    }
+    .summary span { color: rgba(255,255,255,.72); font-size: 12px; }
+    h1 { margin: 0; font-size: 28px; line-height: 1.1; letter-spacing: 0; }
+    .score { display: flex; align-items: end; gap: 8px; }
+    .score strong { font-size: 44px; line-height: .9; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .card { display: grid; gap: 6px; border: 1px solid #e3e8ef; border-radius: 18px; background: #fff; padding: 14px; }
+    .card strong { font-size: 20px; }
+    .card span, .paragraph { color: #667085; font-size: 12px; line-height: 1.55; }
+    .paragraph { border-left: 3px solid #0b74de; padding-left: 12px; }
+    .clip-row { display: flex; gap: 8px; overflow: hidden; }
+    .clip { min-width: 92px; min-height: 96px; border-radius: 18px; background: linear-gradient(145deg, #dff6ef, #bcd7ff); }
+    button { height: 44px; border: 0; border-radius: 14px; background: #0b74de; color: #fff; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="summary">
+      <span>6 月 30 日日报</span>
+      <h1>今天整体状态稳定，互动表达明显增加</h1>
+      <div class="score"><strong>92</strong><span>综合成长指数</span></div>
+    </section>
+
+    <section class="grid">
+      <article class="card"><span>专注</span><strong>42m</strong><span>较昨日 +8m</span></article>
+      <article class="card"><span>互动</span><strong>7次</strong><span>主动表达增加</span></article>
+      <article class="card"><span>运动</span><strong>28m</strong><span>户外活动充分</span></article>
+      <article class="card"><span>提醒</span><strong>1条</strong><span>午休稍短</span></article>
+    </section>
+
+    <p class="paragraph">建议明天继续安排小组协作任务，并保留 15 分钟自由表达时间。</p>
+
+    <section>
+      <div class="clip-row">
+        <div class="clip"></div>
+        <div class="clip"></div>
+        <div class="clip"></div>
+      </div>
+    </section>
+
+    <button type="button">分享给家人</button>
+  </main>
+</body>
+</html>

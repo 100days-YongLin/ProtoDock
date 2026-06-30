@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://100days-yonglin.github.io/ProtoDock/protodock.project.schema.json",
+  "title": "ProtoDock Project Manifest",
+  "type": "object",
+  "required": ["schemaVersion", "project", "pages", "canvas"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "project": {
+      "type": "object",
+      "required": ["id", "name", "devicePreset"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "devicePreset": {
+          "type": "string",
+          "enum": [
+            "web-landscape",
+            "web-portrait",
+            "iphone-portrait",
+            "iphone-landscape",
+            "ipad-portrait",
+            "ipad-landscape"
+          ]
+        }
+      }
+    },
+    "pages": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["title", "entry"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string" },
+          "tag": { "type": "string" },
+          "sourceDir": { "type": "string" },
+          "entry": { "type": "string", "minLength": 1 },
+          "doc": { "type": "string" }
+        }
+      }
+    },
+    "canvas": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "pageId", "x", "y"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "pageId": { "type": "string", "minLength": 1 },
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "from", "to"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "from": { "type": "string", "minLength": 1 },
+              "to": { "type": "string", "minLength": 1 },
+              "label": { "type": "string" },
+              "fromSide": { "$ref": "#/$defs/side" },
+              "toSide": { "$ref": "#/$defs/side" }
+            }
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "text", "x", "y"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "text": { "type": "string" },
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "side": {
+      "type": "string",
+      "enum": ["top", "right", "bottom", "left"]
+    }
+  }
+}

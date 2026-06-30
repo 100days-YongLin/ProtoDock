@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PicTale 首页</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f4f7fb;
+      color: #182230;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    main { min-height: 100vh; padding: 18px; display: grid; gap: 14px; align-content: start; }
+    .hero {
+      display: grid;
+      gap: 14px;
+      border-radius: 24px;
+      background: linear-gradient(145deg, #dff6ef, #ffffff 68%);
+      padding: 20px;
+      box-shadow: 0 18px 48px rgba(24, 34, 48, 0.12);
+    }
+    .topline { display: flex; align-items: center; justify-content: space-between; color: #667085; font-size: 12px; }
+    h1 { margin: 0; max-width: 8em; font-size: 30px; line-height: 1.05; letter-spacing: 0; }
+    .status { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .metric { border: 1px solid #e0e6ef; border-radius: 16px; background: rgba(255,255,255,.8); padding: 10px; }
+    .metric strong { display: block; font-size: 18px; }
+    .metric span { color: #667085; font-size: 11px; }
+    .section { display: grid; gap: 10px; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; }
+    .clip {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      background: #fff;
+      padding: 10px;
+    }
+    .thumb { border-radius: 14px; background: linear-gradient(135deg, #192231, #4f8cff); min-height: 68px; }
+    .clip strong { display: block; font-size: 14px; }
+    .clip span, .report span { color: #667085; font-size: 12px; line-height: 1.45; }
+    .report {
+      display: grid;
+      gap: 8px;
+      border-radius: 20px;
+      background: #182230;
+      color: #fff;
+      padding: 16px;
+    }
+    .report span { color: rgba(255,255,255,.74); }
+    button { height: 42px; border: 0; border-radius: 14px; background: #0b74de; color: #fff; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="topline"><span>PicTale</span><span>今天 18:20</span></div>
+      <h1>今天的成长故事已经准备好</h1>
+      <div class="status">
+        <div class="metric"><strong>6</strong><span>精彩片段</span></div>
+        <div class="metric"><strong>42m</strong><span>专注时长</span></div>
+        <div class="metric"><strong>3</strong><span>互动提醒</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><span>最新片段</span><span>查看全部</span></div>
+      <article class="clip">
+        <div class="thumb"></div>
+        <div>
+          <strong>积木合作完成</strong>
+          <span>老师引导下完成搭建，出现主动分享行为。</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="report">
+      <strong>今日日报</strong>
+      <span>已根据片段、互动和行为记录生成摘要。</span>
+      <button type="button">查看日报</button>
+    </section>
+  </main>
+</body>
+</html>
