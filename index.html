@@ -30,7 +30,6 @@
         <div class="tool-group primary-tools" aria-label="编辑">
           <button class="tool-button active" id="modeSelect" title="选择" aria-label="选择" data-requires-project><i data-lucide="mouse-pointer-2"></i></button>
           <button class="tool-button" id="addNode" title="新增页面" aria-label="新增页面" data-requires-project><i data-lucide="square-plus"></i></button>
-          <button class="tool-button" id="addEdge" title="连线" aria-label="连线" data-requires-project><i data-lucide="git-branch-plus"></i></button>
           <button class="tool-button" id="addText" title="文本" aria-label="文本" data-requires-project><i data-lucide="type"></i></button>
         </div>
         <div class="tool-group" aria-label="演示">
@@ -88,7 +87,12 @@
         </section>
 
         <section class="panel-section">
-          <h2 class="panel-heading">原型页面</h2>
+          <div class="panel-heading-row">
+            <h2 class="panel-heading">原型页面</h2>
+            <button class="panel-icon-button" id="sortPagesButton" type="button" title="排序页面" aria-label="排序页面" aria-pressed="false" data-requires-project>
+              <i data-lucide="arrow-up-down"></i>
+            </button>
+          </div>
           <ul class="doc-list page-list" id="pageList">
           </ul>
         </section>
@@ -157,8 +161,38 @@
 
         <section class="panel-section inspector-summary">
           <div class="inspector-title">
-            <strong id="inspectorName">绑定摄像头</strong>
-            <span id="inspectorType">小程序 / 首次使用</span>
+            <div class="inspector-title-row">
+              <div>
+                <strong id="inspectorName">绑定摄像头</strong>
+                <span id="inspectorType">小程序 / 首次使用</span>
+              </div>
+              <button class="panel-icon-button" id="pageSettingsButton" type="button" title="设置页面信息" aria-label="设置页面信息" aria-expanded="false" aria-controls="pageSettingsPanel" data-requires-project>
+                <i data-lucide="settings-2"></i>
+              </button>
+            </div>
+            <div class="page-settings-panel" id="pageSettingsPanel" hidden>
+              <label>
+                <span>页面名称</span>
+                <input id="pageTitleInput">
+              </label>
+              <label>
+                <span>类型</span>
+                <input id="pageKindInput">
+              </label>
+              <label>
+                <span>源码目录</span>
+                <input id="pageSourceDirInput">
+              </label>
+              <label>
+                <span>入口</span>
+                <input id="pageEntryInput">
+              </label>
+              <label>
+                <span>文档</span>
+                <input id="pageDocInput">
+              </label>
+              <button class="safe-area-save" id="savePageSettings" type="button">保存</button>
+            </div>
           </div>
 
           <div class="source-panel" id="sourceMeta">
@@ -246,6 +280,22 @@
         <button class="secondary" id="conflictReload" type="button">读取本地变更</button>
         <button class="primary" id="conflictOverwrite" type="button">覆盖本地文件</button>
         <button class="secondary" id="conflictCancel" type="button">取消</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="project-modal-backdrop" id="unsavedHomeModal" hidden>
+    <section class="project-modal conflict-modal" role="dialog" aria-modal="true" aria-labelledby="unsavedHomeTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="unsavedHomeTitle">画布有未保存修改</strong>
+          <span>返回首页会丢失当前未保存的页面、连线和文档改动。</span>
+        </div>
+      </header>
+
+      <div class="action-row">
+        <button class="secondary" id="unsavedHomeCancel" type="button">取消</button>
+        <button class="primary" id="unsavedHomeConfirm" type="button">继续返回首页</button>
       </div>
     </section>
   </div>

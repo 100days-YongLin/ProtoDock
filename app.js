@@ -21,6 +21,7 @@ const els = {
   zoomValue: document.getElementById('zoomValue'),
   productSelect: document.getElementById('productSelect'),
   pageList: document.getElementById('pageList'),
+  sortPagesButton: document.getElementById('sortPagesButton'),
   canvasPresetName: document.getElementById('canvasPresetName'),
   canvasPresetDesc: document.getElementById('canvasPresetDesc'),
   safeAreaToggle: document.getElementById('safeAreaToggle'),
@@ -34,6 +35,14 @@ const els = {
   startScreen: document.getElementById('startScreen'),
   inspectorName: document.getElementById('inspectorName'),
   inspectorType: document.getElementById('inspectorType'),
+  pageSettingsButton: document.getElementById('pageSettingsButton'),
+  pageSettingsPanel: document.getElementById('pageSettingsPanel'),
+  pageTitleInput: document.getElementById('pageTitleInput'),
+  pageKindInput: document.getElementById('pageKindInput'),
+  pageSourceDirInput: document.getElementById('pageSourceDirInput'),
+  pageEntryInput: document.getElementById('pageEntryInput'),
+  pageDocInput: document.getElementById('pageDocInput'),
+  savePageSettings: document.getElementById('savePageSettings'),
   sourceMeta: document.getElementById('sourceMeta'),
   sourcePath: document.getElementById('sourcePath'),
   entryPath: document.getElementById('entryPath'),
@@ -54,7 +63,8 @@ const els = {
   projectDirectory: document.getElementById('projectDirectory'),
   projectDirectoryPreview: document.getElementById('projectDirectoryPreview'),
   projectPresetGrid: document.getElementById('projectPresetGrid'),
-  conflictModal: document.getElementById('conflictModal')
+  conflictModal: document.getElementById('conflictModal'),
+  unsavedHomeModal: document.getElementById('unsavedHomeModal')
 };
 
 const buttons = {
@@ -71,7 +81,6 @@ const buttons = {
   cancelProject: document.getElementById('cancelProject'),
   modeSelect: document.getElementById('modeSelect'),
   addNode: document.getElementById('addNode'),
-  addEdge: document.getElementById('addEdge'),
   addText: document.getElementById('addText'),
   playFlow: document.getElementById('playFlow'),
   resetView: document.getElementById('resetView'),
@@ -82,7 +91,9 @@ const buttons = {
   playbackNext: document.getElementById('playbackNext'),
   conflictReload: document.getElementById('conflictReload'),
   conflictOverwrite: document.getElementById('conflictOverwrite'),
-  conflictCancel: document.getElementById('conflictCancel')
+  conflictCancel: document.getElementById('conflictCancel'),
+  unsavedHomeCancel: document.getElementById('unsavedHomeCancel'),
+  unsavedHomeConfirm: document.getElementById('unsavedHomeConfirm')
 };
 
 const canvasPresets = {
@@ -167,6 +178,11 @@ const state = {
   edgeClickCandidate: null,
   activePreviewNodeId: null,
   safeAreaSettingsOpen: false,
+  pageSettingsOpen: false,
+  pageSettingsNodeId: null,
+  pageSortMode: false,
+  draggingPageNodeId: null,
+  activePageSortDrag: null,
   selectedPresetId: 'iphone-portrait',
   selectedProjectDirectoryHandle: null,
   toolMode: 'select',
@@ -177,7 +193,7 @@ const state = {
   activePan: null,
   activeInspectorResize: null,
   activeNoteDrag: null,
-  activeEdgeDraft: null,
+  activeEdgeDrag: null,
   playbackTimer: null,
   playbackIndex: 0,
   playbackActive: false,
@@ -958,17 +974,23 @@ function renderNote(note) {
 function renderPageList() {
   if (!state.manifest) {
     els.pageList.innerHTML = '';
+    els.pageList.classList.remove('is-sorting');
     return;
   }
+  els.pageList.classList.toggle('is-sorting', state.pageSortMode);
   els.pageList.innerHTML = state.manifest.canvas.nodes.map((node, index) => {
     const page = pageForNode(node);
     return `
-      <li class="doc-item ${node.id === state.selectedNodeId ? 'active' : ''}" data-page-node="${escapeHtml(node.id)}">
-        <strong>${index + 1}. ${escapeHtml(page.title || node.pageId)}</strong>
-        <span>${escapeHtml(page.entry || '未设置入口')}</span>
+      <li class="doc-item ${node.id === state.selectedNodeId ? 'active' : ''} ${node.id === state.draggingPageNodeId ? 'dragging' : ''}" data-page-node="${escapeHtml(node.id)}" draggable="false">
+        <button class="page-order-handle" type="button" title="拖拽排序" aria-label="拖拽排序" tabindex="-1"><i data-lucide="grip-vertical"></i></button>
+        <span class="page-list-copy">
+          <strong>${index + 1}. ${escapeHtml(page.title || node.pageId)}</strong>
+          <span>${escapeHtml(page.entry || '未设置入口')}</span>
+        </span>
       </li>
     `;
   }).join('');
+  window.lucide?.createIcons();
 }
 
 function renderProjectActions() {
@@ -979,6 +1001,7 @@ function renderProjectActions() {
   buttons.saveProject?.toggleAttribute('disabled', !hasProject || state.readOnly);
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
   els.safeAreaToggle?.toggleAttribute('disabled', !hasProject);
+  els.sortPagesButton?.toggleAttribute('disabled', !hasProject);
   els.productSelect?.setAttribute('aria-disabled', String(!hasProject));
 }
 
@@ -1012,6 +1035,91 @@ function renderSafeAreaSettingsControls() {
   els.saveSafeAreaSettings?.toggleAttribute('disabled', !hasProject);
   if (!state.safeAreaSettingsOpen) {
     syncSafeAreaInputs();
+  }
+}
+
+function syncPageSettingsInputs() {
+  const node = activeNode();
+  const page = activePage();
+  if (!node || !page) {
+    return;
+  }
+  state.pageSettingsNodeId = node.id;
+  if (els.pageTitleInput) {
+    els.pageTitleInput.value = page.title || node.pageId;
+  }
+  if (els.pageKindInput) {
+    els.pageKindInput.value = page.kind || '';
+  }
+  if (els.pageSourceDirInput) {
+    els.pageSourceDirInput.value = page.sourceDir || dirname(page.entry || '');
+  }
+  if (els.pageEntryInput) {
+    els.pageEntryInput.value = page.entry || '';
+  }
+  if (els.pageDocInput) {
+    els.pageDocInput.value = page.doc || '';
+  }
+}
+
+function renderPageSettingsControls() {
+  const hasActivePage = !!activeNode() && !!activePage();
+  if (!hasActivePage) {
+    state.pageSettingsOpen = false;
+    state.pageSettingsNodeId = null;
+  }
+  if (els.pageSettingsPanel) {
+    els.pageSettingsPanel.hidden = !hasActivePage || !state.pageSettingsOpen;
+  }
+  if (els.pageSettingsButton) {
+    els.pageSettingsButton.hidden = !hasActivePage;
+    els.pageSettingsButton.disabled = !hasActivePage;
+    els.pageSettingsButton.classList.toggle('active', state.pageSettingsOpen);
+    els.pageSettingsButton.setAttribute('aria-expanded', String(state.pageSettingsOpen));
+  }
+  els.savePageSettings?.toggleAttribute('disabled', !hasActivePage);
+  if (hasActivePage && (!state.pageSettingsOpen || state.pageSettingsNodeId !== activeNode().id)) {
+    syncPageSettingsInputs();
+  }
+}
+
+function setPageSettingsOpen(open) {
+  if (!activeNode() || !activePage()) {
+    return;
+  }
+  state.pageSettingsOpen = !!open;
+  state.pageSettingsNodeId = activeNode()?.id || null;
+  if (state.pageSettingsOpen) {
+    syncPageSettingsInputs();
+  }
+  renderPageSettingsControls();
+  window.lucide?.createIcons();
+}
+
+function savePageSettings() {
+  const node = activeNode();
+  const page = activePage();
+  if (!node || !page) {
+    return;
+  }
+  const next = {
+    title: (els.pageTitleInput?.value || '').trim() || node.pageId,
+    kind: (els.pageKindInput?.value || '').trim(),
+    sourceDir: (els.pageSourceDirInput?.value || '').trim(),
+    entry: (els.pageEntryInput?.value || '').trim(),
+    doc: (els.pageDocInput?.value || '').trim()
+  };
+  let changed = false;
+  ['title', 'kind', 'sourceDir', 'entry', 'doc'].forEach((key) => {
+    if ((page[key] || '') !== next[key]) {
+      page[key] = next[key];
+      changed = true;
+    }
+  });
+  state.pageSettingsOpen = false;
+  renderCanvas();
+  if (changed) {
+    markDirty('页面信息已修改');
   }
 }
 
@@ -1151,6 +1259,14 @@ function edgeGeometry(edge) {
   };
 }
 
+function draftEdgeSvg() {
+  const draft = state.activeEdgeDrag;
+  if (!draft) {
+    return '';
+  }
+  return `<path class="edge-draft" marker-end="url(#arrow)" d="M ${draft.fromPoint.x} ${draft.fromPoint.y} L ${draft.currentPoint.x} ${draft.currentPoint.y}"></path>`;
+}
+
 function scheduleRenderEdges() {
   if (state.edgeFrameId) {
     return;
@@ -1270,7 +1386,7 @@ function renderEdges() {
       </g>
     `;
   }).join('');
-  els.edgeLayer.innerHTML = markerDefs() + edgeSvg;
+  els.edgeLayer.innerHTML = markerDefs() + edgeSvg + draftEdgeSvg();
   els.edgeLayer.querySelectorAll('[data-edge-id]').forEach((edgeGroup) => {
     edgeGroup.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -1310,8 +1426,7 @@ function bindRenderedCanvas() {
       event.stopPropagation();
     });
     element.querySelectorAll('.node-anchor').forEach((anchor) => {
-      anchor.addEventListener('click', handleAnchorClick);
-      anchor.addEventListener('pointerdown', (event) => event.stopPropagation());
+      anchor.addEventListener('pointerdown', handleAnchorPointerDown);
     });
   });
   document.querySelectorAll('.text-note').forEach((noteElement) => {
@@ -1405,6 +1520,7 @@ async function updateInspector() {
     els.sourcePath.textContent = '-';
     els.entryPath.textContent = '-';
     els.docPath.textContent = '-';
+    renderPageSettingsControls();
     setEditorValue('');
     return;
   }
@@ -1414,6 +1530,7 @@ async function updateInspector() {
   els.sourcePath.textContent = page.sourceDir || dirname(page.entry || '') || '-';
   els.entryPath.textContent = page.entry || '-';
   els.docPath.textContent = page.doc || '-';
+  renderPageSettingsControls();
 
   const content = await loadDocForPage(node.pageId, page);
   if (state.selectedNodeId === node.id) {
@@ -1664,6 +1781,9 @@ function handleNotePointerDown(event) {
 }
 
 function moveActiveDrags(event) {
+  if (state.activePageSortDrag) {
+    movePageSortDrag(event);
+  }
   if (state.activeDrag) {
     const drag = state.activeDrag;
     const dx = (event.clientX - drag.startX) / state.zoom;
@@ -1685,6 +1805,10 @@ function moveActiveDrags(event) {
     drag.element.style.left = `${drag.note.x}px`;
     drag.element.style.top = `${drag.note.y}px`;
   }
+  if (state.activeEdgeDrag) {
+    state.activeEdgeDrag.currentPoint = screenToWorld(event.clientX, event.clientY);
+    renderEdges();
+  }
   if (state.activePan) {
     state.panX = state.activePan.originalX + event.clientX - state.activePan.startX;
     state.panY = state.activePan.originalY + event.clientY - state.activePan.startY;
@@ -1697,7 +1821,13 @@ function moveActiveDrags(event) {
   }
 }
 
-function endActiveDrags() {
+function endActiveDrags(event) {
+  if (endPageSortDrag(event)) {
+    return;
+  }
+  if (state.activeEdgeDrag) {
+    completeAnchorDrag(event);
+  }
   if (state.activeDrag) {
     state.activeDrag = null;
     els.canvasShell.classList.remove('is-dragging-node');
@@ -1724,42 +1854,64 @@ function endActiveDrags() {
   }
 }
 
-function handleAnchorClick(event) {
+function handleAnchorPointerDown(event) {
+  if (event.button !== 0 || !state.manifest) {
+    return;
+  }
   event.stopPropagation();
+  event.preventDefault();
   const nodeElement = event.currentTarget.closest('.page-node');
   const nodeId = nodeElement.dataset.id;
   const side = event.currentTarget.dataset.anchor;
-  if (!state.activeEdgeDraft) {
-    state.activeEdgeDraft = { from: nodeId, fromSide: side };
-    state.toolMode = 'edge';
-    renderToolMode();
-    setStatus('选择目标页面锚点');
+  const rect = getRectForNodeId(nodeId);
+  if (!rect) {
     return;
   }
-  if (state.activeEdgeDraft.from === nodeId) {
-    state.activeEdgeDraft = null;
+  const fromPoint = connectorPoint(rect, side);
+  state.activeEdgeDrag = {
+    pointerId: event.pointerId,
+    from: nodeId,
+    fromSide: side,
+    fromPoint,
+    currentPoint: screenToWorld(event.clientX, event.clientY)
+  };
+  event.currentTarget.setPointerCapture(event.pointerId);
+  els.canvasShell.classList.add('is-linking');
+  renderEdges();
+  setStatus('拖到另一个页面锚点完成连线');
+}
+
+function completeAnchorDrag(event) {
+  const drag = state.activeEdgeDrag;
+  if (!drag || !state.manifest) {
+    return;
+  }
+  const targetAnchor = document.elementFromPoint(event.clientX, event.clientY)?.closest('.node-anchor');
+  const targetNodeElement = targetAnchor?.closest('.page-node');
+  const toNodeId = targetNodeElement?.dataset.id;
+  const toSide = targetAnchor?.dataset.anchor;
+  state.activeEdgeDrag = null;
+  els.canvasShell.classList.remove('is-linking');
+  if (!targetAnchor || !toNodeId || !toSide || toNodeId === drag.from) {
+    renderEdges();
     setStatus('已取消连线');
     return;
   }
   state.manifest.canvas.edges.push({
     id: `edge-${Date.now()}`,
-    from: state.activeEdgeDraft.from,
-    to: nodeId,
+    from: drag.from,
+    to: toNodeId,
     label: '',
-    fromSide: state.activeEdgeDraft.fromSide,
-    toSide: side
+    fromSide: drag.fromSide,
+    toSide
   });
-  state.activeEdgeDraft = null;
   renderEdges();
   markDirty('已新增连线');
 }
 
 function renderToolMode() {
   buttons.modeSelect?.classList.toggle('active', state.toolMode === 'select');
-  buttons.addEdge?.classList.toggle('active', state.toolMode === 'edge');
   buttons.addText?.classList.toggle('active', state.toolMode === 'text');
-  els.canvasShell.classList.toggle('is-linking', state.toolMode === 'edge');
-  els.canvasShell.classList.toggle('show-anchors', state.toolMode === 'edge');
 }
 
 function setToolMode(mode) {
@@ -1767,9 +1919,6 @@ function setToolMode(mode) {
     exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   }
   state.toolMode = mode;
-  if (mode !== 'edge') {
-    state.activeEdgeDraft = null;
-  }
   renderToolMode();
 }
 
@@ -1919,7 +2068,13 @@ async function loadBundledExample() {
     console.warn(error);
     state.manifest = null;
     state.editingEdgeLabelId = null;
+    state.activeEdgeDrag = null;
     state.safeAreaSettingsOpen = false;
+    state.pageSettingsOpen = false;
+    state.pageSettingsNodeId = null;
+    state.pageSortMode = false;
+    state.draggingPageNodeId = null;
+    state.activePageSortDrag = null;
     renderCanvas();
     setStatus('选择工作目录开始');
   }
@@ -1932,7 +2087,13 @@ async function loadManifestText(text, options = {}) {
   state.previewResetNodeIds.clear();
   state.activePreviewNodeId = null;
   state.editingEdgeLabelId = null;
+  state.activeEdgeDrag = null;
   state.safeAreaSettingsOpen = false;
+  state.pageSettingsOpen = false;
+  state.pageSettingsNodeId = null;
+  state.pageSortMode = false;
+  state.draggingPageNodeId = null;
+  state.activePageSortDrag = null;
   state.docCache.clear();
   state.docDirty.clear();
   state.manifest = normalizeManifest(JSON.parse(text));
@@ -2266,6 +2427,18 @@ function showConflictDialog() {
   });
 }
 
+function showUnsavedHomeDialog() {
+  return new Promise((resolve) => {
+    const close = (confirmed) => {
+      els.unsavedHomeModal.hidden = true;
+      resolve(confirmed);
+    };
+    buttons.unsavedHomeCancel.onclick = () => close(false);
+    buttons.unsavedHomeConfirm.onclick = () => close(true);
+    els.unsavedHomeModal.hidden = false;
+  });
+}
+
 function startPlayback() {
   if (!state.manifest?.canvas.nodes.length) {
     return;
@@ -2363,15 +2536,121 @@ function centerNode(nodeId) {
   updateZoom();
 }
 
-function goHome() {
-  if (state.dirty && !confirm('当前项目有未保存修改，返回首页会丢失这些修改。继续返回？')) {
+function setPageSortMode(enabled) {
+  if (!state.manifest) {
     return;
+  }
+  state.pageSortMode = !!enabled;
+  state.activePageSortDrag = null;
+  state.draggingPageNodeId = null;
+  els.sortPagesButton?.classList.toggle('active', state.pageSortMode);
+  els.sortPagesButton?.setAttribute('aria-pressed', String(state.pageSortMode));
+  renderPageList();
+  setStatus(state.pageSortMode ? '拖拽左侧页面调整顺序' : '已退出页面排序');
+}
+
+function moveNodeInOrder(sourceId, targetId = null, placement = 'before') {
+  if (!state.manifest || !sourceId || sourceId === targetId) {
+    return false;
+  }
+  const nodes = state.manifest.canvas.nodes;
+  const beforeOrder = nodes.map((node) => node.id).join('|');
+  const sourceIndex = nodes.findIndex((node) => node.id === sourceId);
+  if (sourceIndex < 0) {
+    return false;
+  }
+  const [node] = nodes.splice(sourceIndex, 1);
+  let insertionIndex = nodes.length;
+  if (targetId) {
+    const targetIndex = nodes.findIndex((item) => item.id === targetId);
+    if (targetIndex < 0) {
+      nodes.splice(sourceIndex, 0, node);
+      return false;
+    }
+    insertionIndex = placement === 'after' ? targetIndex + 1 : targetIndex;
+  }
+  nodes.splice(insertionIndex, 0, node);
+  return nodes.map((item) => item.id).join('|') !== beforeOrder;
+}
+
+function beginPageSortDrag(event) {
+  if (!state.pageSortMode || event.button !== 0) {
+    return;
+  }
+  const item = event.target.closest('[data-page-node]');
+  if (!item) {
+    return;
+  }
+  state.activePageSortDrag = {
+    pointerId: event.pointerId,
+    nodeId: item.dataset.pageNode,
+    changed: false
+  };
+  state.draggingPageNodeId = item.dataset.pageNode;
+  item.classList.add('dragging');
+  els.pageList.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function movePageSortDrag(event) {
+  const drag = state.activePageSortDrag;
+  if (!drag || event.pointerId !== drag.pointerId) {
+    return;
+  }
+  const listRect = els.pageList.getBoundingClientRect();
+  let moved = false;
+  if (event.clientY > listRect.bottom) {
+    moved = moveNodeInOrder(drag.nodeId, null, 'after');
+  } else {
+    const item = document.elementFromPoint(event.clientX, event.clientY)?.closest('.page-list .doc-item[data-page-node]');
+    if (item && els.pageList.contains(item) && item.dataset.pageNode !== drag.nodeId) {
+      const itemRect = item.getBoundingClientRect();
+      const placement = event.clientY > itemRect.top + itemRect.height / 2 ? 'after' : 'before';
+      moved = moveNodeInOrder(drag.nodeId, item.dataset.pageNode, placement);
+    }
+  }
+  if (!moved) {
+    return;
+  }
+  drag.changed = true;
+  renderPageList();
+  event.preventDefault();
+}
+
+function endPageSortDrag(event) {
+  const drag = state.activePageSortDrag;
+  if (!drag || event.pointerId !== drag.pointerId) {
+    return false;
+  }
+  state.activePageSortDrag = null;
+  state.draggingPageNodeId = null;
+  if (els.pageList.hasPointerCapture?.(event.pointerId)) {
+    els.pageList.releasePointerCapture(event.pointerId);
+  }
+  if (drag.changed) {
+    renderCanvas();
+    markDirty('页面顺序已调整');
+  } else {
+    renderPageList();
+  }
+  event.preventDefault();
+  return true;
+}
+
+async function goHome() {
+  if (state.dirty) {
+    const confirmed = await showUnsavedHomeDialog();
+    if (!confirmed) {
+      setStatus('已取消返回首页');
+      return;
+    }
   }
   stopPlayback();
   state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
   state.previewUrls.clear();
-  state.previewJobs.clear();
   state.previewResetNodeIds.clear();
+  state.previewJobs.clear();
   state.docCache.clear();
   state.docDirty.clear();
   state.manifest = null;
@@ -2386,9 +2665,13 @@ function goHome() {
   state.selectedEdgeId = null;
   state.selectedNoteId = null;
   state.editingEdgeLabelId = null;
-  state.edgeClickCandidate = null;
   state.activePreviewNodeId = null;
-  state.activeEdgeDraft = null;
+  state.activeEdgeDrag = null;
+  state.pageSettingsOpen = false;
+  state.pageSettingsNodeId = null;
+  state.pageSortMode = false;
+  state.draggingPageNodeId = null;
+  state.activePageSortDrag = null;
   state.safeAreaSettingsOpen = false;
   state.panX = 0;
   state.panY = 0;
@@ -2410,7 +2693,6 @@ function bindGlobalEvents() {
   buttons.chooseProjectDirectory?.addEventListener('click', chooseProjectDirectory);
   buttons.createProject?.addEventListener('click', createProject);
   buttons.modeSelect?.addEventListener('click', () => setToolMode('select'));
-  buttons.addEdge?.addEventListener('click', () => setToolMode('edge'));
   buttons.addText?.addEventListener('click', () => setToolMode('text'));
   buttons.addNode?.addEventListener('click', addNode);
   buttons.playFlow?.addEventListener('click', startPlayback);
@@ -2424,6 +2706,13 @@ function bindGlobalEvents() {
     setSafeAreaSettingsOpen(!state.safeAreaSettingsOpen);
   });
   els.saveSafeAreaSettings?.addEventListener('click', saveSafeAreaSettings);
+  els.pageSettingsButton?.addEventListener('click', () => {
+    setPageSettingsOpen(!state.pageSettingsOpen);
+  });
+  els.savePageSettings?.addEventListener('click', savePageSettings);
+  els.sortPagesButton?.addEventListener('click', () => {
+    setPageSortMode(!state.pageSortMode);
+  });
   buttons.resetView?.addEventListener('click', () => {
     state.zoom = 1;
     state.panX = 0;
@@ -2463,6 +2752,13 @@ function bindGlobalEvents() {
     }
     renderPlayback();
   });
+  window.addEventListener('beforeunload', (event) => {
+    if (!state.dirty) {
+      return;
+    }
+    event.preventDefault();
+    event.returnValue = '';
+  });
 
   els.projectPresetGrid?.addEventListener('click', (event) => {
     const card = event.target.closest('[data-preset]');
@@ -2479,14 +2775,14 @@ function bindGlobalEvents() {
       closeProjectModal();
     }
   });
-
   els.pageList?.addEventListener('click', (event) => {
     const item = event.target.closest('[data-page-node]');
-    if (item) {
+    if (item && !state.pageSortMode) {
       selectNode(item.dataset.pageNode);
       centerNode(item.dataset.pageNode);
     }
   });
+  els.pageList?.addEventListener('pointerdown', beginPageSortDrag);
 
   els.canvasShell.addEventListener('pointerdown', (event) => {
     const blankCanvasTarget = isCanvasBlankTarget(event.target);
@@ -2537,7 +2833,9 @@ function bindGlobalEvents() {
       saveProject();
     }
     if (event.key === 'Escape') {
-      state.activeEdgeDraft = null;
+      state.activeEdgeDrag = null;
+      els.canvasShell.classList.remove('is-linking');
+      renderEdges();
       setToolMode('select');
       stopPlayback();
     }
