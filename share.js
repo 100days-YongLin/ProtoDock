@@ -8,17 +8,122 @@
     choose: document.getElementById('chooseShareFile'),
     upload: document.getElementById('uploadShareFile'),
     status: document.getElementById('shareStatus'),
+    progress: document.getElementById('shareProgress'),
+    progressBar: document.getElementById('shareProgressBar'),
+    progressText: document.getElementById('shareProgressText'),
     result: document.getElementById('shareResult'),
     url: document.getElementById('shareUrl'),
     fileName: document.getElementById('shareFileName')
   };
 
   let selectedFile = null;
+  let isUploading = false;
 
   function setStatus(message) {
     if (els.status) {
       els.status.textContent = message;
     }
+  }
+
+  function formatPercent(value) {
+    return `${Math.max(0, Math.min(100, Math.round(value)))}%`;
+  }
+
+  function setProgress(value, options = {}) {
+    if (!els.progress) {
+      return;
+    }
+    const isIndeterminate = !!options.indeterminate;
+    els.progress.hidden = false;
+    els.progress.classList.toggle('is-indeterminate', isIndeterminate);
+    if (els.progressBar) {
+      els.progressBar.style.width = isIndeterminate ? '' : formatPercent(value);
+    }
+    if (els.progressText) {
+      els.progressText.textContent = options.label || (isIndeterminate ? '处理中' : formatPercent(value));
+    }
+  }
+
+  function resetProgress() {
+    if (els.progress) {
+      els.progress.hidden = true;
+      els.progress.classList.remove('is-indeterminate');
+    }
+    if (els.progressBar) {
+      els.progressBar.style.width = '0%';
+    }
+    if (els.progressText) {
+      els.progressText.textContent = '0%';
+    }
+  }
+
+  function setUploading(uploading) {
+    isUploading = uploading;
+    if (els.upload) {
+      els.upload.disabled = uploading || !selectedFile;
+    }
+    if (els.choose) {
+      els.choose.disabled = uploading;
+    }
+    if (els.dropzone) {
+      els.dropzone.setAttribute('aria-disabled', String(uploading));
+    }
+  }
+
+  function parseJsonResponse(text) {
+    try {
+      return JSON.parse(text || '{}');
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function uploadArchive(body) {
+    return new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('POST', '/api/shares');
+
+      request.upload.addEventListener('progress', (event) => {
+        if (!event.lengthComputable) {
+          setProgress(0, { indeterminate: true });
+          setStatus('正在上传...');
+          return;
+        }
+        if (event.loaded >= event.total) {
+          setProgress(100, { indeterminate: true });
+          setStatus('上传完成，服务器正在解压...');
+          return;
+        }
+        const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+        setProgress(percent);
+        setStatus(`正在上传 ${formatPercent(percent)}`);
+      });
+
+      request.addEventListener('load', () => {
+        const payload = parseJsonResponse(request.responseText);
+        if (request.status < 200 || request.status >= 300) {
+          reject(new Error(payload.error || '上传失败'));
+          return;
+        }
+        resolve(payload);
+      });
+
+      request.addEventListener('error', () => {
+        reject(new Error('网络连接失败'));
+      });
+
+      request.addEventListener('abort', () => {
+        reject(new Error('上传已取消'));
+      });
+
+      request.addEventListener('loadend', () => {
+        if (request.status >= 200 && request.status < 300) {
+          setProgress(100);
+        }
+      });
+
+      request.send(body);
+    });
   }
 
   function openModal() {
@@ -36,6 +141,9 @@
   }
 
   function selectFile(file) {
+    if (isUploading) {
+      return;
+    }
     selectedFile = file && file.name.toLowerCase().endsWith('.zip') ? file : null;
     if (els.fileName) {
       els.fileName.textContent = selectedFile ? selectedFile.name : '拖入项目 zip，或点击选择';
@@ -46,26 +154,22 @@
     if (els.result) {
       els.result.hidden = true;
     }
+    resetProgress();
     setStatus(selectedFile ? '已选择压缩包，点击上传生成链接' : '请选择 .zip 项目压缩包');
   }
 
   async function uploadFile() {
-    if (!selectedFile || !els.upload) {
+    if (!selectedFile || !els.upload || isUploading) {
       return;
     }
-    els.upload.disabled = true;
-    setStatus('正在上传并生成分享链接...');
+    setUploading(true);
+    setProgress(0);
+    setStatus('准备上传...');
     const body = new FormData();
     body.append('archive', selectedFile);
     try {
-      const response = await fetch('/api/shares', {
-        method: 'POST',
-        body
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || '上传失败');
-      }
+      const payload = await uploadArchive(body);
+      setProgress(100);
       if (els.url) {
         els.url.href = payload.url;
         els.url.textContent = payload.url;
@@ -76,18 +180,25 @@
       setStatus('分享链接已生成');
     } catch (error) {
       setStatus(`上传失败：${error.message || '服务器无法处理压缩包'}`);
-      els.upload.disabled = false;
+    } finally {
+      setUploading(false);
     }
   }
 
   els.open?.addEventListener('click', openModal);
   els.close?.addEventListener('click', closeModal);
   els.choose?.addEventListener('click', () => els.input?.click());
-  els.dropzone?.addEventListener('click', () => els.input?.click());
+  els.dropzone?.addEventListener('click', () => {
+    if (!isUploading) {
+      els.input?.click();
+    }
+  });
   els.dropzone?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      els.input?.click();
+      if (!isUploading) {
+        els.input?.click();
+      }
     }
   });
   els.input?.addEventListener('change', () => selectFile(els.input.files?.[0] || null));
@@ -100,6 +211,9 @@
   ['dragenter', 'dragover'].forEach((type) => {
     els.dropzone?.addEventListener(type, (event) => {
       event.preventDefault();
+      if (isUploading) {
+        return;
+      }
       els.dropzone.classList.add('drag-over');
     });
   });
@@ -110,6 +224,9 @@
     });
   });
   els.dropzone?.addEventListener('drop', (event) => {
+    if (isUploading) {
+      return;
+    }
     selectFile(event.dataTransfer?.files?.[0] || null);
   });
 })();
