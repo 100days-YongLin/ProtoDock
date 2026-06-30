@@ -134,9 +134,11 @@ const state = {
   docDirty: new Set(),
   previewUrls: new Map(),
   previewJobs: new Map(),
+  previewResetNodeIds: new Set(),
   selectedNodeId: null,
   selectedEdgeId: null,
   selectedNoteId: null,
+  activePreviewNodeId: null,
   selectedPresetId: 'iphone-portrait',
   selectedProjectDirectoryHandle: null,
   toolMode: 'select',
@@ -607,23 +609,112 @@ function reloadNodePreview(nodeId) {
   if (!node) {
     return;
   }
+  if (state.activePreviewNodeId === nodeId) {
+    state.activePreviewNodeId = null;
+  }
+  state.previewResetNodeIds.delete(nodeId);
+  syncPreviewInteractionUi();
   hydratePreview(node);
-  setStatus('已刷新页面预览');
+  setStatus('已重置页面预览');
+}
+
+function previewActionFor(nodeId) {
+  if (state.activePreviewNodeId === nodeId) {
+    return {
+      mode: 'active',
+      icon: 'mouse-pointer-2',
+      label: '退出原型交互',
+      title: '正在操作原型，点击手机外退出'
+    };
+  }
+  if (state.previewResetNodeIds.has(nodeId)) {
+    return {
+      mode: 'reset',
+      icon: 'rotate-cw',
+      label: '重置页面预览',
+      title: '重置页面预览'
+    };
+  }
+  return {
+    mode: 'ready',
+    icon: 'mouse-pointer-2',
+    label: '启用原型交互',
+    title: '启用原型交互'
+  };
+}
+
+function syncPreviewInteractionUi() {
+  document.querySelectorAll('.page-node').forEach((element) => {
+    const nodeId = element.dataset.id;
+    const action = previewActionFor(nodeId);
+    const button = element.querySelector('[data-preview-action-node]');
+    element.classList.toggle('is-preview-active', action.mode === 'active');
+    element.classList.toggle('needs-preview-reset', action.mode === 'reset');
+    if (!button) {
+      return;
+    }
+    button.dataset.previewAction = action.mode;
+    button.title = action.title;
+    button.setAttribute('aria-label', action.label);
+    button.setAttribute('aria-pressed', action.mode === 'active' ? 'true' : 'false');
+    button.innerHTML = `<i data-lucide="${action.icon}"></i>`;
+  });
+  window.lucide?.createIcons();
+}
+
+function activatePreviewInteraction(nodeId) {
+  if (state.activePreviewNodeId && state.activePreviewNodeId !== nodeId) {
+    state.previewResetNodeIds.add(state.activePreviewNodeId);
+  }
+  state.activePreviewNodeId = nodeId;
+  state.previewResetNodeIds.delete(nodeId);
+  selectNode(nodeId);
+  syncPreviewInteractionUi();
+  setStatus('已启用原型交互，点击手机外退出');
+}
+
+function exitPreviewInteraction(nodeId = state.activePreviewNodeId, options = {}) {
+  if (!nodeId || state.activePreviewNodeId !== nodeId) {
+    return;
+  }
+  state.activePreviewNodeId = null;
+  state.previewResetNodeIds.add(nodeId);
+  syncPreviewInteractionUi();
+  if (!options.silent) {
+    setStatus('已退出原型交互，可刷新重置页面');
+  }
+}
+
+function handlePreviewActionClick(event) {
+  event.stopPropagation();
+  const nodeId = event.currentTarget.dataset.previewActionNode;
+  const action = previewActionFor(nodeId);
+  if (action.mode === 'reset') {
+    reloadNodePreview(nodeId);
+    return;
+  }
+  if (action.mode === 'active') {
+    exitPreviewInteraction(nodeId);
+    return;
+  }
+  activatePreviewInteraction(nodeId);
 }
 
 function renderNode(node, index) {
   const page = pageForNode(node);
   const selected = node.id === state.selectedNodeId;
+  const previewAction = previewActionFor(node.id);
+  const previewStateClass = previewAction.mode === 'active' ? 'is-preview-active' : previewAction.mode === 'reset' ? 'needs-preview-reset' : '';
   return `
-    <article class="page-node ${selected ? 'selected' : ''}" data-id="${escapeHtml(node.id)}" style="${nodeStyleFor(node)}">
+    <article class="page-node ${selected ? 'selected' : ''} ${previewStateClass}" data-id="${escapeHtml(node.id)}" style="${nodeStyleFor(node)}">
       <header class="node-head">
         <div class="node-title">
           <strong>${escapeHtml(page.title || node.pageId)}</strong>
           <span>${escapeHtml(page.sourceDir || dirname(page.entry || ''))}</span>
         </div>
         <div class="node-actions">
-          <button class="node-refresh" type="button" data-refresh-node="${escapeHtml(node.id)}" title="刷新页面预览" aria-label="刷新页面预览">
-            <i data-lucide="rotate-cw"></i>
+          <button class="node-preview-action" type="button" data-preview-action-node="${escapeHtml(node.id)}" data-preview-action="${previewAction.mode}" title="${escapeHtml(previewAction.title)}" aria-label="${escapeHtml(previewAction.label)}" aria-pressed="${previewAction.mode === 'active' ? 'true' : 'false'}">
+            <i data-lucide="${escapeHtml(previewAction.icon)}"></i>
           </button>
           <span class="node-index">${index + 1}</span>
         </div>
@@ -708,9 +799,6 @@ function renderCanvas() {
     renderChrome();
     return;
   }
-  if (!state.selectedNodeId && state.manifest.canvas.nodes.length) {
-    state.selectedNodeId = state.manifest.canvas.nodes[0].id;
-  }
   els.nodeMount.innerHTML = state.manifest.canvas.nodes.map(renderNode).join('');
   els.noteMount.innerHTML = state.manifest.canvas.notes.map(renderNote).join('');
   renderEdges();
@@ -719,6 +807,7 @@ function renderCanvas() {
   updateInspector();
   updateZoom();
   window.lucide?.createIcons();
+  syncPreviewInteractionUi();
   state.manifest.canvas.nodes.forEach(hydratePreview);
 }
 
@@ -812,11 +901,8 @@ function renderEdges() {
 function bindRenderedCanvas() {
   document.querySelectorAll('.page-node').forEach((element) => {
     element.addEventListener('pointerdown', handleNodePointerDown);
-    element.querySelector('[data-refresh-node]')?.addEventListener('click', (event) => {
-      event.stopPropagation();
-      reloadNodePreview(event.currentTarget.dataset.refreshNode);
-    });
-    element.querySelector('[data-refresh-node]')?.addEventListener('pointerdown', (event) => {
+    element.querySelector('[data-preview-action-node]')?.addEventListener('click', handlePreviewActionClick);
+    element.querySelector('[data-preview-action-node]')?.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
     });
     element.querySelectorAll('.node-anchor').forEach((anchor) => {
@@ -838,6 +924,9 @@ function bindRenderedCanvas() {
 }
 
 function selectNode(id) {
+  if (state.activePreviewNodeId && state.activePreviewNodeId !== id) {
+    exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
+  }
   state.selectedNodeId = id;
   state.selectedEdgeId = null;
   state.selectedNoteId = null;
@@ -851,6 +940,7 @@ function selectNode(id) {
 }
 
 function selectEdge(id) {
+  exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.selectedEdgeId = id;
   state.selectedNodeId = null;
   state.selectedNoteId = null;
@@ -861,6 +951,7 @@ function selectEdge(id) {
 }
 
 function selectNote(id) {
+  exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.selectedNoteId = id;
   state.selectedNodeId = null;
   state.selectedEdgeId = null;
@@ -870,6 +961,23 @@ function selectNote(id) {
   });
   renderEdges();
   updateInspector();
+}
+
+function clearSelection(options = {}) {
+  if (state.activePreviewNodeId) {
+    exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
+  }
+  state.selectedNodeId = null;
+  state.selectedEdgeId = null;
+  state.selectedNoteId = null;
+  document.querySelectorAll('.page-node').forEach((node) => node.classList.remove('selected'));
+  document.querySelectorAll('.text-note').forEach((note) => note.classList.remove('selected'));
+  renderEdges();
+  renderPageList();
+  updateInspector();
+  if (!options.silent) {
+    setStatus('已取消选中');
+  }
 }
 
 async function updateInspector() {
@@ -994,17 +1102,38 @@ function screenToWorld(clientX, clientY) {
   };
 }
 
+function isCanvasBlankTarget(target) {
+  return target === els.canvasShell
+    || target === els.canvasTransform
+    || target === els.nodeMount
+    || target === els.noteMount
+    || target === els.edgeLayer;
+}
+
 function handleNodePointerDown(event) {
   if (event.button !== 0 || state.toolMode !== 'select') {
     return;
   }
-  if (event.target.closest('.prototype-frame, .device-screen, .node-refresh')) {
-    selectNode(event.currentTarget.dataset.id);
+  const element = event.currentTarget;
+  const nodeId = element.dataset.id;
+  const previewSurface = event.target.closest('.device-screen, .prototype-frame-stage');
+  if (state.activePreviewNodeId === nodeId) {
+    if (!previewSurface) {
+      clearSelection({ silent: true });
+      setStatus('已退出原型交互，可刷新重置页面');
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    selectNode(nodeId);
     return;
   }
-  const element = event.currentTarget;
-  selectNode(element.dataset.id);
-  const node = state.manifest.canvas.nodes.find((item) => item.id === element.dataset.id);
+  if (previewSurface || event.target.closest('.node-preview-action')) {
+    selectNode(nodeId);
+    return;
+  }
+  selectNode(nodeId);
+  const node = state.manifest.canvas.nodes.find((item) => item.id === nodeId);
   if (!node) {
     return;
   }
@@ -1134,6 +1263,9 @@ function renderToolMode() {
 }
 
 function setToolMode(mode) {
+  if (mode !== 'select') {
+    exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
+  }
   state.toolMode = mode;
   if (mode !== 'edge') {
     state.activeEdgeDraft = null;
@@ -1145,6 +1277,7 @@ function addNode() {
   if (!state.manifest) {
     return;
   }
+  exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   const pageId = `page-${Date.now()}`;
   const nodeId = `node-${pageId}`;
   state.manifest.pages[pageId] = buildPageRecord(pageId, '新页面');
@@ -1185,6 +1318,10 @@ function deleteSelected() {
     state.manifest.canvas.nodes = state.manifest.canvas.nodes.filter((item) => item.id !== state.selectedNodeId);
     state.manifest.canvas.edges = state.manifest.canvas.edges.filter((edge) => edge.from !== state.selectedNodeId && edge.to !== state.selectedNodeId);
     revokePreviewUrls(state.selectedNodeId);
+    state.previewResetNodeIds.delete(state.selectedNodeId);
+    if (state.activePreviewNodeId === state.selectedNodeId) {
+      state.activePreviewNodeId = null;
+    }
     state.selectedNodeId = state.manifest.canvas.nodes[0]?.id || null;
     renderCanvas();
     markDirty('已删除页面节点');
@@ -1231,6 +1368,8 @@ async function loadBundledExample() {
 async function loadManifestText(text, options = {}) {
   state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
   state.previewUrls.clear();
+  state.previewResetNodeIds.clear();
+  state.activePreviewNodeId = null;
   state.docCache.clear();
   state.docDirty.clear();
   state.manifest = normalizeManifest(JSON.parse(text));
@@ -1678,7 +1817,17 @@ function bindGlobalEvents() {
   });
 
   els.canvasShell.addEventListener('pointerdown', (event) => {
-    if (event.button === 1 || event.shiftKey || event.target === els.canvasShell) {
+    const blankCanvasTarget = isCanvasBlankTarget(event.target);
+    if (state.toolMode === 'text' && event.button === 0 && blankCanvasTarget) {
+      addTextNote(screenToWorld(event.clientX, event.clientY));
+      setToolMode('select');
+      event.preventDefault();
+      return;
+    }
+    if (event.button === 0 && blankCanvasTarget) {
+      clearSelection({ silent: true });
+    }
+    if (event.button === 1 || event.shiftKey || blankCanvasTarget) {
       state.activePan = {
         startX: event.clientX,
         startY: event.clientY,
@@ -1688,10 +1837,6 @@ function bindGlobalEvents() {
       els.canvasShell.classList.add('is-panning');
       event.preventDefault();
       return;
-    }
-    if (state.toolMode === 'text' && event.target.closest('.canvas-shell') && !event.target.closest('.page-node') && !event.target.closest('.text-note')) {
-      addTextNote(screenToWorld(event.clientX, event.clientY));
-      setToolMode('select');
     }
   });
   els.canvasShell.addEventListener('wheel', (event) => {
@@ -1735,6 +1880,8 @@ window.ProtoDock = {
       selectedNodeId: state.selectedNodeId,
       selectedEdgeId: state.selectedEdgeId,
       selectedNoteId: state.selectedNoteId,
+      activePreviewNodeId: state.activePreviewNodeId,
+      previewResetNodeIds: Array.from(state.previewResetNodeIds),
       readOnly: state.readOnly,
       dirty: state.dirty,
       zoom: state.zoom,

@@ -801,7 +801,7 @@ select {
 }
 
 .node-index,
-.node-refresh,
+.node-preview-action,
 .tag {
   flex: 0 0 auto;
   border-radius: 999px;
@@ -817,7 +817,7 @@ select {
   flex: 0 0 auto;
 }
 
-.node-refresh {
+.node-preview-action {
   display: grid;
   width: 28px;
   height: 28px;
@@ -831,21 +831,31 @@ select {
   transition: opacity 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
-.node-refresh svg {
+.node-preview-action svg {
   width: 14px;
   height: 14px;
 }
 
-.page-node:hover .node-refresh,
-.page-node.selected .node-refresh {
+.page-node:hover .node-preview-action,
+.page-node.selected .node-preview-action {
   opacity: 1;
 }
 
-.node-refresh:hover,
-.node-refresh:focus-visible {
+.node-preview-action:hover,
+.node-preview-action:focus-visible {
   background: #f5f5f7;
   color: var(--primary);
   outline: none;
+}
+
+.node-preview-action[data-preview-action="active"] {
+  background: var(--primary);
+  color: #fff;
+}
+
+.node-preview-action[data-preview-action="reset"] {
+  background: #f5f5f7;
+  color: var(--primary);
 }
 
 .node-index {
@@ -1076,6 +1086,10 @@ select {
   height: var(--preview-height);
   border: 0;
   background: #fff;
+  pointer-events: none;
+}
+
+.page-node.is-preview-active .prototype-frame {
   pointer-events: auto;
 }
 
