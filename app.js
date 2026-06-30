@@ -342,6 +342,52 @@ function nodeStyleFor(node) {
   return `left:${node.x}px;top:${node.y}px;${previewStyle}`;
 }
 
+function estimatedNodeSize() {
+  const preset = presetFor();
+  const frameWidth = preset.frameWidth || preset.width || 390;
+  const frameHeight = preset.frameHeight || preset.height || 830;
+  const previewWidth = preset.thumbnailWidth || frameWidth;
+  const scale = previewWidth / frameWidth;
+  return {
+    width: Math.round(frameWidth * scale),
+    height: Math.round(frameHeight * scale) + 48
+  };
+}
+
+function measuredNodeBoxes() {
+  const boxes = {};
+  document.querySelectorAll('.page-node').forEach((element) => {
+    const id = element.dataset.id;
+    if (!id) {
+      return;
+    }
+    boxes[id] = {
+      x: Number.parseFloat(element.style.left) || 0,
+      y: Number.parseFloat(element.style.top) || 0,
+      width: element.offsetWidth,
+      height: element.offsetHeight
+    };
+  });
+  return boxes;
+}
+
+function nextNodePosition() {
+  const calculatePosition = window.ProtoDockPlacement?.calculateNewNodePosition;
+  if (!calculatePosition) {
+    return {
+      x: 160 + state.manifest.canvas.nodes.length * 280,
+      y: 160
+    };
+  }
+  return calculatePosition({
+    nodes: state.manifest.canvas.nodes,
+    selectedNodeId: state.selectedNodeId,
+    measuredBoxes: measuredNodeBoxes(),
+    nodeSize: estimatedNodeSize(),
+    canvasLimit: VIRTUAL_CANVAS_LIMIT
+  });
+}
+
 function manifestText(manifest = state.manifest) {
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
@@ -1784,18 +1830,20 @@ function addNode() {
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   const pageId = `page-${Date.now()}`;
   const nodeId = `node-${pageId}`;
+  const position = nextNodePosition();
   state.manifest.pages[pageId] = buildPageRecord(pageId, '新页面');
   state.manifest.canvas.nodes.push({
     id: nodeId,
     pageId,
-    x: 160 + state.manifest.canvas.nodes.length * 280,
-    y: 160
+    x: clampCanvasCoord(position.x),
+    y: clampCanvasCoord(position.y)
   });
   state.docCache.set(pageId, buildDefaultDoc(pageId, state.manifest.pages[pageId]));
   state.docDirty.add(pageId);
   state.selectedNodeId = nodeId;
   renderCanvas();
-  markDirty('已新增页面节点');
+  centerNode(nodeId);
+  markDirty('已新增页面节点，并定位到新页面');
 }
 
 function addTextNote(worldPoint) {
