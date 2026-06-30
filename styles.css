@@ -101,6 +101,7 @@ select {
 
 .toolbar {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: center;
   gap: 10px;
@@ -118,16 +119,25 @@ select {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.product-select {
-  width: 190px;
+.project-display {
+  display: flex;
+  flex: 0 1 320px;
+  justify-content: center;
+  align-items: center;
+  width: clamp(180px, 24vw, 320px);
+  min-width: 0;
   height: 30px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   background: #1d1d1f;
   color: #fff;
   padding: 0 12px;
-  outline: none;
   font-size: 12px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .canvas-badge {
@@ -172,13 +182,13 @@ select {
 }
 
 .tool-button:disabled,
-.product-select:disabled {
+.project-display[aria-disabled="true"] {
   cursor: default;
   opacity: 0.42;
 }
 
 .status {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
@@ -1908,7 +1918,8 @@ select {
     padding: 1px;
   }
 
-  .product-select {
+  .project-display {
+    flex-basis: 138px;
     width: 138px;
     height: 30px;
     font-size: 12px;

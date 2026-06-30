@@ -1026,7 +1026,7 @@ function renderChrome() {
     els.canvasProductDesc.textContent = '选择工作目录开始';
     els.canvasPresetName.textContent = '未选择';
     els.canvasPresetDesc.textContent = '打开项目后显示设备壳';
-    els.productSelect.innerHTML = '';
+    els.productSelect.textContent = '未打开项目';
     renderSafeAreaSettingsControls();
     return;
   }
@@ -1040,7 +1040,7 @@ function renderChrome() {
     els.safeAreaToggle.checked = safeAreaEnabled();
   }
   renderSafeAreaSettingsControls();
-  els.productSelect.innerHTML = `<option>${escapeHtml(state.manifest.project.name)}</option>`;
+  els.productSelect.textContent = state.manifest.project.name;
   renderPageList();
 }
 
@@ -1790,6 +1790,10 @@ function setSafeAreaEnabled(enabled) {
 
 function setSafeAreaSettingsOpen(open) {
   if (!state.manifest) {
+    return;
+  }
+  if (!open && state.safeAreaSettingsOpen) {
+    saveSafeAreaSettings();
     return;
   }
   state.safeAreaSettingsOpen = !!open;
