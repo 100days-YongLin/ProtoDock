@@ -824,28 +824,95 @@ function captureFrameSizeForPreset(preset) {
   };
 }
 
-function waitForIframeReady(iframe) {
+function waitForPreviewImages(documentRef) {
+  const images = Array.from(documentRef.images || []).filter((image) => !image.complete);
+  if (!images.length) {
+    return Promise.resolve();
+  }
+  return Promise.race([
+    Promise.all(images.map((image) => new Promise((resolve) => {
+      image.addEventListener('load', resolve, { once: true });
+      image.addEventListener('error', resolve, { once: true });
+    }))),
+    new Promise((resolve) => window.setTimeout(resolve, 5000))
+  ]);
+}
+
+function isExpectedIframeDocument(iframe, expectedSrc) {
+  const doc = iframe.contentDocument;
+  if (!doc?.documentElement) {
+    return false;
+  }
+  if (!expectedSrc) {
+    return true;
+  }
+  if (doc.location?.href === 'about:blank') {
+    return false;
+  }
+  try {
+    return new URL(doc.location.href).href === new URL(expectedSrc, window.location.href).href;
+  } catch (error) {
+    return doc.location?.href === expectedSrc;
+  }
+}
+
+function waitForIframeReady(iframe, options = {}) {
+  const expectedSrc = options.expectedSrc || '';
   return new Promise((resolve, reject) => {
-    const done = () => {
+    let settled = false;
+    const cleanup = () => {
+      iframe.removeEventListener('load', done);
+      iframe.removeEventListener('error', fail);
+    };
+    const fail = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(new Error('页面预览加载失败'));
+    };
+    const done = async () => {
+      if (settled || !isExpectedIframeDocument(iframe, expectedSrc)) {
+        return;
+      }
       const doc = iframe.contentDocument;
       if (!doc?.documentElement) {
+        settled = true;
+        cleanup();
         reject(new Error('无法读取页面预览'));
         return;
       }
-      const finish = () => resolve(iframe);
+      const finish = async () => {
+        if (doc.fonts?.ready) {
+          await doc.fonts.ready.catch(() => {});
+        }
+        await waitForPreviewImages(doc);
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(iframe);
+      };
       if (doc.readyState === 'complete') {
-        finish();
+        await finish();
       } else {
         window.setTimeout(finish, 150);
       }
     };
 
-    iframe.addEventListener('load', done, { once: true });
-    iframe.addEventListener('error', () => reject(new Error('页面预览加载失败')), { once: true });
-    window.setTimeout(() => {
-      if (iframe.contentDocument?.documentElement) {
-        resolve(iframe);
+    iframe.addEventListener('load', done);
+    iframe.addEventListener('error', fail);
+    window.setTimeout(async () => {
+      if (settled) {
+        return;
+      }
+      if (isExpectedIframeDocument(iframe, expectedSrc)) {
+        await done();
       } else {
+        settled = true;
+        cleanup();
         reject(new Error('页面预览加载超时'));
       }
     }, 8000);
@@ -870,9 +937,17 @@ async function createCaptureIframe(node) {
     `height:${size.height}px`,
     'pointer-events:none'
   ].join(';');
+  const pendingSrc = iframe.src && !iframe.srcdoc ? iframe.src : '';
+  if (pendingSrc) {
+    iframe.removeAttribute('src');
+  }
+  const ready = waitForIframeReady(iframe, { expectedSrc: pendingSrc });
   document.body.append(iframe);
+  if (pendingSrc) {
+    iframe.src = pendingSrc;
+  }
   try {
-    await waitForIframeReady(iframe);
+    await ready;
     return { iframe, captureNodeId: captureNode.id };
   } catch (error) {
     iframe.remove();
