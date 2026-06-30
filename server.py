@@ -22,6 +22,7 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parent
 SHARES_DIR = ROOT / "shares"
 MANIFEST_FILE = "protodock.project.json"
+PUBLIC_BASE_URL = os.environ.get("PROTODOCK_PUBLIC_BASE_URL", "").rstrip("/")
 
 MAX_UPLOAD_BYTES = int(os.environ.get("PROTODOCK_MAX_UPLOAD_BYTES", 100 * 1024 * 1024))
 MAX_EXTRACTED_BYTES = int(os.environ.get("PROTODOCK_MAX_EXTRACTED_BYTES", 250 * 1024 * 1024))
@@ -265,6 +266,8 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
                 return share_id
 
     def absolute_url(self, path: str) -> str:
+        if PUBLIC_BASE_URL:
+            return f"{PUBLIC_BASE_URL}{path}"
         proto = self.headers.get("X-Forwarded-Proto", "http")
         host = self.headers.get("Host") or f"{self.server.server_address[0]}:{self.server.server_address[1]}"
         return f"{proto}://{host}{path}"

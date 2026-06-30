@@ -2168,6 +2168,43 @@ async function loadBundledExample() {
   }
 }
 
+function showStartScreen(message = '选择工作目录开始') {
+  state.manifest = null;
+  state.projectHandle = null;
+  state.manifestHandle = null;
+  state.projectBaseUrl = null;
+  state.projectDirectoryName = null;
+  state.shareId = null;
+  state.readOnly = true;
+  state.manifestHash = null;
+  state.dirty = false;
+  state.docCache.clear();
+  state.docDirty.clear();
+  state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
+  state.previewUrls.clear();
+  state.previewJobs.clear();
+  state.previewResetNodeIds.clear();
+  state.selectedNodeId = null;
+  state.selectedEdgeId = null;
+  state.selectedNoteId = null;
+  state.editingEdgeLabelId = null;
+  state.activePreviewNodeId = null;
+  state.activeEdgeDrag = null;
+  state.safeAreaSettingsOpen = false;
+  state.pageSettingsOpen = false;
+  state.pageSettingsNodeId = null;
+  state.pageSortMode = false;
+  state.draggingPageNodeId = null;
+  state.activePageSortDrag = null;
+  state.toolMode = 'select';
+  state.panX = 0;
+  state.panY = 0;
+  state.zoom = window.innerWidth < 760 ? 0.78 : 1;
+  renderToolMode();
+  renderCanvas();
+  setStatus(message);
+}
+
 function isValidShareId(value) {
   return /^[a-zA-Z0-9_-]{6,80}$/.test(value || '');
 }
@@ -2557,7 +2594,7 @@ async function reloadProject() {
     setStatus('已读取本地变更');
     return;
   }
-  await loadBundledExample();
+  showStartScreen();
 }
 
 function showConflictDialog() {
@@ -3056,6 +3093,6 @@ const initialShareId = shareIdFromLocation();
 if (initialShareId) {
   loadSharedProject(initialShareId);
 } else {
-  loadBundledExample();
+  showStartScreen();
 }
 window.lucide?.createIcons();

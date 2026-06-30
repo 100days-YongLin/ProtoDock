@@ -125,6 +125,12 @@ http://<server-ip>:6080/index.html
 
 默认使用 `6080` 是为了避开 Chrome 会拦截的保留端口，例如 `6000` 和 `6666`。
 
+如果服务通过 FRP 或反向代理暴露，可以设置公开地址，让上传接口返回稳定分享链接：
+
+```bash
+PROTODOCK_PUBLIC_BASE_URL=http://frp-mkpjyxdy.ns-asvegw7b:6080 PROTODOCK_PORT=6080 python3 server.py
+```
+
 ## 冲突处理
 
 保存前如果磁盘上的 `protodock.project.json` 已经被其他工具或 Agent 修改，ProtoDock 会弹窗提示：
