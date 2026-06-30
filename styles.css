@@ -463,20 +463,20 @@ select {
 
 .safe-area-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 6px;
 }
 
 .safe-area-field {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(52px, auto) minmax(80px, 1fr) auto;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
-  padding: 8px 9px;
+  padding: 8px 10px;
 }
 
 .safe-area-field span,
