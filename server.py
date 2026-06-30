@@ -167,6 +167,31 @@ def parse_multipart_archive(headers, body: bytes) -> tuple[str, bytes]:
     raise ProtoDockError(HTTPStatus.BAD_REQUEST, "缺少 archive 文件字段")
 
 
+def share_item_from_directory(directory: Path, url_for=None) -> dict | None:
+    share_id = directory.name
+    if not is_valid_share_id(share_id):
+        return None
+    manifest_path = directory / MANIFEST_FILE
+    if not manifest_path.is_file():
+        return None
+    try:
+        with manifest_path.open("r", encoding="utf-8") as file:
+            manifest = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return None
+    project = manifest.get("project") if isinstance(manifest, dict) else {}
+    if not isinstance(project, dict):
+        project = {}
+    name = str(project.get("name") or share_id)
+    updated_at = manifest_path.stat().st_mtime
+    return {
+        "id": share_id,
+        "name": name,
+        "url": (url_for or absolute_public_url)(f"/s/{share_id}"),
+        "updatedAt": updated_at
+    }
+
+
 def request_path_to_file(root: Path, request_path: str) -> Path:
     decoded = unquote(request_path).replace("\\", "/")
     normalized = posixpath.normpath(decoded.lstrip("/"))
@@ -180,6 +205,18 @@ def request_path_to_file(root: Path, request_path: str) -> Path:
     if os.path.commonpath([root_resolved, target]) != str(root_resolved):
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "非法路径")
     return target
+
+
+def absolute_public_url(path: str, headers=None, server_address=None) -> str:
+    if PUBLIC_BASE_URL:
+        return f"{PUBLIC_BASE_URL}{path}"
+    if headers is None:
+        return path
+    proto = headers.get("X-Forwarded-Proto", "http")
+    host = headers.get("Host")
+    if not host and server_address:
+        host = f"{server_address[0]}:{server_address[1]}"
+    return f"{proto}://{host}{path}" if host else path
 
 
 class ProtoDockHandler(BaseHTTPRequestHandler):
@@ -205,6 +242,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             path = parsed.path
             if path == "/api/health":
                 self.send_json(HTTPStatus.OK, {"ok": True, "service": "protodock"})
+                return
+            if path == "/api/shares":
+                self.handle_share_list()
                 return
             if path.startswith("/s/"):
                 self.serve_share_index(path)
@@ -259,6 +299,18 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         url = self.absolute_url(f"/s/{share_id}")
         self.send_json(HTTPStatus.CREATED, {"id": share_id, "url": url})
 
+    def handle_share_list(self) -> None:
+        SHARES_DIR.mkdir(parents=True, exist_ok=True)
+        items = []
+        for directory in SHARES_DIR.iterdir():
+            if not directory.is_dir():
+                continue
+            item = share_item_from_directory(directory, self.absolute_url)
+            if item:
+                items.append(item)
+        items.sort(key=lambda item: item.get("updatedAt") or 0, reverse=True)
+        self.send_json(HTTPStatus.OK, {"items": items})
+
     def create_share_id(self) -> str:
         while True:
             share_id = secrets.token_urlsafe(8)
@@ -266,11 +318,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
                 return share_id
 
     def absolute_url(self, path: str) -> str:
-        if PUBLIC_BASE_URL:
-            return f"{PUBLIC_BASE_URL}{path}"
-        proto = self.headers.get("X-Forwarded-Proto", "http")
-        host = self.headers.get("Host") or f"{self.server.server_address[0]}:{self.server.server_address[1]}"
-        return f"{proto}://{host}{path}"
+        return absolute_public_url(path, self.headers, self.server.server_address)
 
     def serve_share_index(self, path: str) -> None:
         parts = [part for part in path.split("/") if part]

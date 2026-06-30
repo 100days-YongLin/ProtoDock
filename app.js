@@ -64,7 +64,10 @@ const els = {
   projectDirectoryPreview: document.getElementById('projectDirectoryPreview'),
   projectPresetGrid: document.getElementById('projectPresetGrid'),
   conflictModal: document.getElementById('conflictModal'),
-  unsavedHomeModal: document.getElementById('unsavedHomeModal')
+  unsavedHomeModal: document.getElementById('unsavedHomeModal'),
+  publicPreviewModal: document.getElementById('publicPreviewModal'),
+  publicPreviewStatus: document.getElementById('publicPreviewStatus'),
+  publicPreviewList: document.getElementById('publicPreviewList')
 };
 
 const buttons = {
@@ -75,7 +78,11 @@ const buttons = {
   reloadProject: document.getElementById('reloadProject'),
   startNewProject: document.getElementById('startNewProject'),
   startOpenProject: document.getElementById('startOpenProject'),
+  startOpenPublicProject: document.getElementById('startOpenPublicProject'),
   closeProjectModal: document.getElementById('closeProjectModal'),
+  closePublicPreviewModal: document.getElementById('closePublicPreviewModal'),
+  refreshPublicPreviews: document.getElementById('refreshPublicPreviews'),
+  cancelPublicPreview: document.getElementById('cancelPublicPreview'),
   chooseProjectDirectory: document.getElementById('chooseProjectDirectory'),
   createProject: document.getElementById('createProject'),
   cancelProject: document.getElementById('cancelProject'),
@@ -2354,6 +2361,65 @@ function closeProjectModal() {
   els.projectModal.hidden = true;
 }
 
+function setPublicPreviewStatus(message) {
+  if (els.publicPreviewStatus) {
+    els.publicPreviewStatus.textContent = message;
+  }
+}
+
+function renderPublicPreviewList(items = []) {
+  if (!els.publicPreviewList) {
+    return;
+  }
+  if (!items.length) {
+    els.publicPreviewList.innerHTML = '<div class="public-preview-empty">暂无公开预览项目</div>';
+    return;
+  }
+  els.publicPreviewList.innerHTML = items.map((item) => `
+    <button class="public-preview-item" type="button" data-share-url="${escapeHtml(item.url || '')}">
+      <strong>${escapeHtml(item.name || '未命名项目')}</strong>
+      <span>${escapeHtml(item.url || '')}</span>
+    </button>
+  `).join('');
+}
+
+async function loadPublicPreviews() {
+  setPublicPreviewStatus('正在读取公开项目...');
+  if (els.publicPreviewList) {
+    els.publicPreviewList.innerHTML = '';
+  }
+  buttons.refreshPublicPreviews?.toggleAttribute('disabled', true);
+  try {
+    const response = await fetch('/api/shares', { cache: 'no-store' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || '无法读取公开预览');
+    }
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    renderPublicPreviewList(items);
+    setPublicPreviewStatus(items.length ? `共 ${items.length} 个公开预览` : '没有公开预览项目');
+  } catch (error) {
+    renderPublicPreviewList([]);
+    setPublicPreviewStatus(`读取失败：${error.message || '当前服务未启用公开预览'}`);
+  } finally {
+    buttons.refreshPublicPreviews?.toggleAttribute('disabled', false);
+  }
+}
+
+function openPublicPreviewModal() {
+  if (!els.publicPreviewModal) {
+    return;
+  }
+  els.publicPreviewModal.hidden = false;
+  loadPublicPreviews();
+}
+
+function closePublicPreviewModal() {
+  if (els.publicPreviewModal) {
+    els.publicPreviewModal.hidden = true;
+  }
+}
+
 async function chooseProjectDirectory() {
   if (!window.showDirectoryPicker) {
     setStatus('当前浏览器不支持目录读写，请使用 Chrome / Edge');
@@ -2871,12 +2937,16 @@ function bindGlobalEvents() {
   buttons.homeProject?.addEventListener('click', goHome);
   buttons.openProject?.addEventListener('click', openProjectDirectory);
   buttons.startOpenProject?.addEventListener('click', openProjectDirectory);
+  buttons.startOpenPublicProject?.addEventListener('click', openPublicPreviewModal);
   buttons.newProject?.addEventListener('click', openProjectModal);
   buttons.startNewProject?.addEventListener('click', openProjectModal);
   buttons.saveProject?.addEventListener('click', saveProject);
   buttons.reloadProject?.addEventListener('click', reloadProject);
   buttons.closeProjectModal?.addEventListener('click', closeProjectModal);
   buttons.cancelProject?.addEventListener('click', closeProjectModal);
+  buttons.closePublicPreviewModal?.addEventListener('click', closePublicPreviewModal);
+  buttons.cancelPublicPreview?.addEventListener('click', closePublicPreviewModal);
+  buttons.refreshPublicPreviews?.addEventListener('click', loadPublicPreviews);
   buttons.chooseProjectDirectory?.addEventListener('click', chooseProjectDirectory);
   buttons.createProject?.addEventListener('click', createProject);
   buttons.modeSelect?.addEventListener('click', () => setToolMode('select'));
@@ -2961,6 +3031,18 @@ function bindGlobalEvents() {
     if (event.target === els.projectModal) {
       closeProjectModal();
     }
+  });
+  els.publicPreviewModal?.addEventListener('click', (event) => {
+    if (event.target === els.publicPreviewModal) {
+      closePublicPreviewModal();
+    }
+  });
+  els.publicPreviewList?.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-share-url]');
+    if (!item?.dataset.shareUrl) {
+      return;
+    }
+    window.location.href = item.dataset.shareUrl;
   });
   els.pageList?.addEventListener('click', (event) => {
     const item = event.target.closest('[data-page-node]');

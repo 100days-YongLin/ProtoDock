@@ -110,6 +110,7 @@
           <div class="start-actions">
             <button class="primary" id="startNewProject" type="button">新建项目</button>
             <button class="secondary" id="startOpenProject" type="button">打开已有项目</button>
+            <button class="secondary" id="startOpenPublicProject" type="button">打开公开预览</button>
           </div>
         </section>
 
@@ -300,6 +301,26 @@
       <div class="action-row">
         <button class="secondary" id="unsavedHomeCancel" type="button">取消</button>
         <button class="primary" id="unsavedHomeConfirm" type="button">继续返回首页</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="project-modal-backdrop" id="publicPreviewModal" hidden>
+    <section class="project-modal public-preview-modal" role="dialog" aria-modal="true" aria-labelledby="publicPreviewTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="publicPreviewTitle">打开公开预览</strong>
+          <span>选择 Ubuntu 上已经上传过的只读原型项目。</span>
+        </div>
+        <button class="tool-button" id="closePublicPreviewModal" title="关闭" aria-label="关闭">×</button>
+      </header>
+
+      <div class="public-preview-status" id="publicPreviewStatus" aria-live="polite">正在读取公开项目...</div>
+      <div class="public-preview-list" id="publicPreviewList"></div>
+
+      <div class="action-row">
+        <button class="secondary" id="refreshPublicPreviews" type="button">刷新</button>
+        <button class="primary" id="cancelPublicPreview" type="button">关闭</button>
       </div>
     </section>
   </div>

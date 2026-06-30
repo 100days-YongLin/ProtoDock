@@ -2056,6 +2056,73 @@ select {
   max-width: 520px;
 }
 
+.public-preview-modal {
+  max-width: 560px;
+}
+
+.public-preview-status {
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.public-preview-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(420px, 52vh);
+  overflow: auto;
+}
+
+.public-preview-item {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.public-preview-item:hover,
+.public-preview-item:focus-visible {
+  border-color: var(--primary-focus);
+  background: rgba(0, 113, 227, 0.06);
+  outline: none;
+}
+
+.public-preview-item strong,
+.public-preview-item span {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-preview-item strong {
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.public-preview-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.public-preview-empty {
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 18px;
+  text-align: center;
+}
+
 .share-dropzone {
   display: grid;
   justify-items: center;
@@ -2205,6 +2272,16 @@ select {
   .app-icon {
     width: 26px;
     height: 26px;
+  }
+
+  .start-actions {
+    flex-direction: column;
+    width: min(280px, 100%);
+  }
+
+  .start-actions .primary,
+  .start-actions .secondary {
+    width: 100%;
   }
 
   .brand-title strong {
