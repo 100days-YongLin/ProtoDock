@@ -8,6 +8,7 @@ const MAX_INSPECTOR_WIDTH = 760;
 const ALIGN_SNAP_THRESHOLD = 10;
 const MAX_SAFE_AREA_INSET = 240;
 const MANIFEST_WATCH_DIRTY_INTERVAL_MS = 6000;
+const SHARE_ARCHIVE_ROOT_DIRS = ['pages', 'docs', 'assets'];
 
 const els = {
   workspace: document.querySelector('.workspace'),
@@ -677,6 +678,130 @@ async function writeTextFile(path, text) {
   const writable = await fileHandle.createWritable();
   await writable.write(text);
   await writable.close();
+}
+
+function canCreateShareArchive() {
+  return !!state.manifest && !!state.projectHandle && !state.readOnly && !state.shareId;
+}
+
+function isAllowedShareArchivePath(path) {
+  const parts = splitPath(path);
+  if (!parts.length) {
+    return false;
+  }
+  if (parts.length === 1) {
+    return parts[0] === MANIFEST_FILE;
+  }
+  return SHARE_ARCHIVE_ROOT_DIRS.includes(parts[0]);
+}
+
+function safeShareArchiveFileName() {
+  const rawName = state.manifest?.project?.name || state.manifest?.project?.id || 'protodock-project';
+  const safeName = String(rawName)
+    .replace(/[^\p{L}\p{N} ._-]+/gu, '-')
+    .replace(/^[ ._-]+|[ ._-]+$/g, '')
+    .slice(0, 80);
+  return `${safeName || 'protodock-project'}.zip`;
+}
+
+function dirtyDocArchiveEntries() {
+  const entries = new Map();
+  for (const pageId of state.docDirty) {
+    const page = state.manifest?.pages?.[pageId];
+    const docPath = page?.doc ? resolvePath('', page.doc) : '';
+    if (docPath && isAllowedShareArchivePath(docPath)) {
+      entries.set(docPath, state.docCache.get(pageId) || '');
+    }
+  }
+  return entries;
+}
+
+async function collectShareFiles(directoryHandle, prefix, files) {
+  const children = [];
+  for await (const [name, handle] of directoryHandle.entries()) {
+    children.push({ name, handle });
+  }
+  children.sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const child of children) {
+    const path = `${prefix}/${child.name}`;
+    if (child.handle.kind === 'file') {
+      files.push({ path, handle: child.handle });
+      continue;
+    }
+    if (child.handle.kind === 'directory') {
+      await collectShareFiles(child.handle, path, files);
+    }
+  }
+}
+
+async function createShareArchive(options = {}) {
+  if (!canCreateShareArchive()) {
+    throw new Error('请先打开一个本地项目目录');
+  }
+  if (!window.ProtoDockZip?.createZipFile) {
+    throw new Error('当前页面缺少 zip 打包模块');
+  }
+
+  await checkExternalManifestChange('manual');
+
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : () => {};
+  const diskFiles = [];
+  onProgress({ phase: 'collecting', current: 0, total: 0 });
+
+  for (const rootName of SHARE_ARCHIVE_ROOT_DIRS) {
+    try {
+      const directoryHandle = await state.projectHandle.getDirectoryHandle(rootName);
+      await collectShareFiles(directoryHandle, rootName, diskFiles);
+      onProgress({ phase: 'collecting', current: diskFiles.length, total: 0 });
+    } catch (error) {
+      if (error?.name !== 'NotFoundError') {
+        throw error;
+      }
+    }
+  }
+
+  const entries = [{
+    path: MANIFEST_FILE,
+    data: manifestText(state.manifest),
+    lastModified: Date.now()
+  }];
+  const dirtyDocs = dirtyDocArchiveEntries();
+  const includedPaths = new Set([MANIFEST_FILE]);
+
+  for (let index = 0; index < diskFiles.length; index += 1) {
+    const item = diskFiles[index];
+    if (!isAllowedShareArchivePath(item.path)) {
+      continue;
+    }
+    const overrideText = dirtyDocs.get(item.path);
+    if (overrideText !== undefined) {
+      entries.push({
+        path: item.path,
+        data: overrideText,
+        lastModified: Date.now()
+      });
+    } else {
+      const file = await item.handle.getFile();
+      entries.push({
+        path: item.path,
+        data: file,
+        lastModified: file.lastModified
+      });
+    }
+    includedPaths.add(item.path);
+    onProgress({ phase: 'reading', current: index + 1, total: diskFiles.length, path: item.path });
+  }
+
+  for (const [path, text] of dirtyDocs) {
+    if (!includedPaths.has(path)) {
+      entries.push({ path, data: text, lastModified: Date.now() });
+      includedPaths.add(path);
+    }
+  }
+
+  onProgress({ phase: 'zipping', current: entries.length, total: entries.length });
+  return window.ProtoDockZip.createZipFile(entries, safeShareArchiveFileName());
 }
 
 async function createBlobUrlFromFile(path, baseDir = '') {
@@ -3265,6 +3390,7 @@ window.ProtoDock = {
       safeAreaBottom: safeArea.bottom,
       readOnly: state.readOnly,
       dirty: state.dirty,
+      canPackageProject: canCreateShareArchive(),
       manifestWatcherActive: !!state.manifestWatchTimer,
       ignoredExternalManifestChange: !!state.ignoredExternalManifestHash,
       zoom: state.zoom,
@@ -3281,6 +3407,7 @@ window.ProtoDock = {
   saveProject,
   reloadProject,
   checkExternalManifestChange,
+  createShareArchive,
   loadSharedProject,
   zoomByWheel(deltaY = -360, clientX, clientY) {
     const rect = els.canvasShell.getBoundingClientRect();

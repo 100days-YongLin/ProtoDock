@@ -2351,6 +2351,49 @@ select {
   text-align: center;
 }
 
+.share-auto-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(0, 113, 227, 0.24);
+  border-radius: 14px;
+  background: rgba(0, 113, 227, 0.06);
+  padding: 10px 12px;
+}
+
+.share-auto-panel[hidden] {
+  display: none;
+}
+
+.share-auto-panel svg {
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+}
+
+.share-auto-panel div,
+.share-auto-panel strong,
+.share-auto-panel span {
+  display: block;
+  min-width: 0;
+}
+
+.share-auto-panel strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-auto-panel span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .share-dropzone {
   display: grid;
   justify-items: center;

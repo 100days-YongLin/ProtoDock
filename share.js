@@ -7,7 +7,11 @@
     updatePanel: document.getElementById('shareUpdatePanel'),
     updateList: document.getElementById('shareTargetList'),
     refreshTargets: document.getElementById('refreshShareTargets'),
+    autoPanel: document.getElementById('shareAutoPanel'),
+    autoTitle: document.getElementById('shareAutoTitle'),
+    autoDescription: document.getElementById('shareAutoDescription'),
     dropzone: document.getElementById('shareDropZone'),
+    dropHint: document.getElementById('shareDropHint'),
     input: document.getElementById('shareFileInput'),
     choose: document.getElementById('chooseShareFile'),
     upload: document.getElementById('uploadShareFile'),
@@ -109,14 +113,60 @@
     }
   }
 
+  function protoDockState() {
+    try {
+      return window.ProtoDock?.getState?.() || {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function canAutoPackage() {
+    return !!window.ProtoDock?.createShareArchive && !!protoDockState().canPackageProject;
+  }
+
+  function uploadSource() {
+    if (selectedFile) {
+      return 'manual';
+    }
+    return canAutoPackage() ? 'auto' : null;
+  }
+
   function canUpload() {
-    return !!selectedFile && !isUploading && (shareMode !== 'update' || !!selectedShareId);
+    return !!uploadSource() && !isUploading && (shareMode !== 'update' || !!selectedShareId);
+  }
+
+  function updatePackageSourceUi() {
+    const autoAvailable = canAutoPackage();
+    const usingAuto = !selectedFile && autoAvailable;
+    if (els.autoPanel) {
+      els.autoPanel.hidden = !usingAuto;
+    }
+    if (els.autoTitle && usingAuto) {
+      els.autoTitle.textContent = '自动打包当前项目';
+    }
+    if (els.autoDescription && usingAuto) {
+      const state = protoDockState();
+      const dirtyText = state.dirty ? '当前未保存的画布和文档改动也会进入分享包。' : '会读取当前本地项目目录里的页面、文档和素材。';
+      els.autoDescription.textContent = `${state.projectDirectoryName || '本地项目'}：${dirtyText}`;
+    }
+    if (els.fileName && !selectedFile) {
+      els.fileName.textContent = autoAvailable ? '也可以拖入项目 zip，改用手动上传' : '拖入项目 zip，或点击选择';
+    }
+    if (els.dropHint) {
+      els.dropHint.textContent = autoAvailable
+        ? '自动打包失败或想上传其他版本时，可以在这里选择 zip。'
+        : '支持根目录直接包含 protodock.project.json，或外层包一层项目文件夹。';
+    }
   }
 
   function updateUploadState() {
+    updatePackageSourceUi();
     if (els.upload) {
       els.upload.disabled = !canUpload();
-      els.upload.textContent = shareMode === 'update' ? '上传并更新链接' : '上传并生成链接';
+      const source = uploadSource();
+      const verb = source === 'auto' ? '打包' : '上传';
+      els.upload.textContent = shareMode === 'update' ? `${verb}并更新链接` : `${verb}并生成链接`;
     }
     if (els.choose) {
       els.choose.disabled = isUploading;
@@ -191,6 +241,25 @@
 
       request.send(body);
     });
+  }
+
+  function setArchiveProgress(progress = {}) {
+    if (progress.phase === 'collecting') {
+      setProgress(0, { indeterminate: true, label: '扫描中' });
+      setStatus(progress.current ? `正在扫描项目文件：${progress.current} 个` : '正在扫描项目目录...');
+      return;
+    }
+    if (progress.phase === 'reading') {
+      const total = progress.total || 1;
+      const percent = Math.min(95, Math.round((progress.current / total) * 95));
+      setProgress(percent, { label: `${progress.current}/${progress.total}` });
+      setStatus(`正在打包 ${progress.current}/${progress.total}`);
+      return;
+    }
+    if (progress.phase === 'zipping') {
+      setProgress(98, { indeterminate: true, label: '压缩中' });
+      setStatus('正在生成 zip...');
+    }
   }
 
   function shareUrlFromPayload(payload) {
@@ -301,7 +370,11 @@
       }
       return;
     }
-    setStatus(selectedFile ? '新建模式：点击上传生成新链接' : '等待上传项目压缩包');
+    if (selectedFile) {
+      setStatus('新建模式：点击上传生成新链接');
+      return;
+    }
+    setStatus(canAutoPackage() ? '将自动打包当前项目，点击即可生成分享链接' : '等待上传项目压缩包');
   }
 
   function selectShareTarget(shareId) {
@@ -319,6 +392,14 @@
     if (!els.modal) {
       return;
     }
+    selectedFile = null;
+    if (els.input) {
+      els.input.value = '';
+    }
+    if (els.result) {
+      els.result.hidden = true;
+    }
+    resetProgress();
     els.modal.hidden = false;
     setMode('create');
     window.lucide?.createIcons();
@@ -353,7 +434,8 @@
   }
 
   async function uploadFile() {
-    if (!selectedFile || !els.upload || isUploading) {
+    const source = uploadSource();
+    if (!source || !els.upload || isUploading) {
       return;
     }
     if (shareMode === 'update' && !selectedShareId) {
@@ -363,13 +445,18 @@
 
     setUploading(true);
     setProgress(0);
-    setStatus(shareMode === 'update' ? '准备更新...' : '准备上传...');
+    setStatus(source === 'auto' ? '准备打包当前项目...' : (shareMode === 'update' ? '准备更新...' : '准备上传...'));
     const body = new FormData();
-    body.append('archive', selectedFile);
-    if (shareMode === 'update') {
-      body.append('shareId', selectedShareId);
-    }
     try {
+      const archiveFile = source === 'auto'
+        ? await window.ProtoDock.createShareArchive({ onProgress: setArchiveProgress })
+        : selectedFile;
+      body.append('archive', archiveFile, archiveFile.name || 'protodock-project.zip');
+      if (shareMode === 'update') {
+        body.append('shareId', selectedShareId);
+      }
+      setProgress(0);
+      setStatus(shareMode === 'update' ? '正在上传更新包...' : '正在上传...');
       const payload = await uploadArchive(body);
       setProgress(100);
       const shareUrl = shareUrlFromPayload(payload);

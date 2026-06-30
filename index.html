@@ -368,10 +368,18 @@
         <div class="share-target-list" id="shareTargetList"></div>
       </div>
 
+      <div class="share-auto-panel" id="shareAutoPanel" hidden>
+        <i data-lucide="archive"></i>
+        <div>
+          <strong id="shareAutoTitle">自动打包当前项目</strong>
+          <span id="shareAutoDescription">将从已打开的本地目录读取 protodock.project.json、pages、docs 和 assets。</span>
+        </div>
+      </div>
+
       <div class="share-dropzone" id="shareDropZone" role="button" tabindex="0" aria-label="上传 ProtoDock 项目压缩包">
         <i data-lucide="upload-cloud"></i>
         <strong id="shareFileName">拖入项目 zip，或点击选择</strong>
-        <span>支持根目录直接包含 protodock.project.json，或外层包一层项目文件夹。</span>
+        <span id="shareDropHint">支持根目录直接包含 protodock.project.json，或外层包一层项目文件夹。</span>
         <input id="shareFileInput" type="file" accept=".zip,application/zip" hidden>
       </div>
 
@@ -399,6 +407,7 @@
   <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
   <script src="./vendor/lucide.min.js"></script>
   <script src="./placement.js"></script>
+  <script src="./zip.js"></script>
   <script src="./app.js"></script>
   <script src="./share.js"></script>
 </body>
