@@ -35,6 +35,27 @@ prototype-project/
 └── exports/
 ```
 
+## Agent 写入边界
+
+原型页面是可生成资产，画布排布是用户劳动成果。Agent 或导出脚本必须先保护画布，再更新页面。
+
+- `pages/**`、`docs/**`、`assets/**` 可以由 Agent 生成或更新。
+- `protodock.project.json` 中的 `project` 和 `pages` 可以由 Agent 按需更新。
+- `canvas.nodes`、`canvas.edges`、`canvas.notes` 默认视为用户在 ProtoDock 中编辑过的布局数据，Agent 不得整体重写。
+- Agent 如需新增页面节点，只能按 `id` 或 `pageId` 增量追加缺失节点，并必须保留已有节点的 `x`、`y`、`fromSide`、`toSide`、锚点、说明文本以及未知字段。
+- 只有用户明确说“重排画布”“重建 flow”或“覆盖 canvas”时，Agent 才能重写 `canvas`。
+- 导出脚本默认必须 preserve canvas；只有显式参数如 `--reset-canvas` 才允许重排或替换整个 `canvas` 对象。
+
+## Manifest 备份规则
+
+Agent 或脚本修改 `protodock.project.json` 前，必须先复制一份备份到当前原型项目目录：
+
+```text
+protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json
+```
+
+如果备份失败，必须停止写入。备份成功后，更新 manifest 时只能按字段 merge，禁止把 `protodock.project.json` 当成可整体重生成的产物。
+
 ## Manifest 最小示例
 
 ```json

@@ -23,10 +23,12 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 5. If using React/Vue/Vite, compile the design before handing it to ProtoDock.
 6. Prefer single-page static bundles for v1. Avoid runtime dev servers, API calls, or assets outside the project directory.
 7. Treat `protodock.project.json > project.id` as the only source of truth for project identity.
-8. Do not change `canvas.nodes[].x`, `canvas.nodes[].y`, or `canvas.edges` unless the user asked you to change the flow.
-9. Do not delete or overwrite user-authored pages, docs, or assets without explicit instruction.
-10. Keep the project-level `devicePreset` consistent. v1 assumes one device shell per project.
-11. Use `docs/<page-id>.md` for page intent, states, and acceptance notes.
+8. Treat `canvas.nodes`, `canvas.edges`, and `canvas.notes` as user-owned ProtoDock layout state. Never regenerate, normalize, replace, or reorder them unless the user explicitly asks for canvas reset or re-layout.
+9. When adding a page to an existing manifest, merge by `pageId` or node `id`: append only missing nodes or edges, and preserve existing coordinates, anchor sides, notes, and unknown fields.
+10. Before writing `protodock.project.json`, create a timestamped backup at `protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json`. If backup fails, stop.
+11. Do not delete or overwrite user-authored pages, docs, or assets without explicit instruction.
+12. Keep the project-level `devicePreset` consistent. v1 assumes one device shell per project.
+13. Use `docs/<page-id>.md` for page intent, states, and acceptance notes.
 
 ## React / Vue Recommended Build
 
@@ -55,12 +57,15 @@ Design agents may update:
 
 Design agents should not update:
 
+- `canvas.nodes`
 - `canvas.nodes[].x`
 - `canvas.nodes[].y`
 - `canvas.edges`
+- `canvas.edges[].fromSide`
+- `canvas.edges[].toSide`
 - `canvas.notes`
 
-Those fields belong to ProtoDock and product-flow editing.
+Those fields belong to ProtoDock and product-flow editing. The default behavior is preserve canvas. Use an explicit reset or re-layout option, such as `--reset-canvas`, only when the user asks for it.
 
 ## Page Sizing
 
