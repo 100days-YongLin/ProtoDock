@@ -82,12 +82,15 @@ const canvasPresets = {
     thumbnailWidth: 158
   },
   'iphone-portrait': {
-    label: 'iPhone 竖版',
-    desc: '390 x 844，移动端小程序',
+    label: 'iPhone 14 Pro',
+    desc: '390 x 830，移动端小程序',
     shellClass: 'iphone iphone-portrait',
+    deviceClass: 'device-iphone-14-pro device-black',
     width: 390,
-    height: 844,
-    thumbnailWidth: 156
+    height: 830,
+    frameWidth: 428,
+    frameHeight: 868,
+    thumbnailWidth: 188
   },
   'iphone-landscape': {
     label: 'iPhone 横版',
@@ -98,12 +101,15 @@ const canvasPresets = {
     thumbnailWidth: 236
   },
   'ipad-portrait': {
-    label: 'iPad 竖版',
-    desc: '820 x 1180，平板竖屏业务',
+    label: 'iPad Pro',
+    desc: '506 x 724，平板竖屏业务',
     shellClass: 'ipad ipad-portrait',
-    width: 820,
-    height: 1180,
-    thumbnailWidth: 150
+    deviceClass: 'device-ipad-pro device-spacegray',
+    width: 506,
+    height: 724,
+    frameWidth: 560,
+    frameHeight: 778,
+    thumbnailWidth: 174
   },
   'ipad-landscape': {
     label: 'iPad 横版',
@@ -225,12 +231,16 @@ function presetFor() {
 function previewStyleFor(preset) {
   const width = preset.width || 390;
   const height = preset.height || 844;
-  const scale = (preset.thumbnailWidth || 124) / width;
-  const viewportWidth = width * scale;
-  const viewportHeight = height * scale;
+  const frameWidth = preset.frameWidth || width;
+  const frameHeight = preset.frameHeight || height;
+  const scale = (preset.thumbnailWidth || 124) / frameWidth;
+  const viewportWidth = frameWidth * scale;
+  const viewportHeight = frameHeight * scale;
   return [
     `--preview-width:${width}px`,
     `--preview-height:${height}px`,
+    `--device-frame-width:${frameWidth}px`,
+    `--device-frame-height:${frameHeight}px`,
     `--preview-scale:${scale.toFixed(5)}`,
     `--viewport-width:${viewportWidth.toFixed(2)}px`,
     `--viewport-height:${viewportHeight.toFixed(2)}px`
@@ -550,6 +560,27 @@ async function hydratePreview(node) {
 function renderPreviewShell(node, page) {
   const preset = presetFor();
   const previewStyle = previewStyleFor(preset);
+  if (preset.deviceClass) {
+    return `
+      <div class="prototype-shell device-backed" style="${previewStyle}">
+        <div class="prototype-device-viewport">
+          <div class="prototype-device device ${escapeHtml(preset.deviceClass)}">
+            <div class="device-frame">
+              <div class="device-screen" data-preview-node="${escapeHtml(node.id)}">
+                <div class="preview-loading">等待预览</div>
+              </div>
+            </div>
+            <div class="device-stripe"></div>
+            <div class="device-header"></div>
+            <div class="device-sensors"></div>
+            <div class="device-btns"></div>
+            <div class="device-power"></div>
+            <div class="device-home"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="prototype-shell ${escapeHtml(preset.shellClass)}" style="${previewStyle}">
       <div class="shell-bar">

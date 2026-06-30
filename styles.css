@@ -923,6 +923,32 @@ select {
   background: #f8fafc;
 }
 
+.prototype-shell.device-backed {
+  display: block;
+  overflow: visible;
+  width: var(--viewport-width);
+  height: var(--viewport-height);
+  border: 0;
+  background: transparent;
+}
+
+.prototype-device-viewport {
+  position: relative;
+  width: var(--viewport-width);
+  height: var(--viewport-height);
+  overflow: visible;
+}
+
+.prototype-device {
+  transform: scale(var(--preview-scale));
+  transform-origin: 0 0;
+}
+
+.prototype-device .device-screen {
+  overflow: hidden;
+  background: #fff;
+}
+
 .prototype-shell.web {
   border-radius: 8px;
 }

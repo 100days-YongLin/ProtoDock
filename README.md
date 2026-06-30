@@ -9,7 +9,8 @@ ProtoDock 是一个本地静态原型工作台。它不负责替设计 Agent 生
 - 新建项目会生成 `README.md`，但项目 ID 仍以 `protodock.project.json` 的 `project.id` 为唯一来源。
 - 页面源码由设计 Agent 维护，入口通常是 `pages/<page-id>/index.html`。
 - ProtoDock 通过 manifest 中的 `page.entry` 读取页面，并在画布节点中用 iframe 预览。
-- iframe 会按设备真实尺寸渲染，例如 iPhone 竖版是 `390 x 844`，再整体缩放成画布缩略图。
+- iframe 会按设备真实尺寸渲染，例如 iPhone 14 Pro 是 `390 x 830`，再整体缩放成画布缩略图。
+- 手机和平板设备壳使用 vendored `picturepan2/devices.css`，避免依赖外部 CDN。
 - 画布节点、连线、文本说明和项目设备壳由 `protodock.project.json` 持久化。
 - 右侧 Markdown 文档可以绑定到 `docs/<page-id>.md`。
 

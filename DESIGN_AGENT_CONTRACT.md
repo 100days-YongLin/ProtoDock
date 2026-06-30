@@ -66,11 +66,11 @@ Those fields belong to ProtoDock and product-flow editing.
 
 Design pages for the project `devicePreset`:
 
-- `iphone-portrait`: mobile / mini-program screens.
+- `iphone-portrait`: mobile / mini-program screens, rendered as an iPhone 14 Pro shell at `390 x 830`.
 - `iphone-landscape`: horizontal mobile flows.
 - `ipad-portrait`: tablet portrait.
 - `ipad-landscape`: tablet landscape.
 - `web-landscape`: desktop web.
 - `web-portrait`: tall web pages.
 
-Use responsive CSS for the target device viewport. ProtoDock renders the page at the real preset size first, then scales that viewport down inside the canvas node. For example, `iphone-portrait` pages should look correct at `390 x 844`; do not design for the small thumbnail size shown on the canvas.
+Use responsive CSS for the target device viewport. ProtoDock renders the page at the real preset size first, then scales that viewport down inside the canvas node. For example, `iphone-portrait` pages should look correct at `390 x 830`; do not design for the small thumbnail size shown on the canvas.
