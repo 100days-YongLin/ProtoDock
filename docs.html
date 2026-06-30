@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>使用文档 - ProtoDock 原型舱</title>
+  <link rel="icon" type="image/png" href="./assets/protodock-icon.png">
+  <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
+  <link rel="stylesheet" href="./docs.css">
+</head>
+<body>
+  <header class="docs-topbar">
+    <a class="docs-brand" href="./index.html" aria-label="返回 ProtoDock">
+      <img src="./assets/protodock-icon.png" alt="">
+      <span>ProtoDock Docs</span>
+    </a>
+    <nav class="docs-nav" aria-label="文档导航">
+      <a href="#quick-start">快速开始</a>
+      <a href="#sharing">分享预览</a>
+      <a href="#agent-boundaries">Agent 边界</a>
+    </nav>
+    <a class="docs-workbench" href="./index.html">打开工作台</a>
+  </header>
+
+  <div class="docs-shell">
+    <aside class="docs-sidebar" aria-label="章节">
+      <strong>使用文档</strong>
+      <a href="#quick-start">快速开始</a>
+      <a href="#project-structure">项目目录</a>
+      <a href="#canvas-workflow">画布协作</a>
+      <a href="#sharing">分享预览</a>
+      <a href="#agent-boundaries">Agent 写入边界</a>
+      <a href="#faq">常见问题</a>
+    </aside>
+
+    <main class="docs-content">
+      <section class="docs-hero" id="quick-start">
+        <p class="eyebrow">ProtoDock 原型舱</p>
+        <h1>用一个工作目录管理画布、PRD 和静态原型。</h1>
+        <p>
+          ProtoDock 读取项目里的 manifest、页面入口和 Markdown 文档，把它们组合成可编排、可预览、可分享的原型工作台。
+        </p>
+      </section>
+
+      <section class="docs-section">
+        <h2>快速开始</h2>
+        <div class="steps">
+          <article>
+            <span>1</span>
+            <h3>准备项目目录</h3>
+            <p>项目根目录需要包含 <code>protodock.project.json</code>，页面入口通常放在 <code>pages/&lt;page-id&gt;/index.html</code>。</p>
+          </article>
+          <article>
+            <span>2</span>
+            <h3>打开工作目录</h3>
+            <p>在首页选择“新建项目”或“打开已有项目”。本地保存会写回当前工作目录。</p>
+          </article>
+          <article>
+            <span>3</span>
+            <h3>编排画布</h3>
+            <p>拖拽页面节点、连接锚点、补充右侧 Markdown，形成可演示的产品流程。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="docs-section" id="project-structure">
+        <h2>项目目录</h2>
+        <p>推荐让原型项目保持简单、可静态打开，方便 Agent 生成页面，也方便 ProtoDock 读取。</p>
+        <pre><code>prototype-project/
+├── protodock.project.json
+├── pages/
+│   └── home/
+│       └── index.html
+├── docs/
+│   └── home.md
+└── assets/</code></pre>
+      </section>
+
+      <section class="docs-section" id="canvas-workflow">
+        <h2>画布协作</h2>
+        <p>画布节点、连线、文本说明和设备壳配置都来自 manifest。页面源码可以由设计 Agent 生成，画布位置属于用户在 ProtoDock 里的排布成果。</p>
+        <div class="callout">
+          <strong>先保护画布，再更新页面。</strong>
+          <p>导出脚本和 Agent 默认只能增量合并节点，不能整体重写 <code>canvas.nodes</code>、<code>canvas.edges</code> 或 <code>canvas.notes</code>。</p>
+        </div>
+      </section>
+
+      <section class="docs-section" id="sharing">
+        <h2>分享预览</h2>
+        <p>部署内置 Python 服务后，可以把 <code>.zip</code> 项目包上传到后端，生成 <code>/s/&lt;share-id&gt;</code> 只读预览链接。</p>
+        <pre><code>PROTODOCK_PORT=6080 python3 server.py</code></pre>
+        <div class="feature-grid">
+          <article>
+            <h3>上传</h3>
+            <p>右上角“分享”支持拖入项目 zip，服务端只解压 manifest、pages、docs 和 assets。</p>
+          </article>
+          <article>
+            <h3>预览</h3>
+            <p>分享链接读取服务端副本，不会写回上传者本地文件，也不会允许浏览者编辑。</p>
+          </article>
+          <article>
+            <h3>下载</h3>
+            <p>进入分享页后，右上角按钮会切换为“下载”，浏览者可以拿到对应项目 zip。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="docs-section" id="agent-boundaries">
+        <h2>Agent 写入边界</h2>
+        <ul class="rule-list">
+          <li><code>pages/**</code>、<code>docs/**</code>、<code>assets/**</code> 可以由 Agent 生成或更新。</li>
+          <li><code>protodock.project.json</code> 中的 <code>project</code> 和 <code>pages</code> 可以按需更新。</li>
+          <li><code>canvas.nodes</code>、<code>canvas.edges</code>、<code>canvas.notes</code> 默认视为用户资产，不得整体重写。</li>
+          <li>写 manifest 前必须先备份到 <code>protodock/backups/</code>。</li>
+        </ul>
+      </section>
+
+      <section class="docs-section" id="faq">
+        <h2>常见问题</h2>
+        <details>
+          <summary>分享页为什么是只读的？</summary>
+          <p>分享页读取的是服务端上传副本，目标是给同事快速浏览方案，不承担多人协作编辑。</p>
+        </details>
+        <details>
+          <summary>页面里的图标和素材每次都要下载吗？</summary>
+          <p>ProtoDock 外壳使用本地 vendored 资源。原型页面自己的素材建议放在项目 <code>assets/</code> 或页面目录中，用相对路径引用。</p>
+        </details>
+        <details>
+          <summary>安全区数值保存在哪里？</summary>
+          <p>保存在 manifest 的 <code>project.safeAreaEnabled</code>、<code>project.safeAreaTop</code> 和 <code>project.safeAreaBottom</code> 字段里。</p>
+        </details>
+      </section>
+    </main>
+
+    <aside class="docs-toc" aria-label="当前页目录">
+      <strong>On this page</strong>
+      <a href="#quick-start">快速开始</a>
+      <a href="#project-structure">项目目录</a>
+      <a href="#canvas-workflow">画布协作</a>
+      <a href="#sharing">分享预览</a>
+      <a href="#agent-boundaries">Agent 写入边界</a>
+    </aside>
+  </div>
+</body>
+</html>

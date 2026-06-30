@@ -87,7 +87,6 @@ const buttons = {
   addNode: document.getElementById('addNode'),
   addText: document.getElementById('addText'),
   playFlow: document.getElementById('playFlow'),
-  resetView: document.getElementById('resetView'),
   zoomIn: document.getElementById('zoomIn'),
   zoomOut: document.getElementById('zoomOut'),
   closePlayback: document.getElementById('closePlayback'),
@@ -2961,12 +2960,6 @@ function bindGlobalEvents() {
   els.savePageSettings?.addEventListener('click', savePageSettings);
   els.sortPagesButton?.addEventListener('click', () => {
     setPageSortMode(!state.pageSortMode);
-  });
-  buttons.resetView?.addEventListener('click', () => {
-    state.zoom = 1;
-    state.panX = 0;
-    state.panY = 0;
-    updateZoom();
   });
   buttons.zoomIn?.addEventListener('click', () => zoomFromCenter(0.1));
   buttons.zoomOut?.addEventListener('click', () => zoomFromCenter(-0.1));

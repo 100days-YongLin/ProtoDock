@@ -99,6 +99,27 @@ select {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.docs-entry {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.72);
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+.docs-entry:hover,
+.docs-entry:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  outline: none;
+}
+
 .toolbar {
   display: flex;
   min-width: 0;
@@ -2279,6 +2300,10 @@ select {
 
   .brand-title strong {
     font-size: 13px;
+  }
+
+  .docs-entry {
+    display: none;
   }
 
   .status {
