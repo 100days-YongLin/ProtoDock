@@ -2367,11 +2367,19 @@ function renderPublicPreviewList(items = []) {
     return;
   }
   els.publicPreviewList.innerHTML = items.map((item) => `
-    <button class="public-preview-item" type="button" data-share-url="${escapeHtml(item.url || '')}">
+    <button class="public-preview-item" type="button" data-share-url="${escapeHtml(shareUrlForItem(item))}">
       <strong>${escapeHtml(item.name || '未命名项目')}</strong>
-      <span>${escapeHtml(item.url || '')}</span>
+      <span>${escapeHtml(shareUrlForItem(item))}</span>
     </button>
   `).join('');
+}
+
+function shareUrlForItem(item) {
+  const path = item.path || (item.id ? `/s/${encodeURIComponent(item.id)}` : item.url || '');
+  if (!path) {
+    return '';
+  }
+  return new URL(path, window.location.href).toString();
 }
 
 async function loadPublicPreviews() {

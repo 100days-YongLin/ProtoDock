@@ -22,7 +22,6 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parent
 SHARES_DIR = ROOT / "shares"
 MANIFEST_FILE = "protodock.project.json"
-PUBLIC_BASE_URL = os.environ.get("PROTODOCK_PUBLIC_BASE_URL", "").rstrip("/")
 
 MAX_UPLOAD_BYTES = int(os.environ.get("PROTODOCK_MAX_UPLOAD_BYTES", 100 * 1024 * 1024))
 MAX_EXTRACTED_BYTES = int(os.environ.get("PROTODOCK_MAX_EXTRACTED_BYTES", 250 * 1024 * 1024))
@@ -184,10 +183,12 @@ def share_item_from_directory(directory: Path, url_for=None) -> dict | None:
         project = {}
     name = str(project.get("name") or share_id)
     updated_at = manifest_path.stat().st_mtime
+    path = f"/s/{share_id}"
     return {
         "id": share_id,
         "name": name,
-        "url": (url_for or absolute_public_url)(f"/s/{share_id}"),
+        "path": path,
+        "url": (url_for or absolute_public_url)(path),
         "updatedAt": updated_at
     }
 
@@ -208,15 +209,21 @@ def request_path_to_file(root: Path, request_path: str) -> Path:
 
 
 def absolute_public_url(path: str, headers=None, server_address=None) -> str:
-    if PUBLIC_BASE_URL:
-        return f"{PUBLIC_BASE_URL}{path}"
     if headers is None:
         return path
-    proto = headers.get("X-Forwarded-Proto", "http")
-    host = headers.get("Host")
+    proto = header_first(headers, "X-Forwarded-Proto") or "http"
+    host = header_first(headers, "X-Forwarded-Host") or headers.get("Host")
+    forwarded_port = header_first(headers, "X-Forwarded-Port")
+    if host and forwarded_port and ":" not in host:
+        host = f"{host}:{forwarded_port}"
     if not host and server_address:
         host = f"{server_address[0]}:{server_address[1]}"
     return f"{proto}://{host}{path}" if host else path
+
+
+def header_first(headers, name: str) -> str:
+    value = headers.get(name, "")
+    return value.split(",", 1)[0].strip()
 
 
 class ProtoDockHandler(BaseHTTPRequestHandler):
@@ -296,8 +303,12 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise
 
-        url = self.absolute_url(f"/s/{share_id}")
-        self.send_json(HTTPStatus.CREATED, {"id": share_id, "url": url})
+        path = f"/s/{share_id}"
+        self.send_json(HTTPStatus.CREATED, {
+            "id": share_id,
+            "path": path,
+            "url": self.absolute_url(path)
+        })
 
     def handle_share_list(self) -> None:
         SHARES_DIR.mkdir(parents=True, exist_ok=True)

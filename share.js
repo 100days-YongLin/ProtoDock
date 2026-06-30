@@ -126,6 +126,14 @@
     });
   }
 
+  function shareUrlFromPayload(payload) {
+    const path = payload.path || (payload.id ? `/s/${encodeURIComponent(payload.id)}` : payload.url || '');
+    if (!path) {
+      return '';
+    }
+    return new URL(path, window.location.href).toString();
+  }
+
   function openModal() {
     if (!els.modal) {
       return;
@@ -170,9 +178,10 @@
     try {
       const payload = await uploadArchive(body);
       setProgress(100);
+      const shareUrl = shareUrlFromPayload(payload);
       if (els.url) {
-        els.url.href = payload.url;
-        els.url.textContent = payload.url;
+        els.url.href = shareUrl;
+        els.url.textContent = shareUrl;
       }
       if (els.result) {
         els.result.hidden = false;
