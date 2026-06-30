@@ -623,10 +623,10 @@ select {
 .page-node {
   position: absolute;
   z-index: 2;
-  width: 280px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: #fff;
+  width: fit-content;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   cursor: grab;
   user-select: none;
 }
@@ -636,12 +636,13 @@ select {
 }
 
 .page-node.selected {
-  border-color: var(--primary-focus);
-  outline: 2px solid rgba(0, 113, 227, 0.18);
+  outline: none;
 }
 
 .node-anchors {
-  pointer-events: auto;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .node-anchor {
@@ -765,9 +766,15 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 44px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
+  width: var(--viewport-width);
+  min-height: 38px;
+  margin: 0 auto 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 7px 10px;
+  box-shadow: 0 10px 24px rgba(23, 32, 51, 0.08);
+  backdrop-filter: saturate(180%) blur(18px);
 }
 
 .node-title {
@@ -778,7 +785,7 @@ select {
 
 .node-title strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 760;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -787,7 +794,7 @@ select {
 .node-title span {
   overflow: hidden;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -819,7 +826,7 @@ select {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   padding: 0;
   transition: opacity 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
@@ -873,11 +880,13 @@ select {
 }
 
 .screen {
+  position: relative;
   display: grid;
-  gap: 8px;
+  width: var(--viewport-width);
+  margin: 0 auto;
   justify-content: center;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .phone-frame,
@@ -955,6 +964,7 @@ select {
 }
 
 .prototype-shell {
+  position: relative;
   display: grid;
   grid-template-rows: auto 1fr;
   overflow: hidden;
@@ -971,6 +981,16 @@ select {
   height: var(--viewport-height);
   border: 0;
   background: transparent;
+}
+
+.page-node.selected .prototype-shell.device-backed::before,
+.page-node.selected .prototype-shell:not(.device-backed)::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--primary-focus);
+  border-radius: 36px;
+  pointer-events: none;
 }
 
 .prototype-device-viewport {

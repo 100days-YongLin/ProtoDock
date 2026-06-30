@@ -247,6 +247,12 @@ function previewStyleFor(preset) {
   ].join(';');
 }
 
+function nodeStyleFor(node) {
+  const preset = presetFor();
+  const previewStyle = previewStyleFor(preset);
+  return `left:${node.x}px;top:${node.y}px;${previewStyle}`;
+}
+
 function manifestText(manifest = state.manifest) {
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
@@ -562,7 +568,7 @@ function renderPreviewShell(node, page) {
   const previewStyle = previewStyleFor(preset);
   if (preset.deviceClass) {
     return `
-      <div class="prototype-shell device-backed" style="${previewStyle}">
+      <div class="prototype-shell device-backed">
         <div class="prototype-device-viewport">
           <div class="prototype-device device ${escapeHtml(preset.deviceClass)}">
             <div class="device-frame">
@@ -582,7 +588,7 @@ function renderPreviewShell(node, page) {
     `;
   }
   return `
-    <div class="prototype-shell ${escapeHtml(preset.shellClass)}" style="${previewStyle}">
+    <div class="prototype-shell ${escapeHtml(preset.shellClass)}">
       <div class="shell-bar">
         <span>${escapeHtml(preset.label)}</span>
         <span>${escapeHtml(page.entry || '未设置入口')}</span>
@@ -609,7 +615,7 @@ function renderNode(node, index) {
   const page = pageForNode(node);
   const selected = node.id === state.selectedNodeId;
   return `
-    <article class="page-node ${selected ? 'selected' : ''}" data-id="${escapeHtml(node.id)}" style="left:${node.x}px;top:${node.y}px;">
+    <article class="page-node ${selected ? 'selected' : ''}" data-id="${escapeHtml(node.id)}" style="${nodeStyleFor(node)}">
       <header class="node-head">
         <div class="node-title">
           <strong>${escapeHtml(page.title || node.pageId)}</strong>
@@ -622,12 +628,14 @@ function renderNode(node, index) {
           <span class="node-index">${index + 1}</span>
         </div>
       </header>
-      <div class="screen">${renderPreviewShell(node, page)}</div>
-      <div class="node-anchors" aria-hidden="true">
-        <button class="node-anchor top" data-anchor="top" tabindex="-1"></button>
-        <button class="node-anchor right" data-anchor="right" tabindex="-1"></button>
-        <button class="node-anchor bottom" data-anchor="bottom" tabindex="-1"></button>
-        <button class="node-anchor left" data-anchor="left" tabindex="-1"></button>
+      <div class="screen">
+        ${renderPreviewShell(node, page)}
+        <div class="node-anchors" aria-hidden="true">
+          <button class="node-anchor top" data-anchor="top" tabindex="-1"></button>
+          <button class="node-anchor right" data-anchor="right" tabindex="-1"></button>
+          <button class="node-anchor bottom" data-anchor="bottom" tabindex="-1"></button>
+          <button class="node-anchor left" data-anchor="left" tabindex="-1"></button>
+        </div>
       </div>
     </article>
   `;
@@ -729,11 +737,12 @@ function getRectForNodeId(id) {
   if (!element) {
     return null;
   }
+  const screen = element.querySelector('.screen') || element;
   return {
-    x: Number.parseFloat(element.style.left),
-    y: Number.parseFloat(element.style.top),
-    w: element.offsetWidth,
-    h: element.offsetHeight
+    x: Number.parseFloat(element.style.left) + screen.offsetLeft,
+    y: Number.parseFloat(element.style.top) + screen.offsetTop,
+    w: screen.offsetWidth,
+    h: screen.offsetHeight
   };
 }
 
