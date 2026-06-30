@@ -2,3 +2,6 @@ shares/
 protodock.log
 protodock.pid
 __pycache__/
+docs-dist/
+docs-site/export.zip
+.tmp-mint-starter/

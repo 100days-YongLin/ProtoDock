@@ -1,0 +1,29 @@
+---
+title: 分享预览
+description: 上传项目 zip，生成只读预览链接。
+---
+
+部署内置 Python 服务后，可以把 `.zip` 项目包上传到后端，生成 `/s/<share-id>` 只读预览链接。
+
+```bash
+PROTODOCK_PORT=6080 python3 server.py
+```
+
+## 上传
+
+右上角 **分享** 按钮支持拖入项目 zip。压缩包根目录可以直接包含 `protodock.project.json`，也可以外层包一层项目文件夹。
+
+服务端只解压：
+
+- `protodock.project.json`
+- `pages/**`
+- `docs/**`
+- `assets/**`
+
+## 预览
+
+分享链接中的项目会从 `shares/<share-id>/` 读取，不会写回上传者本地文件，也不会允许浏览者编辑 canvas、docs 或页面信息。
+
+## 下载
+
+进入 `/s/<share-id>` 后，右上角按钮会从 **分享** 切换为 **下载**。浏览者可以下载该只读项目对应的 zip 包。

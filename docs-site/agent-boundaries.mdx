@@ -1,0 +1,40 @@
+---
+title: Agent 写入边界
+description: 哪些东西 Agent 可以生成，哪些东西绝对不能覆盖。
+---
+
+原型页面是可生成资产，画布排布是用户劳动成果。Agent 或导出脚本必须先保护画布，再更新页面。
+
+## 可以更新
+
+- `pages/**`
+- `docs/**`
+- `assets/**`
+- `protodock.project.json` 中的 `project` 和 `pages`
+
+## 默认禁止整体重写
+
+- `canvas.nodes`
+- `canvas.edges`
+- `canvas.notes`
+- 节点坐标
+- 锚点方向
+- 未知字段
+
+## 增量合并
+
+如果确实需要新增页面节点，只能按 `id` 或 `pageId` 增量追加缺失节点，并保留已有节点的 `x`、`y`、`fromSide`、`toSide`、锚点、说明文本以及未知字段。
+
+## Manifest 备份
+
+修改 `protodock.project.json` 前，必须先复制一份备份到：
+
+```text
+protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json
+```
+
+如果备份失败，停止写入。
+
+<Warning>
+  只有用户明确说“重排画布”“重建 flow”或“覆盖 canvas”时，Agent 才能重写 `canvas`。
+</Warning>

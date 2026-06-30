@@ -1,0 +1,81 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "almond",
+  "name": "ProtoDock 原型舱",
+  "description": "ProtoDock 使用文档：本地项目、画布协作、只读分享和 Agent 写入边界。",
+  "colors": {
+    "primary": "#0066CC",
+    "light": "#2997FF",
+    "dark": "#0066CC"
+  },
+  "favicon": "/logo/light.svg",
+  "icons": {
+    "library": "lucide"
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs"
+  },
+  "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Docs",
+          "icon": "book-open",
+          "href": "/docs"
+        },
+        {
+          "anchor": "Workbench",
+          "icon": "panel-top",
+          "href": "/index.html"
+        }
+      ]
+    },
+    "groups": [
+      {
+        "group": "开始使用",
+        "icon": "rocket",
+        "expanded": true,
+        "pages": [
+          "docs",
+          "quickstart",
+          "project-structure"
+        ]
+      },
+      {
+        "group": "协作与分享",
+        "icon": "workflow",
+        "expanded": true,
+        "pages": [
+          "canvas-workflow",
+          "sharing",
+          "deployment"
+        ]
+      },
+      {
+        "group": "Agent 契约",
+        "icon": "shield-check",
+        "expanded": true,
+        "pages": [
+          "agent-boundaries"
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/100days-YongLin/ProtoDock"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "打开工作台",
+      "href": "/index.html"
+    }
+  }
+}

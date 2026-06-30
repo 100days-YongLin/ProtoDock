@@ -1,0 +1,6 @@
+<svg width="180" height="36" viewBox="0 0 180 36" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ProtoDock">
+  <rect width="36" height="36" rx="8" fill="#FFFFFF"/>
+  <path d="M11 26V9.8H21.2C24.7 9.8 27.4 12.5 27.4 16C27.4 19.5 24.7 22.2 21.2 22.2H16.8V26H11ZM16.8 17.4H20.7C21.5 17.4 22.1 16.8 22.1 16C22.1 15.2 21.5 14.6 20.7 14.6H16.8V17.4Z" fill="#050505"/>
+  <path d="M11 26L16.8 20.2H21.2C23.5 20.2 25.4 18.3 25.4 16" stroke="#050505" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="48" y="23" fill="#F7F8FA" font-family="Inter, ui-sans-serif, system-ui" font-size="16" font-weight="700">ProtoDock</text>
+</svg>

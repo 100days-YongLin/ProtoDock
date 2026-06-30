@@ -1,0 +1,40 @@
+---
+title: 项目目录
+description: ProtoDock 推荐的本地项目组织方式。
+---
+
+每个原型项目必须包含 `protodock.project.json`。页面源码由设计 Agent 维护，ProtoDock 只读取 manifest 中声明的静态入口。
+
+```text
+prototype-project/
+├── protodock.project.json
+├── pages/
+│   ├── home/
+│   │   └── index.html
+│   ├── clips/
+│   │   └── index.html
+│   └── report/
+│       └── index.html
+├── docs/
+│   ├── home.md
+│   ├── clips.md
+│   └── report.md
+├── assets/
+└── exports/
+```
+
+## Manifest
+
+`protodock.project.json` 持久化项目元信息、页面入口、画布节点、流程连线、文本说明和设备壳配置。
+
+## Pages
+
+`pages/<page-id>/index.html` 是浏览器可直接打开的静态入口。React、Vue、Svelte 或 Vite 页面需要先构建成静态产物，再交给 ProtoDock 预览。
+
+## Docs
+
+`docs/<page-id>.md` 是右侧 Markdown 文档的默认位置，用来记录页面目标、状态和验收标准。
+
+## Assets
+
+原型页面自己的图标、图片和素材建议放进项目 `assets/` 或页面目录中，通过相对路径引用。

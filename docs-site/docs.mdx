@@ -1,0 +1,38 @@
+---
+title: Home
+description: 用一个工作目录管理画布、PRD 和静态原型。
+mode: frame
+---
+
+<div className="flex w-full flex-col gap-8 max-w-5xl mx-auto px-4 md:px-8 lg:px-12 py-10 lg:gap-12 lg:py-16">
+  <div className="flex max-w-[620px] flex-col gap-3 self-center text-center">
+    <p className="text-sm font-medium text-primary">ProtoDock 原型舱</p>
+    <h1 className="text-[32px] font-semibold leading-tight tracking-tight text-gray-950 dark:text-gray-50">
+      用一个工作目录管理画布、PRD 和静态原型
+    </h1>
+    <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400">
+      ProtoDock 读取项目里的 manifest、页面入口和 Markdown 文档，把它们组合成可编排、可预览、可分享的本地原型工作台。
+    </p>
+  </div>
+
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <Card title="快速开始" icon="rocket" href="/quickstart">
+      新建或打开一个 ProtoDock 项目。
+    </Card>
+    <Card title="分享预览" icon="share-2" href="/sharing">
+      上传项目 zip，生成只读 URL。
+    </Card>
+    <Card title="Agent 边界" icon="shield-check" href="/agent-boundaries">
+      明确哪些文件能生成，哪些画布状态必须保护。
+    </Card>
+  </div>
+
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <Card title="项目目录" icon="folder-tree" href="/project-structure">
+      推荐的 manifest、pages、docs 和 assets 组织方式。
+    </Card>
+    <Card title="部署方式" icon="server" href="/deployment">
+      在 Ubuntu 上运行分享服务和 Mintlify 文档导出。
+    </Card>
+  </div>
+</div>

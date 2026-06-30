@@ -1,0 +1,28 @@
+---
+title: 部署方式
+description: 在 Ubuntu 上运行 ProtoDock 分享服务和 Mintlify 文档。
+---
+
+## ProtoDock 分享服务
+
+在 Ubuntu 上保持一个 Python 服务即可运行主工作台和分享接口：
+
+```bash
+PROTODOCK_HOST=0.0.0.0 PROTODOCK_PORT=6080 python3 server.py
+```
+
+## Mintlify 文档
+
+文档源码放在 `docs-site/`，使用 Mintlify 官方 CLI 验证和导出：
+
+```bash
+cd docs-site
+npx mint validate
+npx mint export
+```
+
+`mint export` 会生成离线部署包。部署时将导出包解压到服务端 `docs-dist/`，ProtoDock 的 Python 服务会把 `/docs` 指向这份 Mintlify 产物。
+
+## 公开访问
+
+如果服务通过 FRP 或反向代理暴露，主应用仍然使用当前访问地址生成分享链接。文档入口固定为 `/docs`，跟随同一个域名访问。

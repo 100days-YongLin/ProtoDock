@@ -1,0 +1,30 @@
+---
+title: 快速开始
+description: 在 ProtoDock 中创建或打开一个本地原型项目。
+---
+
+## 打开工作台
+
+在仓库根目录启动静态服务：
+
+```bash
+python3 -m http.server 4175
+```
+
+然后打开：
+
+```text
+http://localhost:4175/index.html
+```
+
+## 新建项目
+
+点击首页的 **新建项目**，选择工作目录和设备规格。ProtoDock 会在目录中创建最小项目结构，并以 `protodock.project.json` 的 `project.id` 作为唯一项目身份。
+
+## 打开已有项目
+
+点击 **打开已有项目**，选择包含 `protodock.project.json` 的目录。ProtoDock 会读取 manifest 中声明的页面入口，并在画布节点中用 iframe 渲染静态页面。
+
+## 保存
+
+点击顶部保存按钮会写回当前工作目录。保存前如果磁盘上的 manifest 已经被其他工具修改，ProtoDock 会弹出冲突提示，让你选择读取本地变更、覆盖本地文件或取消。

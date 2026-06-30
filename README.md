@@ -105,6 +105,18 @@ http://localhost:4175/index.html
 
 打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json` 与 `docs/*.md`。
 
+## 使用文档
+
+顶部“使用文档”入口指向 `/docs`。文档源码使用 Mintlify 官方模板结构维护在 `docs-site/`，不是手写静态页面。
+
+本地构建文档：
+
+```bash
+./scripts/build-docs.sh
+```
+
+脚本会运行 `mint validate` 和 `mint export`，并把导出包解压到 `docs-dist/`。`docs-dist/` 是生成产物，不进入 git；当目录存在时，内置 Python 服务会把 `/docs`、Mintlify 页面路由和 `_next` 资源指向这份导出结果。
+
 ## 分享预览服务
 
 如果需要让同事通过 URL 只读预览项目，可以启动内置 Python 服务：

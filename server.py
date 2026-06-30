@@ -21,6 +21,7 @@ from urllib.parse import quote, unquote, urlparse
 
 ROOT = Path(__file__).resolve().parent
 SHARES_DIR = ROOT / "shares"
+DOCS_EXPORT_DIR = ROOT / "docs-dist"
 MANIFEST_FILE = "protodock.project.json"
 
 MAX_UPLOAD_BYTES = int(os.environ.get("PROTODOCK_MAX_UPLOAD_BYTES", 100 * 1024 * 1024))
@@ -29,8 +30,10 @@ MAX_FILE_BYTES = int(os.environ.get("PROTODOCK_MAX_FILE_BYTES", 80 * 1024 * 1024
 
 ALLOWED_ROOT_FILES = {MANIFEST_FILE}
 ALLOWED_ROOT_DIRS = {"pages", "docs", "assets"}
-PRIVATE_ROOT_NAMES = {".git", "shares", "protodock", "node_modules", "exports"}
+PRIVATE_ROOT_NAMES = {".git", "shares", "protodock", "node_modules", "exports", "docs-site", "docs-dist"}
 PRIVATE_STATIC_FILES = {"server.py", "protodock.log", "protodock.pid"}
+DOCS_ASSET_ROOTS = {"_next", "favicons", "images", "logo"}
+DOCS_PAGE_ROOTS = {"quickstart", "project-structure", "canvas-workflow", "sharing", "deployment", "agent-boundaries"}
 
 
 class ProtoDockError(Exception):
@@ -275,6 +278,35 @@ def request_path_to_file(root: Path, request_path: str) -> Path:
     return target
 
 
+def docs_request_path_to_file(request_path: str) -> Path | None:
+    if not DOCS_EXPORT_DIR.is_dir():
+        return None
+    decoded = unquote(request_path).replace("\\", "/")
+    normalized = posixpath.normpath(decoded.lstrip("/"))
+    parts = [part for part in normalized.split("/") if part]
+    if parts == ["docs"]:
+        pass
+    elif parts and parts[0] == "docs":
+        parts = parts[1:]
+    elif parts and parts[0] in DOCS_ASSET_ROOTS | DOCS_PAGE_ROOTS:
+        pass
+    else:
+        return None
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "非法路径")
+    target = (DOCS_EXPORT_DIR / Path(*parts)).resolve() if parts else (DOCS_EXPORT_DIR / "index.html").resolve()
+    root_resolved = DOCS_EXPORT_DIR.resolve()
+    if os.path.commonpath([root_resolved, target]) != str(root_resolved):
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "非法路径")
+    candidates = [target]
+    if target.suffix != ".html":
+        candidates.extend([target / "index.html", target.with_suffix(".html")])
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def absolute_public_url(path: str, headers=None, server_address=None) -> str:
     if headers is None:
         return path
@@ -329,6 +361,12 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             if path.startswith("/shares/"):
                 self.serve_share_asset(path)
                 return
+            docs_file = docs_request_path_to_file(path)
+            if docs_file:
+                self.serve_file(docs_file)
+                return
+            if path == "/docs" or path.startswith("/docs/"):
+                raise ProtoDockError(HTTPStatus.NOT_FOUND, "文档还未构建")
             self.serve_static_asset(path)
         except ProtoDockError as error:
             self.send_error_json(error)
