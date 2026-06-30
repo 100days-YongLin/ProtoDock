@@ -822,8 +822,8 @@ function initMarkdownEditor() {
     state.markdownEditor = new toastui.Editor({
       el: els.markdownMount,
       height: '100%',
-      initialEditType: 'markdown',
-      previewStyle: 'vertical',
+      initialEditType: 'wysiwyg',
+      hideModeSwitch: true,
       initialValue: ''
     });
     state.markdownEditor.on('change', handleEditorChange);
