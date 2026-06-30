@@ -173,29 +173,6 @@
                 <i data-lucide="settings-2"></i>
               </button>
             </div>
-            <div class="page-settings-panel" id="pageSettingsPanel" hidden>
-              <label>
-                <span>页面名称</span>
-                <input id="pageTitleInput">
-              </label>
-              <label>
-                <span>类型</span>
-                <input id="pageKindInput">
-              </label>
-              <label>
-                <span>源码目录</span>
-                <input id="pageSourceDirInput">
-              </label>
-              <label>
-                <span>入口</span>
-                <input id="pageEntryInput">
-              </label>
-              <label>
-                <span>文档</span>
-                <input id="pageDocInput">
-              </label>
-              <button class="safe-area-save" id="savePageSettings" type="button">保存</button>
-            </div>
           </div>
 
           <div class="source-panel" id="sourceMeta">
@@ -214,6 +191,44 @@
                 <dd id="docPath">-</dd>
               </div>
             </dl>
+          </div>
+
+          <div class="page-settings-panel" id="pageSettingsPanel" hidden>
+            <div class="page-settings-head">
+              <strong>页面设置</strong>
+              <span>修改后会更新 manifest 中的页面元信息。</span>
+            </div>
+            <div class="page-settings-grid">
+              <fieldset>
+                <legend>基础信息</legend>
+                <label>
+                  <span>页面名称</span>
+                  <input id="pageTitleInput" autocomplete="off">
+                </label>
+                <label>
+                  <span>类型</span>
+                  <input id="pageKindInput" autocomplete="off">
+                </label>
+              </fieldset>
+              <fieldset>
+                <legend>路径绑定</legend>
+                <label>
+                  <span>源码目录</span>
+                  <input id="pageSourceDirInput" autocomplete="off" spellcheck="false">
+                </label>
+                <label>
+                  <span>入口文件</span>
+                  <input id="pageEntryInput" autocomplete="off" spellcheck="false">
+                </label>
+                <label>
+                  <span>页面文档</span>
+                  <input id="pageDocInput" autocomplete="off" spellcheck="false">
+                </label>
+              </fieldset>
+            </div>
+            <div class="page-settings-actions">
+              <button class="safe-area-save" id="savePageSettings" type="button">保存</button>
+            </div>
           </div>
         </section>
 

@@ -1099,6 +1099,9 @@ function renderPageSettingsControls() {
     state.pageSettingsOpen = false;
     state.pageSettingsNodeId = null;
   }
+  if (els.sourceMeta) {
+    els.sourceMeta.hidden = !hasActivePage || (canEdit && state.pageSettingsOpen);
+  }
   if (els.pageSettingsPanel) {
     els.pageSettingsPanel.hidden = !canEdit || !state.pageSettingsOpen;
   }
