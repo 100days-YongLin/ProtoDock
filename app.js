@@ -8,6 +8,8 @@ const MAX_INSPECTOR_WIDTH = 760;
 const ALIGN_SNAP_THRESHOLD = 10;
 const MAX_SAFE_AREA_INSET = 240;
 const MANIFEST_WATCH_DIRTY_INTERVAL_MS = 6000;
+const CAPTURE_PREVIEW_READY_TIMEOUT_MS = 20000;
+const CAPTURE_IMAGE_SETTLE_TIMEOUT_MS = 5000;
 const SHARE_ARCHIVE_ROOT_DIRS = ['pages', 'docs', 'assets'];
 
 const els = {
@@ -834,7 +836,7 @@ function waitForPreviewImages(documentRef) {
       image.addEventListener('load', resolve, { once: true });
       image.addEventListener('error', resolve, { once: true });
     }))),
-    new Promise((resolve) => window.setTimeout(resolve, 5000))
+    new Promise((resolve) => window.setTimeout(resolve, CAPTURE_IMAGE_SETTLE_TIMEOUT_MS))
   ]);
 }
 
@@ -915,7 +917,7 @@ function waitForIframeReady(iframe, options = {}) {
         cleanup();
         reject(new Error('页面预览加载超时'));
       }
-    }, 8000);
+    }, CAPTURE_PREVIEW_READY_TIMEOUT_MS);
   });
 }
 
