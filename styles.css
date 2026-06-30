@@ -381,8 +381,7 @@ select {
 
 .doc-item {
   display: grid;
-  grid-template-columns: 0 minmax(0, 1fr);
-  gap: 0;
+  gap: 5px;
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -391,6 +390,11 @@ select {
   color: var(--text);
   text-align: left;
   cursor: pointer;
+}
+
+.page-list .doc-item {
+  grid-template-columns: 0 minmax(0, 1fr);
+  gap: 0;
 }
 
 .page-list.is-sorting .doc-item {
