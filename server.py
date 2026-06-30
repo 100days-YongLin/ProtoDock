@@ -357,6 +357,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             if path == "/api/health":
                 self.send_json(HTTPStatus.OK, {"ok": True, "service": "protodock"})
                 return
+            if path == "/_mintlify/api/user":
+                self.send_json(HTTPStatus.OK, {"user": None})
+                return
             if path == "/api/shares":
                 self.handle_share_list()
                 return
