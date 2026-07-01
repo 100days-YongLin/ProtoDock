@@ -566,7 +566,10 @@ def github_https_repo_url(repo_url: str) -> str:
 
 def github_app_git_context(work_dir: Path) -> tuple[str, dict[str, str]]:
     token = github_app_installation_token()
-    askpass_path = work_dir / ".git-askpass.sh"
+    askpass_dir = work_dir / ".git"
+    if not askpass_dir.is_dir():
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "Git 工作目录未初始化")
+    askpass_path = askpass_dir / "protodock-askpass.sh"
     askpass_path.write_text(
         "#!/bin/sh\n"
         "case \"$1\" in\n"
@@ -634,8 +637,8 @@ def push_project_to_github(project_dir: Path, product_name: str, version: str, c
     work_dir = Path(tempfile.mkdtemp(prefix=".push-", dir=GITHUB_WORK_DIR))
 
     try:
+        run_command(["git", "init"], cwd=work_dir)
         remote_url, git_env = github_git_context(work_dir)
-        run_command(["git", "init"], cwd=work_dir, env=git_env)
         run_command(["git", "remote", "add", "origin", remote_url], cwd=work_dir, env=git_env)
         exists = run_command(
             ["git", "ls-remote", "--exit-code", "--heads", "origin", branch],
