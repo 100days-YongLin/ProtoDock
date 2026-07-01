@@ -32,6 +32,21 @@
   let isLoadingTargets = false;
   const activeShareId = shareIdFromLocation();
 
+  function appBaseUrl() {
+    if (window.location.origin && window.location.origin !== 'null') {
+      return `${window.location.origin}/`;
+    }
+    return new URL('./', window.location.href).toString();
+  }
+
+  function appUrl(path = '/') {
+    const value = String(path || '/');
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+      return value;
+    }
+    return new URL(value.replace(/^\/+/, ''), appBaseUrl()).toString();
+  }
+
   function setStatus(message) {
     if (els.status) {
       els.status.textContent = message;
@@ -59,7 +74,7 @@
     if (!activeShareId) {
       return;
     }
-    window.location.href = new URL(`/api/shares/${encodeURIComponent(activeShareId)}/download`, window.location.origin).toString();
+    window.location.href = appUrl(`/api/shares/${encodeURIComponent(activeShareId)}/download`);
   }
 
   function configureDownloadMode() {
@@ -267,7 +282,7 @@
     if (!path) {
       return '';
     }
-    return new URL(path, window.location.href).toString();
+    return appUrl(path);
   }
 
   function shareUrlForItem(item) {
@@ -275,7 +290,7 @@
     if (!path) {
       return '';
     }
-    return new URL(path, window.location.href).toString();
+    return appUrl(path);
   }
 
   function renderShareTargets() {

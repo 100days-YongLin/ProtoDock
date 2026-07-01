@@ -12,6 +12,21 @@ const CAPTURE_PREVIEW_READY_TIMEOUT_MS = 20000;
 const CAPTURE_IMAGE_SETTLE_TIMEOUT_MS = 5000;
 const SHARE_ARCHIVE_ROOT_DIRS = ['pages', 'docs', 'assets'];
 
+function appBaseUrl() {
+  if (window.location.origin && window.location.origin !== 'null') {
+    return `${window.location.origin}/`;
+  }
+  return new URL('./', window.location.href).toString();
+}
+
+function appUrl(path = '/') {
+  const value = String(path || '/');
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+    return value;
+  }
+  return new URL(value.replace(/^\/+/, ''), appBaseUrl()).toString();
+}
+
 const els = {
   workspace: document.querySelector('.workspace'),
   inspector: document.querySelector('.inspector'),
@@ -2572,7 +2587,7 @@ function deleteSelected() {
 
 async function loadBundledExample() {
   try {
-    const baseUrl = new URL('examples/pictale/', window.location.href);
+    const baseUrl = new URL('examples/pictale/', appBaseUrl());
     const manifestUrl = new URL(MANIFEST_FILE, baseUrl);
     const response = await fetch(manifestUrl, { cache: 'no-store' });
     if (!response.ok) {
@@ -2658,7 +2673,7 @@ function shareIdFromLocation() {
 
 async function loadSharedProject(shareId) {
   try {
-    const baseUrl = new URL(`/shares/${encodeURIComponent(shareId)}/`, window.location.origin);
+    const baseUrl = new URL(appUrl(`/shares/${encodeURIComponent(shareId)}/`));
     const manifestUrl = new URL(MANIFEST_FILE, baseUrl);
     const response = await fetch(manifestUrl, { cache: 'no-store' });
     if (!response.ok) {
@@ -2812,7 +2827,7 @@ function shareUrlForItem(item) {
   if (!path) {
     return '';
   }
-  return new URL(path, window.location.href).toString();
+  return appUrl(path);
 }
 
 async function loadPublicPreviews() {
@@ -3350,6 +3365,10 @@ async function goHome() {
       setStatus('已取消返回首页');
       return;
     }
+  }
+  if (shareIdFromLocation()) {
+    window.location.href = appUrl('/index.html');
+    return;
   }
   stopManifestWatcher();
   stopPlayback();
