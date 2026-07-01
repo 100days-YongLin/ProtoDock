@@ -3,7 +3,6 @@
     open: document.getElementById('openGithubModal'),
     modal: document.getElementById('githubModal'),
     close: document.getElementById('closeGithubModal'),
-    cancel: document.getElementById('cancelGithubPush'),
     refresh: document.getElementById('refreshGithubConfig'),
     repo: document.getElementById('githubRepoText'),
     credentialTitle: document.getElementById('githubCredentialTitle'),
@@ -405,15 +404,9 @@
   });
   els.open?.addEventListener('click', openModal);
   els.close?.addEventListener('click', closeModal);
-  els.cancel?.addEventListener('click', closeModal);
   els.refresh?.addEventListener('click', loadConfig);
   els.copyKey?.addEventListener('click', copyDeployKey);
   els.push?.addEventListener('click', pushProject);
-  els.modal?.addEventListener('click', (event) => {
-    if (event.target === els.modal) {
-      closeModal();
-    }
-  });
 
   updateState();
 })();
