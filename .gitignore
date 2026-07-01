@@ -5,3 +5,5 @@ __pycache__/
 docs-dist/
 docs-site/export.zip
 .tmp-mint-starter/
+.secrets/
+.github-work/

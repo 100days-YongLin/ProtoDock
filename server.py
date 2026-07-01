@@ -5,9 +5,11 @@ import json
 import mimetypes
 import os
 import posixpath
+import re
 import secrets
 import shutil
 import stat
+import subprocess
 import tempfile
 import zipfile
 from email import policy
@@ -22,15 +24,32 @@ from urllib.parse import quote, unquote, urlparse
 ROOT = Path(__file__).resolve().parent
 SHARES_DIR = ROOT / "shares"
 DOCS_EXPORT_DIR = ROOT / "docs-dist"
+SECRETS_DIR = ROOT / ".secrets"
+GITHUB_WORK_DIR = ROOT / ".github-work"
 MANIFEST_FILE = "protodock.project.json"
 
 MAX_UPLOAD_BYTES = int(os.environ.get("PROTODOCK_MAX_UPLOAD_BYTES", 100 * 1024 * 1024))
 MAX_EXTRACTED_BYTES = int(os.environ.get("PROTODOCK_MAX_EXTRACTED_BYTES", 250 * 1024 * 1024))
 MAX_FILE_BYTES = int(os.environ.get("PROTODOCK_MAX_FILE_BYTES", 80 * 1024 * 1024))
+GITHUB_REPO_URL = os.environ.get("PROTODOCK_GITHUB_REPO", "").strip()
+GITHUB_KEY_PATH = Path(os.environ.get("PROTODOCK_GITHUB_KEY_PATH", SECRETS_DIR / "github-deploy-key")).expanduser()
+GITHUB_AUTHOR_NAME = os.environ.get("PROTODOCK_GITHUB_AUTHOR_NAME", "ProtoDock")
+GITHUB_AUTHOR_EMAIL = os.environ.get("PROTODOCK_GITHUB_AUTHOR_EMAIL", "protodock@localhost")
+GITHUB_PUSH_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_PUSH_TIMEOUT_SECONDS", "120"))
 
 ALLOWED_ROOT_FILES = {MANIFEST_FILE}
 ALLOWED_ROOT_DIRS = {"pages", "docs", "assets"}
-PRIVATE_ROOT_NAMES = {".git", "shares", "protodock", "node_modules", "exports", "docs-site", "docs-dist"}
+PRIVATE_ROOT_NAMES = {
+    ".git",
+    ".github-work",
+    ".secrets",
+    "shares",
+    "protodock",
+    "node_modules",
+    "exports",
+    "docs-site",
+    "docs-dist",
+}
 PRIVATE_STATIC_FILES = {"server.py", "protodock.log", "protodock.pid"}
 DOCS_ASSET_ROOTS = {"_next", "favicons", "images", "logo"}
 DOCS_PAGE_ROOTS = {
@@ -303,6 +322,211 @@ def build_share_archive(share_id: str) -> tuple[Path, str]:
     return archive_path, download_name
 
 
+def safe_branch_component(value: str, label: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"请填写{label}")
+    if len(text) > 64:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}过长")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", text):
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}只能包含英文、数字、点、中横线和下划线")
+    if text.endswith(".") or text.endswith(".lock") or ".." in text:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}不能作为 Git 分支名")
+    return text
+
+
+def github_branch_name(product_name: str, version: str) -> str:
+    product = safe_branch_component(product_name, "产品名")
+    version_name = safe_branch_component(version, "版本号")
+    branch = f"{product}/{version_name}"
+    validate_git_ref(branch)
+    return branch
+
+
+def validate_git_ref(ref_name: str) -> None:
+    try:
+        run_command(["git", "check-ref-format", "--branch", ref_name], cwd=ROOT)
+    except ProtoDockError as error:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "产品名和版本号组合后不是合法 Git 分支名") from error
+
+
+def safe_commit_message(value: str) -> str:
+    message = str(value or "").strip()
+    if not message:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请填写提交说明")
+    if len(message) > 200:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "提交说明过长")
+    return message
+
+
+def run_command(
+    args: list[str],
+    cwd: Path,
+    *,
+    env: dict[str, str] | None = None,
+    timeout: int | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess:
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
+    result = subprocess.run(
+        args,
+        cwd=str(cwd),
+        env=merged_env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=timeout or GITHUB_PUSH_TIMEOUT_SECONDS,
+        check=False,
+    )
+    if check and result.returncode != 0:
+        output = (result.stderr or result.stdout or "").strip()
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, output or f"命令执行失败：{' '.join(args)}")
+    return result
+
+
+def ensure_github_deploy_key() -> str:
+    GITHUB_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not GITHUB_KEY_PATH.exists():
+        run_command([
+            "ssh-keygen",
+            "-t",
+            "ed25519",
+            "-N",
+            "",
+            "-C",
+            "protodock-deploy-key",
+            "-f",
+            str(GITHUB_KEY_PATH),
+        ], cwd=ROOT)
+        GITHUB_KEY_PATH.chmod(0o600)
+    public_key_path = Path(f"{GITHUB_KEY_PATH}.pub")
+    if not public_key_path.exists():
+        result = run_command(["ssh-keygen", "-y", "-f", str(GITHUB_KEY_PATH)], cwd=ROOT)
+        public_key_path.write_text(result.stdout.strip() + "\n", encoding="utf-8")
+    return public_key_path.read_text(encoding="utf-8").strip()
+
+
+def github_config_payload() -> dict:
+    public_key = ""
+    key_error = ""
+    try:
+        public_key = ensure_github_deploy_key()
+    except ProtoDockError as error:
+        key_error = error.message
+    except Exception as error:
+        key_error = str(error)
+    return {
+        "configured": bool(GITHUB_REPO_URL),
+        "repo": GITHUB_REPO_URL,
+        "publicKey": public_key,
+        "keyReady": bool(public_key),
+        "keyError": key_error,
+        "branchPattern": "产品名/版本号",
+    }
+
+
+def github_git_env() -> dict[str, str]:
+    ensure_github_deploy_key()
+    return {
+        "GIT_SSH_COMMAND": (
+            f"ssh -i {GITHUB_KEY_PATH} "
+            "-o IdentitiesOnly=yes "
+            "-o StrictHostKeyChecking=accept-new"
+        )
+    }
+
+
+def github_web_url(repo_url: str) -> str:
+    repo = repo_url.strip()
+    if repo.startswith("git@github.com:"):
+        path = repo[len("git@github.com:"):]
+    elif repo.startswith("ssh://git@github.com/"):
+        path = repo[len("ssh://git@github.com/"):]
+    elif repo.startswith("https://github.com/"):
+        path = repo[len("https://github.com/"):]
+    else:
+        return ""
+    path = path[:-4] if path.endswith(".git") else path
+    return f"https://github.com/{path.strip('/')}"
+
+
+def copy_project_to_repo(project_dir: Path, repo_dir: Path) -> None:
+    for child in repo_dir.iterdir():
+        if child.name == ".git":
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+    manifest = project_dir / MANIFEST_FILE
+    if not manifest.is_file():
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "项目包缺少 protodock.project.json")
+    shutil.copy2(manifest, repo_dir / MANIFEST_FILE)
+
+    for root_name in sorted(ALLOWED_ROOT_DIRS):
+        source = project_dir / root_name
+        if source.is_dir():
+            shutil.copytree(source, repo_dir / root_name)
+
+
+def push_project_to_github(project_dir: Path, product_name: str, version: str, commit_message: str) -> dict:
+    if not GITHUB_REPO_URL:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "服务器未配置 PROTODOCK_GITHUB_REPO")
+
+    branch = github_branch_name(product_name, version)
+    message = safe_commit_message(commit_message)
+    git_env = github_git_env()
+    GITHUB_WORK_DIR.mkdir(parents=True, exist_ok=True)
+    work_dir = Path(tempfile.mkdtemp(prefix=".push-", dir=GITHUB_WORK_DIR))
+
+    try:
+        run_command(["git", "init"], cwd=work_dir, env=git_env)
+        run_command(["git", "remote", "add", "origin", GITHUB_REPO_URL], cwd=work_dir, env=git_env)
+        exists = run_command(
+            ["git", "ls-remote", "--exit-code", "--heads", "origin", branch],
+            cwd=work_dir,
+            env=git_env,
+            check=False,
+        ).returncode == 0
+
+        if exists:
+            run_command(["git", "fetch", "--depth", "1", "origin", branch], cwd=work_dir, env=git_env)
+            run_command(["git", "checkout", "-B", branch, "FETCH_HEAD"], cwd=work_dir, env=git_env)
+        else:
+            run_command(["git", "checkout", "--orphan", branch], cwd=work_dir, env=git_env)
+
+        copy_project_to_repo(project_dir, work_dir)
+        run_command(["git", "config", "user.name", GITHUB_AUTHOR_NAME], cwd=work_dir, env=git_env)
+        run_command(["git", "config", "user.email", GITHUB_AUTHOR_EMAIL], cwd=work_dir, env=git_env)
+        run_command(["git", "add", "-A"], cwd=work_dir, env=git_env)
+
+        diff_result = run_command(["git", "diff", "--cached", "--quiet"], cwd=work_dir, env=git_env, check=False)
+        if diff_result.returncode == 0:
+            commit = run_command(["git", "rev-parse", "HEAD"], cwd=work_dir, env=git_env, check=False)
+            commit_hash = commit.stdout.strip() if commit.returncode == 0 else ""
+            action = "unchanged"
+        else:
+            run_command(["git", "commit", "-m", message], cwd=work_dir, env=git_env)
+            commit_hash = run_command(["git", "rev-parse", "HEAD"], cwd=work_dir, env=git_env).stdout.strip()
+            action = "pushed"
+
+        run_command(["git", "push", "--force-with-lease", "origin", branch], cwd=work_dir, env=git_env)
+        web_url = github_web_url(GITHUB_REPO_URL)
+        return {
+            "repo": GITHUB_REPO_URL,
+            "branch": branch,
+            "commit": commit_hash,
+            "action": action,
+            "branchUrl": f"{web_url}/tree/{quote(branch, safe='/')}" if web_url else "",
+            "commitUrl": f"{web_url}/commit/{commit_hash}" if web_url and commit_hash else "",
+        }
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
 def request_path_to_file(root: Path, request_path: str) -> Path:
     decoded = unquote(request_path).replace("\\", "/")
     normalized = posixpath.normpath(decoded.lstrip("/"))
@@ -395,6 +619,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             if path == "/api/shares":
                 self.handle_share_list()
                 return
+            if path == "/api/github/config":
+                self.handle_github_config()
+                return
             if path.startswith("/api/shares/"):
                 self.handle_share_download(path)
                 return
@@ -423,9 +650,13 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             parsed = urlparse(self.path)
-            if parsed.path != "/api/shares":
-                raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
-            self.handle_share_upload()
+            if parsed.path == "/api/shares":
+                self.handle_share_upload()
+                return
+            if parsed.path == "/api/github/push":
+                self.handle_github_push()
+                return
+            raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
         except ProtoDockError as error:
             self.send_error_json(error)
         except Exception as error:
@@ -469,6 +700,35 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             "url": self.absolute_url(path),
             "action": "updated" if is_update else "created"
         })
+
+    def handle_github_config(self) -> None:
+        self.send_json(HTTPStatus.OK, github_config_payload())
+
+    def handle_github_push(self) -> None:
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length <= 0:
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "上传内容为空")
+        if length > MAX_UPLOAD_BYTES:
+            raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "zip 上传体积过大")
+        body = self.rfile.read(length)
+        filename, archive, fields = parse_multipart_upload(self.headers, body)
+        if not filename.lower().endswith(".zip"):
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请上传 .zip 文件")
+
+        GITHUB_WORK_DIR.mkdir(parents=True, exist_ok=True)
+        temp_dir = Path(tempfile.mkdtemp(prefix=".upload-", dir=GITHUB_WORK_DIR))
+        try:
+            safe_extract_project_zip(archive, temp_dir)
+            result = push_project_to_github(
+                temp_dir,
+                fields.get("productName", ""),
+                fields.get("version", ""),
+                fields.get("commitMessage", ""),
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        self.send_json(HTTPStatus.OK, result)
 
     def handle_share_list(self) -> None:
         SHARES_DIR.mkdir(parents=True, exist_ok=True)

@@ -42,6 +42,10 @@
         <i data-lucide="share-2"></i>
         <span>分享</span>
       </button>
+      <button class="share-button" id="openGithubModal" type="button" title="推送到 GitHub" aria-label="推送到 GitHub">
+        <i data-lucide="git-branch"></i>
+        <span>GitHub</span>
+      </button>
       <div class="status">
         <span class="dot"></span>
         <span>本地预览</span>
@@ -409,6 +413,76 @@
     </section>
   </div>
 
+  <div class="project-modal-backdrop" id="githubModal" hidden>
+    <section class="project-modal github-modal" role="dialog" aria-modal="true" aria-labelledby="githubModalTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="githubModalTitle">推送到 GitHub</strong>
+          <span>将当前原型项目推送到公司内部固定仓库，分支名由产品名和版本号组合。</span>
+        </div>
+        <button class="tool-button" id="closeGithubModal" title="关闭" aria-label="关闭">×</button>
+      </header>
+
+      <div class="github-config-panel">
+        <div>
+          <strong>固定仓库</strong>
+          <span id="githubRepoText">正在读取服务器配置...</span>
+        </div>
+        <button class="secondary compact" id="refreshGithubConfig" type="button">刷新</button>
+      </div>
+
+      <div class="github-key-panel">
+        <div>
+          <strong>Deploy Key 公钥</strong>
+          <span>把这段公钥添加到固定 GitHub 私有仓库的 Deploy Keys，并勾选写权限。</span>
+        </div>
+        <pre id="githubPublicKey">正在生成公钥...</pre>
+        <button class="secondary" id="copyGithubDeployKey" type="button">复制公钥</button>
+      </div>
+
+      <div class="github-form-grid">
+        <label>
+          <span>产品名</span>
+          <input id="githubProductName" type="text" autocomplete="off" placeholder="pictale">
+        </label>
+        <label>
+          <span>版本号</span>
+          <input id="githubVersion" type="text" autocomplete="off" placeholder="v1">
+        </label>
+      </div>
+
+      <label class="github-message-field">
+        <span>Commit message</span>
+        <textarea id="githubCommitMessage" rows="3" placeholder="update prototype flow"></textarea>
+      </label>
+
+      <div class="github-branch-preview">
+        <span>目标分支</span>
+        <strong id="githubBranchPreview">-</strong>
+      </div>
+
+      <div class="share-status" id="githubStatus" aria-live="polite">等待填写推送信息</div>
+
+      <div class="share-progress" id="githubProgress" hidden>
+        <div class="share-progress-track" aria-hidden="true">
+          <i id="githubProgressBar"></i>
+        </div>
+        <span id="githubProgressText">0%</span>
+      </div>
+
+      <div class="share-result github-result" id="githubResult" hidden>
+        <span>推送结果</span>
+        <a id="githubBranchUrl" href="#" target="_blank" rel="noreferrer"></a>
+        <a id="githubCommitUrl" href="#" target="_blank" rel="noreferrer"></a>
+      </div>
+
+      <div class="action-row">
+        <button class="secondary" id="cancelGithubPush" type="button">取消</button>
+        <button class="primary" id="pushGithubProject" type="button" disabled>推送到 GitHub</button>
+      </div>
+    </section>
+  </div>
+
   <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
   <script src="./vendor/lucide.min.js"></script>
   <script src="./placement.js"></script>
@@ -416,5 +490,6 @@
   <script src="./capture.js"></script>
   <script src="./app.js"></script>
   <script src="./share.js"></script>
+  <script src="./github.js"></script>
 </body>
 </html>

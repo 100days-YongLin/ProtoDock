@@ -235,6 +235,11 @@ select {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.share-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .status {
   display: none;
   align-items: center;
@@ -2141,6 +2146,12 @@ select {
   color: #fff;
 }
 
+.primary:disabled,
+.secondary:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
 .secondary {
   border: 1px solid var(--line);
   background: #fff;
@@ -2153,6 +2164,10 @@ select {
 
 .share-modal {
   max-width: 520px;
+}
+
+.github-modal {
+  max-width: 560px;
 }
 
 .public-preview-modal {
@@ -2398,6 +2413,125 @@ select {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.github-config-panel,
+.github-key-panel,
+.github-branch-preview {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+
+.github-config-panel {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.github-config-panel div,
+.github-key-panel div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.github-config-panel strong,
+.github-key-panel strong,
+.github-branch-preview strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.github-config-panel span,
+.github-key-panel span,
+.github-branch-preview span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.github-config-panel .compact {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.github-key-panel pre {
+  overflow: auto;
+  max-height: 98px;
+  margin: 0;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.github-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.github-form-grid label,
+.github-message-field {
+  display: grid;
+  gap: 6px;
+}
+
+.github-form-grid span,
+.github-message-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.github-form-grid input,
+.github-message-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8f9fb;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+.github-message-field textarea {
+  resize: vertical;
+}
+
+.github-form-grid input:focus,
+.github-message-field textarea:focus {
+  border-color: var(--primary-focus);
+  background: #fff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12);
+}
+
+.github-branch-preview {
+  background: #f8fafc;
+}
+
+.github-branch-preview strong {
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.github-result {
+  gap: 4px;
 }
 
 .share-dropzone {

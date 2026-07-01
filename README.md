@@ -152,6 +152,29 @@ http://<server-ip>:6080/index.html
 
 如果服务通过 FRP 或反向代理暴露，分享列表和上传结果会按当前访问地址生成链接。也就是说，从哪个域名或端口打开 ProtoDock，公开预览列表里就显示对应入口的 `/s/<share-id>`。
 
+## GitHub 推送
+
+内置 Python 服务也可以把当前本地项目推送到公司内部固定私有 GitHub 仓库。这个能力复用浏览器端自动打包：只读取 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，不会把服务端密钥写入项目包。
+
+服务端启动前配置固定仓库：
+
+```bash
+export PROTODOCK_GITHUB_REPO=git@github.com:company/protodock-prototypes.git
+export PROTODOCK_GITHUB_AUTHOR_NAME=ProtoDock
+export PROTODOCK_GITHUB_AUTHOR_EMAIL=protodock@example.com
+PROTODOCK_PORT=6080 python3 server.py
+```
+
+第一次打开右上角“GitHub”弹窗时，服务端会在 `.secrets/github-deploy-key` 自动生成 deploy key。把弹窗中的公钥复制到固定私有仓库的 `Settings -> Deploy keys`，并勾选写权限。私钥只保存在服务端 `.secrets/`，该目录必须留在 `.gitignore` 中。
+
+推送时用户填写：
+
+- `产品名`：例如 `pictale`
+- `版本号`：例如 `v1` 或 `report-h5`
+- `Commit message`：本次提交说明
+
+后端会组合分支名为 `产品名/版本号`，例如 `pictale/v1`。每次推送都会覆盖该分支中的受控内容，再执行 commit 和 `git push --force-with-lease`。产品名和版本号只允许英文、数字、点、中横线和下划线，避免生成非法 Git 分支名。
+
 ## 冲突处理
 
 打开本地项目后，ProtoDock 会轻量监测 `protodock.project.json` 是否被其他工具或 Agent 修改。检测只读取项目清单文件，不递归扫描 `pages/**`、`docs/**` 或 `assets/**`。当窗口重新获得焦点时会检查一次；如果当前画布有未保存改动，会额外低频检查。
