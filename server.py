@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import json
 import mimetypes
 import os
@@ -11,6 +12,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import zipfile
 from email import policy
 from email.parser import BytesParser
@@ -18,6 +20,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from pathlib import Path, PurePosixPath
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 from urllib.parse import quote, unquote, urlparse
 
 
@@ -32,7 +36,11 @@ MAX_UPLOAD_BYTES = int(os.environ.get("PROTODOCK_MAX_UPLOAD_BYTES", 100 * 1024 *
 MAX_EXTRACTED_BYTES = int(os.environ.get("PROTODOCK_MAX_EXTRACTED_BYTES", 250 * 1024 * 1024))
 MAX_FILE_BYTES = int(os.environ.get("PROTODOCK_MAX_FILE_BYTES", 80 * 1024 * 1024))
 GITHUB_REPO_URL = os.environ.get("PROTODOCK_GITHUB_REPO", "").strip()
+GITHUB_AUTH_MODE = os.environ.get("PROTODOCK_GITHUB_AUTH", "").strip().lower()
 GITHUB_KEY_PATH = Path(os.environ.get("PROTODOCK_GITHUB_KEY_PATH", SECRETS_DIR / "github-deploy-key")).expanduser()
+GITHUB_APP_ID = os.environ.get("PROTODOCK_GITHUB_APP_ID", "").strip()
+GITHUB_INSTALLATION_ID = os.environ.get("PROTODOCK_GITHUB_INSTALLATION_ID", "").strip()
+GITHUB_APP_KEY_PATH = Path(os.environ.get("PROTODOCK_GITHUB_APP_KEY_PATH", SECRETS_DIR / "github-app.private-key.pem")).expanduser()
 GITHUB_AUTHOR_NAME = os.environ.get("PROTODOCK_GITHUB_AUTHOR_NAME", "ProtoDock")
 GITHUB_AUTHOR_EMAIL = os.environ.get("PROTODOCK_GITHUB_AUTHOR_EMAIL", "protodock@localhost")
 GITHUB_PUSH_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_PUSH_TIMEOUT_SECONDS", "120"))
@@ -408,7 +416,35 @@ def ensure_github_deploy_key() -> str:
     return public_key_path.read_text(encoding="utf-8").strip()
 
 
+def github_auth_mode() -> str:
+    mode = GITHUB_AUTH_MODE.replace("_", "-")
+    if mode in {"app", "github-app"}:
+        return "app"
+    if mode in {"deploy-key", "deploykey", "ssh"}:
+        return "deploy-key"
+    if GITHUB_APP_ID or GITHUB_INSTALLATION_ID or os.environ.get("PROTODOCK_GITHUB_APP_KEY_PATH"):
+        return "app"
+    return "deploy-key"
+
+
 def github_config_payload() -> dict:
+    mode = github_auth_mode()
+    if mode == "app":
+        key_ready = GITHUB_APP_KEY_PATH.is_file()
+        return {
+            "authMode": "app",
+            "configured": bool(GITHUB_REPO_URL and GITHUB_APP_ID and GITHUB_INSTALLATION_ID and key_ready),
+            "repo": GITHUB_REPO_URL,
+            "repoConfigured": bool(GITHUB_REPO_URL),
+            "appId": GITHUB_APP_ID,
+            "installationId": GITHUB_INSTALLATION_ID,
+            "privateKeyReady": key_ready,
+            "keyReady": key_ready,
+            "publicKey": "",
+            "keyError": "" if key_ready else "服务器未找到 GitHub App PEM 私钥",
+            "branchPattern": "产品名/版本号",
+        }
+
     public_key = ""
     key_error = ""
     try:
@@ -418,6 +454,7 @@ def github_config_payload() -> dict:
     except Exception as error:
         key_error = str(error)
     return {
+        "authMode": "deploy-key",
         "configured": bool(GITHUB_REPO_URL),
         "repo": GITHUB_REPO_URL,
         "publicKey": public_key,
@@ -427,7 +464,7 @@ def github_config_payload() -> dict:
     }
 
 
-def github_git_env() -> dict[str, str]:
+def github_deploy_key_git_env() -> dict[str, str]:
     ensure_github_deploy_key()
     return {
         "GIT_SSH_COMMAND": (
@@ -436,6 +473,121 @@ def github_git_env() -> dict[str, str]:
             "-o StrictHostKeyChecking=accept-new"
         )
     }
+
+
+def base64url_bytes(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def base64url_json(data: dict) -> str:
+    payload = json.dumps(data, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return base64url_bytes(payload)
+
+
+def sign_github_app_jwt(signing_input: bytes) -> bytes:
+    if not GITHUB_APP_KEY_PATH.is_file():
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "服务器未找到 GitHub App PEM 私钥")
+    result = subprocess.run(
+        ["openssl", "dgst", "-sha256", "-sign", str(GITHUB_APP_KEY_PATH)],
+        input=signing_input,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=15,
+        check=False,
+    )
+    if result.returncode != 0:
+        output = result.stderr.decode("utf-8", "replace").strip()
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, output or "GitHub App 私钥签名失败")
+    return result.stdout
+
+
+def github_app_jwt() -> str:
+    if not GITHUB_APP_ID:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "服务器未配置 PROTODOCK_GITHUB_APP_ID")
+    now = int(time.time())
+    header = base64url_json({"alg": "RS256", "typ": "JWT"})
+    payload = base64url_json({
+        "iat": now - 60,
+        "exp": now + 540,
+        "iss": GITHUB_APP_ID,
+    })
+    signing_input = f"{header}.{payload}".encode("ascii")
+    signature = base64url_bytes(sign_github_app_jwt(signing_input))
+    return f"{header}.{payload}.{signature}"
+
+
+def github_app_installation_token() -> str:
+    if not GITHUB_INSTALLATION_ID:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "服务器未配置 PROTODOCK_GITHUB_INSTALLATION_ID")
+    request = urllib_request.Request(
+        f"https://api.github.com/app/installations/{GITHUB_INSTALLATION_ID}/access_tokens",
+        data=b"{}",
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {github_app_jwt()}",
+            "Content-Type": "application/json",
+            "User-Agent": "ProtoDock",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib_request.urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib_error.HTTPError as error:
+        body = error.read().decode("utf-8", "replace")
+        try:
+            payload = json.loads(body)
+            message = payload.get("message") or body
+        except json.JSONDecodeError:
+            message = body or str(error)
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"GitHub App 取 token 失败：{message}") from error
+    except urllib_error.URLError as error:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"GitHub App 连接失败：{error.reason}") from error
+
+    token = str(payload.get("token") or "")
+    if not token:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "GitHub App 未返回 installation token")
+    return token
+
+
+def github_https_repo_url(repo_url: str) -> str:
+    repo = repo_url.strip()
+    if repo.startswith("git@github.com:"):
+        path = repo[len("git@github.com:"):]
+        return f"https://github.com/{path}"
+    if repo.startswith("ssh://git@github.com/"):
+        path = repo[len("ssh://git@github.com/"):]
+        return f"https://github.com/{path}"
+    if repo.startswith("https://github.com/"):
+        return repo if repo.endswith(".git") else f"{repo}.git"
+    return repo
+
+
+def github_app_git_context(work_dir: Path) -> tuple[str, dict[str, str]]:
+    token = github_app_installation_token()
+    askpass_path = work_dir / ".git-askpass.sh"
+    askpass_path.write_text(
+        "#!/bin/sh\n"
+        "case \"$1\" in\n"
+        "*Username*) printf '%s\\n' x-access-token ;;\n"
+        "*Password*) printf '%s\\n' \"$PROTODOCK_GITHUB_TOKEN\" ;;\n"
+        "*) printf '\\n' ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    askpass_path.chmod(0o700)
+    return github_https_repo_url(GITHUB_REPO_URL), {
+        "GIT_ASKPASS": str(askpass_path),
+        "GIT_TERMINAL_PROMPT": "0",
+        "PROTODOCK_GITHUB_TOKEN": token,
+    }
+
+
+def github_git_context(work_dir: Path) -> tuple[str, dict[str, str]]:
+    if github_auth_mode() == "app":
+        return github_app_git_context(work_dir)
+    return GITHUB_REPO_URL, github_deploy_key_git_env()
 
 
 def github_web_url(repo_url: str) -> str:
@@ -478,13 +630,13 @@ def push_project_to_github(project_dir: Path, product_name: str, version: str, c
 
     branch = github_branch_name(product_name, version)
     message = safe_commit_message(commit_message)
-    git_env = github_git_env()
     GITHUB_WORK_DIR.mkdir(parents=True, exist_ok=True)
     work_dir = Path(tempfile.mkdtemp(prefix=".push-", dir=GITHUB_WORK_DIR))
 
     try:
+        remote_url, git_env = github_git_context(work_dir)
         run_command(["git", "init"], cwd=work_dir, env=git_env)
-        run_command(["git", "remote", "add", "origin", GITHUB_REPO_URL], cwd=work_dir, env=git_env)
+        run_command(["git", "remote", "add", "origin", remote_url], cwd=work_dir, env=git_env)
         exists = run_command(
             ["git", "ls-remote", "--exit-code", "--heads", "origin", branch],
             cwd=work_dir,

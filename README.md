@@ -156,7 +156,7 @@ http://<server-ip>:6080/index.html
 
 内置 Python 服务也可以把当前本地项目推送到公司内部固定私有 GitHub 仓库。这个能力复用浏览器端自动打包：只读取 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，不会把服务端密钥写入项目包。
 
-服务端启动前配置固定仓库：
+服务端启动前配置固定仓库。默认认证方式是 Deploy Key：
 
 ```bash
 export PROTODOCK_GITHUB_REPO=git@github.com:company/protodock-prototypes.git
@@ -166,6 +166,21 @@ PROTODOCK_PORT=6080 python3 server.py
 ```
 
 第一次打开右上角“GitHub”弹窗时，服务端会在 `.secrets/github-deploy-key` 自动生成 deploy key。把弹窗中的公钥复制到固定私有仓库的 `Settings -> Deploy keys`，并勾选写权限。私钥只保存在服务端 `.secrets/`，该目录必须留在 `.gitignore` 中。
+
+如果组织策略禁用了 Deploy Keys，推荐改用 GitHub App installation token。先在 GitHub 组织里创建 GitHub App，授予目标仓库 `Contents: Read and write` 权限并安装到固定仓库，然后把 GitHub App 下载的 `.pem` 私钥放到服务端 `.secrets/` 目录。启动服务时配置：
+
+```bash
+export PROTODOCK_GITHUB_AUTH=app
+export PROTODOCK_GITHUB_REPO=https://github.com/company/protodock-prototypes.git
+export PROTODOCK_GITHUB_APP_ID=<github-app-id>
+export PROTODOCK_GITHUB_INSTALLATION_ID=<installation-id>
+export PROTODOCK_GITHUB_APP_KEY_PATH=/path/to/protodock-share/.secrets/protodock-push.private-key.pem
+export PROTODOCK_GITHUB_AUTHOR_NAME=ProtoDock
+export PROTODOCK_GITHUB_AUTHOR_EMAIL=protodock@example.com
+PROTODOCK_PORT=6080 python3 server.py
+```
+
+GitHub App 模式下，前端不会展示或复制私钥；服务端只在推送时临时换取 installation token，并通过 git 的凭据回调使用这个 token。`.pem`、`.secrets/` 和 `.github-work/` 都不应进入 git。
 
 推送时用户填写：
 
