@@ -1,6 +1,6 @@
 ---
 title: 快速开始
-description: 在 ProtoDock 中创建或打开一个本地原型项目。
+description: 在 ProtoDock 中创建项目，或从本地、公开预览、GitHub 打开项目。
 ---
 
 ## 打开工作台
@@ -23,9 +23,15 @@ http://localhost:4175/index.html
 
 新建项目后，可以把这个目录交给 Codex、Claude Code 或其他 AI Agent，让它根据需求生成 `pages/`、`docs/` 和 `assets/`。ProtoDock 会读取 Agent 注册到 manifest 里的静态页面入口，并在画布中预览。
 
-## 打开已有项目
+## 打开项目
 
-点击 **打开已有项目**，选择包含 `protodock.project.json` 的目录。ProtoDock 会读取 manifest 中声明的页面入口，并在画布节点中用 iframe 渲染静态页面。
+点击首页的 **打开项目** 后，可以选择三种来源：
+
+- `打开本地项目`：选择包含 `protodock.project.json` 的目录。ProtoDock 会读取 manifest 中声明的页面入口，并在画布节点中用 iframe 渲染静态页面。这个模式可编辑、可保存。
+- `打开公开预览`：从当前服务已有分享项目中选择一个 `/s/<share-id>` 只读预览。
+- `从 GitHub 仓库打开`：输入仓库地址和分支，并可选填写项目路径。服务端会下载该分支中的 ProtoDock 项目，生成一个只读预览链接。
+
+从 GitHub 打开时，分支必填；项目路径留空表示从仓库根目录读取 `protodock.project.json`。
 
 ## 接入 AI Agent
 

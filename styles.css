@@ -2174,6 +2174,80 @@ select {
   max-width: 560px;
 }
 
+.open-project-modal {
+  max-width: 620px;
+}
+
+.open-project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.open-project-option {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 136px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  padding: 14px;
+  text-align: left;
+}
+
+.open-project-option svg {
+  width: 22px;
+  height: 22px;
+  color: var(--primary);
+}
+
+.open-project-option strong {
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.open-project-option span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.open-project-option:hover,
+.open-project-option:focus-visible {
+  border-color: var(--primary-focus);
+  background: rgba(0, 113, 227, 0.06);
+  outline: none;
+}
+
+.github-open-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.github-open-panel > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.github-open-panel strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.github-open-panel span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .public-preview-list {
   display: grid;
   gap: 8px;
@@ -2482,12 +2556,14 @@ select {
   gap: 10px;
 }
 
+.github-open-panel label,
 .github-form-grid label,
 .github-message-field {
   display: grid;
   gap: 6px;
 }
 
+.github-open-panel label span,
 .github-form-grid span,
 .github-message-field span {
   color: var(--muted);
@@ -2495,6 +2571,7 @@ select {
   font-weight: 700;
 }
 
+.github-open-panel input,
 .github-form-grid input,
 .github-message-field textarea {
   width: 100%;
@@ -2512,6 +2589,7 @@ select {
   resize: vertical;
 }
 
+.github-open-panel input:focus,
 .github-form-grid input:focus,
 .github-message-field textarea:focus {
   border-color: var(--primary-focus);
@@ -2693,6 +2771,11 @@ select {
   .start-actions .primary,
   .start-actions .secondary {
     width: 100%;
+  }
+
+  .open-project-grid,
+  .github-form-grid {
+    grid-template-columns: 1fr;
   }
 
   .brand-title strong {

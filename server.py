@@ -44,6 +44,7 @@ GITHUB_APP_KEY_PATH = Path(os.environ.get("PROTODOCK_GITHUB_APP_KEY_PATH", SECRE
 GITHUB_AUTHOR_NAME = os.environ.get("PROTODOCK_GITHUB_AUTHOR_NAME", "ProtoDock")
 GITHUB_AUTHOR_EMAIL = os.environ.get("PROTODOCK_GITHUB_AUTHOR_EMAIL", "protodock@localhost")
 GITHUB_PUSH_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_PUSH_TIMEOUT_SECONDS", "120"))
+GITHUB_OPEN_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_OPEN_TIMEOUT_SECONDS", "120"))
 
 ALLOWED_ROOT_FILES = {MANIFEST_FILE}
 ALLOWED_ROOT_DIRS = {"pages", "docs", "assets"}
@@ -64,7 +65,11 @@ DOCS_PAGE_ROOTS = {
     "quickstart",
     "project-structure",
     "ai-agent-workflow",
+    "ai-agent-tools",
+    "ai-agent-skills",
+    "ai-agent-prompts",
     "canvas-workflow",
+    "conflict-handling",
     "sharing",
     "deployment",
     "agent-boundaries",
@@ -351,6 +356,21 @@ def github_branch_name(product_name: str, version: str) -> str:
     return branch
 
 
+def validate_github_open_branch(branch: str) -> str:
+    ref_name = str(branch or "").strip()
+    if not ref_name:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请填写分支")
+    if len(ref_name) > 200:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支名过长")
+    if ref_name.startswith("-"):
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支名不能以中横线开头")
+    try:
+        run_command(["git", "check-ref-format", "--branch", ref_name], cwd=ROOT)
+    except ProtoDockError as error:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支名不是合法 Git 分支") from error
+    return ref_name
+
+
 def validate_git_ref(ref_name: str) -> None:
     try:
         run_command(["git", "check-ref-format", "--branch", ref_name], cwd=ROOT)
@@ -564,6 +584,66 @@ def github_https_repo_url(repo_url: str) -> str:
     return repo
 
 
+def github_open_repo_url(repo_url: str) -> str:
+    repo = github_https_repo_url(str(repo_url or "").strip())
+    parsed = urlparse(repo)
+    if parsed.scheme != "https" or parsed.netloc.lower() != "github.com":
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "仓库地址必须是 github.com 的 HTTPS 或 SSH 地址")
+    path = parsed.path.strip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 2:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "仓库地址格式应为 https://github.com/owner/repo")
+    owner, repo_name = parts
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", owner) or not re.fullmatch(r"[A-Za-z0-9_.-]+", repo_name):
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "仓库 owner 或名称包含非法字符")
+    return f"https://github.com/{owner}/{repo_name}.git"
+
+
+def safe_project_subpath(value: str) -> PurePosixPath:
+    raw = str(value or "").strip().replace("\\", "/")
+    if not raw:
+        return PurePosixPath(".")
+    if raw.startswith("/") or ":" in raw.split("/", 1)[0]:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "项目路径必须是仓库内相对路径")
+    path = PurePosixPath(posixpath.normpath(raw))
+    if str(path) in {"", "."}:
+        return PurePosixPath(".")
+    if any(part in {"", ".", ".."} for part in path.parts):
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "项目路径不能包含 . 或 ..")
+    if len(str(path)) > 240:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "项目路径过长")
+    return path
+
+
+def github_app_clone_context(work_dir: Path) -> dict[str, str]:
+    token = github_app_installation_token()
+    work_dir.mkdir(parents=True, exist_ok=True)
+    askpass_path = work_dir / "protodock-askpass.sh"
+    askpass_path.write_text(
+        "#!/bin/sh\n"
+        "case \"$1\" in\n"
+        "*Username*) printf '%s\\n' x-access-token ;;\n"
+        "*Password*) printf '%s\\n' \"$PROTODOCK_GITHUB_TOKEN\" ;;\n"
+        "*) printf '\\n' ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    askpass_path.chmod(0o700)
+    return {
+        "GIT_ASKPASS": str(askpass_path),
+        "GIT_TERMINAL_PROMPT": "0",
+        "PROTODOCK_GITHUB_TOKEN": token,
+    }
+
+
+def github_open_git_env(work_dir: Path) -> dict[str, str]:
+    if github_auth_mode() == "app" and GITHUB_APP_ID and GITHUB_INSTALLATION_ID and GITHUB_APP_KEY_PATH.is_file():
+        return github_app_clone_context(work_dir)
+    return {"GIT_TERMINAL_PROMPT": "0"}
+
+
 def github_app_git_context(work_dir: Path) -> tuple[str, dict[str, str]]:
     token = github_app_installation_token()
     askpass_dir = work_dir / ".git"
@@ -625,6 +705,107 @@ def copy_project_to_repo(project_dir: Path, repo_dir: Path) -> None:
         source = project_dir / root_name
         if source.is_dir():
             shutil.copytree(source, repo_dir / root_name)
+
+
+def copy_project_snapshot(source_dir: Path, destination: Path) -> None:
+    manifest = source_dir / MANIFEST_FILE
+    if not manifest.is_file() or manifest.is_symlink():
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "仓库路径中缺少 protodock.project.json")
+    try:
+        with manifest.open("r", encoding="utf-8") as file:
+            json.load(file)
+    except json.JSONDecodeError as error:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "protodock.project.json 不是合法 JSON") from error
+
+    total_size = manifest.stat().st_size
+    if total_size > MAX_EXTRACTED_BYTES:
+        raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "项目体积过大")
+    destination.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(manifest, destination / MANIFEST_FILE)
+
+    for root_name in sorted(ALLOWED_ROOT_DIRS):
+        source = source_dir / root_name
+        if not source.exists():
+            continue
+        if not source.is_dir() or source.is_symlink():
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{root_name} 必须是目录")
+        target_root = destination / root_name
+        for path in sorted(source.rglob("*")):
+            if path.is_symlink():
+                raise ProtoDockError(HTTPStatus.BAD_REQUEST, "项目不能包含软链接")
+            if path.is_dir():
+                continue
+            if not path.is_file():
+                continue
+            relative = PurePosixPath(path.relative_to(source_dir).as_posix())
+            if not allowed_project_path(relative):
+                continue
+            file_size = path.stat().st_size
+            if file_size > MAX_FILE_BYTES:
+                raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "项目中存在过大的文件")
+            total_size += file_size
+            if total_size > MAX_EXTRACTED_BYTES:
+                raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "项目体积过大")
+            target = target_root / path.relative_to(source)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+
+
+def github_share_id(repo_url: str, branch: str) -> str:
+    seed = f"{repo_url}@{branch}-{secrets.token_urlsafe(6)}"
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "-", seed).strip("-")
+    return (cleaned[-52:] or secrets.token_urlsafe(8))[:80]
+
+
+def open_project_from_github(repo_url: str, branch: str, project_path: str) -> dict:
+    clone_url = github_open_repo_url(repo_url)
+    ref_name = validate_github_open_branch(branch)
+    subpath = safe_project_subpath(project_path)
+
+    GITHUB_WORK_DIR.mkdir(parents=True, exist_ok=True)
+    SHARES_DIR.mkdir(parents=True, exist_ok=True)
+    work_dir = Path(tempfile.mkdtemp(prefix=".open-", dir=GITHUB_WORK_DIR))
+    share_id = github_share_id(clone_url, ref_name)
+    final_dir = SHARES_DIR / share_id
+    while final_dir.exists():
+        share_id = github_share_id(clone_url, ref_name)
+        final_dir = SHARES_DIR / share_id
+    temp_share_dir = Path(tempfile.mkdtemp(prefix=".github-open-", dir=SHARES_DIR))
+
+    try:
+        git_env = github_open_git_env(work_dir)
+        repo_dir = work_dir / "repo"
+        run_command([
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "--single-branch",
+            "--branch",
+            ref_name,
+            clone_url,
+            str(repo_dir),
+        ], cwd=work_dir, env=git_env, timeout=GITHUB_OPEN_TIMEOUT_SECONDS)
+        source_dir = repo_dir if str(subpath) == "." else (repo_dir / Path(*subpath.parts))
+        source_dir = source_dir.resolve()
+        if os.path.commonpath([repo_dir.resolve(), source_dir]) != str(repo_dir.resolve()):
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "项目路径非法")
+        copy_project_snapshot(source_dir, temp_share_dir)
+        replace_share_directory(final_dir, temp_share_dir, share_id)
+        temp_share_dir = None
+        path = f"/s/{share_id}"
+        return {
+            "id": share_id,
+            "path": path,
+            "repo": clone_url,
+            "branch": ref_name,
+            "projectPath": "" if str(subpath) == "." else str(subpath),
+            "action": "created",
+        }
+    finally:
+        if temp_share_dir is not None:
+            shutil.rmtree(temp_share_dir, ignore_errors=True)
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def push_project_to_github(project_dir: Path, product_name: str, version: str, commit_message: str) -> dict:
@@ -808,6 +989,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/shares":
                 self.handle_share_upload()
                 return
+            if parsed.path == "/api/github/open":
+                self.handle_github_open()
+                return
             if parsed.path == "/api/github/push":
                 self.handle_github_push()
                 return
@@ -817,6 +1001,24 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         except Exception as error:
             print(f"Unhandled POST error: {error}")
             self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "服务器内部错误"})
+
+    def read_json_body(self, max_bytes: int = 32 * 1024) -> dict:
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length <= 0:
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请求内容为空")
+        if length > max_bytes:
+            raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "请求内容过大")
+        content_type = self.headers.get("Content-Type", "")
+        if "application/json" not in content_type:
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请使用 application/json")
+        body = self.rfile.read(length)
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except json.JSONDecodeError as error:
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请求 JSON 格式不正确") from error
+        if not isinstance(payload, dict):
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请求 JSON 必须是对象")
+        return payload
 
     def handle_share_upload(self) -> None:
         length = int(self.headers.get("Content-Length", "0") or "0")
@@ -858,6 +1060,16 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
 
     def handle_github_config(self) -> None:
         self.send_json(HTTPStatus.OK, github_config_payload())
+
+    def handle_github_open(self) -> None:
+        payload = self.read_json_body()
+        result = open_project_from_github(
+            payload.get("repoUrl", ""),
+            payload.get("branch", ""),
+            payload.get("projectPath", ""),
+        )
+        result["url"] = self.absolute_url(result["path"])
+        self.send_json(HTTPStatus.CREATED, result)
 
     def handle_github_push(self) -> None:
         length = int(self.headers.get("Content-Length", "0") or "0")

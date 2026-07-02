@@ -86,6 +86,11 @@ const els = {
   conflictModal: document.getElementById('conflictModal'),
   conflictModalTitle: document.getElementById('conflictModalTitle'),
   conflictModalDescription: document.getElementById('conflictModalDescription'),
+  openProjectModal: document.getElementById('openProjectModal'),
+  githubOpenRepo: document.getElementById('githubOpenRepo'),
+  githubOpenBranch: document.getElementById('githubOpenBranch'),
+  githubOpenProjectPath: document.getElementById('githubOpenProjectPath'),
+  githubOpenStatus: document.getElementById('githubOpenStatus'),
   unsavedHomeModal: document.getElementById('unsavedHomeModal'),
   publicPreviewModal: document.getElementById('publicPreviewModal'),
   publicPreviewList: document.getElementById('publicPreviewList')
@@ -99,7 +104,10 @@ const buttons = {
   reloadProject: document.getElementById('reloadProject'),
   startNewProject: document.getElementById('startNewProject'),
   startOpenProject: document.getElementById('startOpenProject'),
-  startOpenPublicProject: document.getElementById('startOpenPublicProject'),
+  closeOpenProjectModal: document.getElementById('closeOpenProjectModal'),
+  openLocalProjectFromMenu: document.getElementById('openLocalProjectFromMenu'),
+  openPublicPreviewFromMenu: document.getElementById('openPublicPreviewFromMenu'),
+  openGithubProject: document.getElementById('openGithubProject'),
   closeProjectModal: document.getElementById('closeProjectModal'),
   closePublicPreviewModal: document.getElementById('closePublicPreviewModal'),
   chooseProjectDirectory: document.getElementById('chooseProjectDirectory'),
@@ -2791,7 +2799,7 @@ function renderDirectoryPreview() {
   `;
 }
 
-function openProjectModal() {
+function openNewProjectModal() {
   state.selectedPresetId = state.manifest?.project?.devicePreset || 'iphone-portrait';
   state.selectedProjectDirectoryHandle = null;
   els.projectName.value = '新 ProtoDock 项目';
@@ -2802,8 +2810,81 @@ function openProjectModal() {
   els.projectName.focus();
 }
 
-function closeProjectModal() {
+function closeNewProjectModal() {
   els.projectModal.hidden = true;
+}
+
+function openProjectMenuModal() {
+  if (!els.openProjectModal) {
+    openProjectDirectory();
+    return;
+  }
+  if (els.githubOpenStatus) {
+    els.githubOpenStatus.textContent = '等待填写仓库地址和分支';
+  }
+  els.openProjectModal.hidden = false;
+  buttons.openLocalProjectFromMenu?.focus();
+}
+
+function closeProjectMenuModal() {
+  if (els.openProjectModal) {
+    els.openProjectModal.hidden = true;
+  }
+}
+
+async function openLocalProjectFromMenu() {
+  closeProjectMenuModal();
+  await openProjectDirectory();
+}
+
+function openPublicPreviewFromMenu() {
+  closeProjectMenuModal();
+  openPublicPreviewModal();
+}
+
+function setGithubOpenBusy(busy) {
+  buttons.openGithubProject?.toggleAttribute('disabled', busy);
+  els.githubOpenRepo?.toggleAttribute('disabled', busy);
+  els.githubOpenBranch?.toggleAttribute('disabled', busy);
+  els.githubOpenProjectPath?.toggleAttribute('disabled', busy);
+}
+
+async function openGithubProjectFromMenu() {
+  const repoUrl = (els.githubOpenRepo?.value || '').trim();
+  const branch = (els.githubOpenBranch?.value || '').trim();
+  const projectPath = (els.githubOpenProjectPath?.value || '').trim();
+
+  if (!repoUrl) {
+    els.githubOpenStatus.textContent = '请填写 GitHub 仓库地址';
+    els.githubOpenRepo?.focus();
+    return;
+  }
+  if (!branch) {
+    els.githubOpenStatus.textContent = '请填写分支';
+    els.githubOpenBranch?.focus();
+    return;
+  }
+
+  setGithubOpenBusy(true);
+  els.githubOpenStatus.textContent = '正在下载 GitHub 项目...';
+  try {
+    const response = await fetch('/api/github/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repoUrl, branch, projectPath })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || '无法打开 GitHub 项目');
+    }
+    els.githubOpenStatus.textContent = '已生成只读预览，正在打开...';
+    window.location.href = payload.url || appUrl(payload.path || `/s/${encodeURIComponent(payload.id)}`);
+  } catch (error) {
+    console.error(error);
+    els.githubOpenStatus.textContent = error.message || '无法打开 GitHub 项目';
+  } finally {
+    setGithubOpenBusy(false);
+  }
 }
 
 function renderPublicPreviewList(items = []) {
@@ -3008,7 +3089,7 @@ async function createProject() {
     await writeInitialFile(root, 'pages/home/index.html', starterHtml(name));
     await writeInitialFile(root, 'docs/home.md', buildDefaultDoc('home', manifest.pages.home));
     const manifestHandle = await root.getFileHandle(MANIFEST_FILE);
-    closeProjectModal();
+    closeNewProjectModal();
     await loadManifestText(text, {
       projectHandle: root,
       manifestHandle,
@@ -3409,15 +3490,18 @@ async function goHome() {
 
 function bindGlobalEvents() {
   buttons.homeProject?.addEventListener('click', goHome);
-  buttons.openProject?.addEventListener('click', openProjectDirectory);
-  buttons.startOpenProject?.addEventListener('click', openProjectDirectory);
-  buttons.startOpenPublicProject?.addEventListener('click', openPublicPreviewModal);
-  buttons.newProject?.addEventListener('click', openProjectModal);
-  buttons.startNewProject?.addEventListener('click', openProjectModal);
+  buttons.openProject?.addEventListener('click', openProjectMenuModal);
+  buttons.startOpenProject?.addEventListener('click', openProjectMenuModal);
+  buttons.openLocalProjectFromMenu?.addEventListener('click', openLocalProjectFromMenu);
+  buttons.openPublicPreviewFromMenu?.addEventListener('click', openPublicPreviewFromMenu);
+  buttons.openGithubProject?.addEventListener('click', openGithubProjectFromMenu);
+  buttons.newProject?.addEventListener('click', openNewProjectModal);
+  buttons.startNewProject?.addEventListener('click', openNewProjectModal);
   buttons.saveProject?.addEventListener('click', saveProject);
   buttons.reloadProject?.addEventListener('click', reloadProject);
-  buttons.closeProjectModal?.addEventListener('click', closeProjectModal);
-  buttons.cancelProject?.addEventListener('click', closeProjectModal);
+  buttons.closeOpenProjectModal?.addEventListener('click', closeProjectMenuModal);
+  buttons.closeProjectModal?.addEventListener('click', closeNewProjectModal);
+  buttons.cancelProject?.addEventListener('click', closeNewProjectModal);
   buttons.closePublicPreviewModal?.addEventListener('click', closePublicPreviewModal);
   buttons.chooseProjectDirectory?.addEventListener('click', chooseProjectDirectory);
   buttons.createProject?.addEventListener('click', createProject);
@@ -3502,9 +3586,21 @@ function bindGlobalEvents() {
   });
   els.projectName?.addEventListener('input', renderDirectoryPreview);
   els.projectDirectory?.addEventListener('input', renderDirectoryPreview);
+  [els.githubOpenRepo, els.githubOpenBranch, els.githubOpenProjectPath].forEach((input) => {
+    input?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        openGithubProjectFromMenu();
+      }
+    });
+  });
   els.projectModal?.addEventListener('click', (event) => {
     if (event.target === els.projectModal) {
-      closeProjectModal();
+      closeNewProjectModal();
+    }
+  });
+  els.openProjectModal?.addEventListener('click', (event) => {
+    if (event.target === els.openProjectModal) {
+      closeProjectMenuModal();
     }
   });
   els.publicPreviewModal?.addEventListener('click', (event) => {

@@ -144,7 +144,11 @@ http://<server-ip>:6080/index.html
 
 分享链接中的项目会从 `shares/<share-id>/` 读取，不会写回上传者本地文件，也不会允许浏览者编辑 canvas、docs 或页面信息。
 
-首页的“打开公开预览”会读取 `GET /api/shares`，列出当前服务上已经上传过的分享项目。列表显示项目名称和分享地址，点击后进入对应 `/s/<share-id>` 只读预览。
+首页的“打开项目”会提供三种来源：
+
+- `打开本地项目`：选择包含 `protodock.project.json` 的本地目录，可编辑并保存。
+- `打开公开预览`：读取 `GET /api/shares`，列出当前服务上已经上传过的分享项目，点击后进入对应 `/s/<share-id>` 只读预览。
+- `从 GitHub 仓库打开`：填写 GitHub 仓库地址、分支和可选项目路径。服务端会下载指定分支中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 只读预览。分支为必填；项目路径留空时默认读取仓库根目录。
 
 进入 `/s/<share-id>` 后，右上角按钮会从“分享”切换为“下载”，下载该只读项目对应的 zip 包。
 

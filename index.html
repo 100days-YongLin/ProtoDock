@@ -111,8 +111,7 @@
           <span>选择一个工作目录开始，画布、PRD 和原型文件会围绕这个目录协作。</span>
           <div class="start-actions">
             <button class="primary" id="startNewProject" type="button">新建项目</button>
-            <button class="secondary" id="startOpenProject" type="button">打开已有项目</button>
-            <button class="secondary" id="startOpenPublicProject" type="button">打开公开预览</button>
+            <button class="secondary" id="startOpenProject" type="button">打开项目</button>
           </div>
         </section>
 
@@ -324,6 +323,54 @@
         <button class="secondary" id="unsavedHomeCancel" type="button">取消</button>
         <button class="primary" id="unsavedHomeConfirm" type="button">继续返回首页</button>
       </div>
+    </section>
+  </div>
+
+  <div class="project-modal-backdrop" id="openProjectModal" hidden>
+    <section class="project-modal open-project-modal" role="dialog" aria-modal="true" aria-labelledby="openProjectTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="openProjectTitle">打开项目</strong>
+          <span>选择本地目录、公开预览，或从 GitHub 仓库载入只读快照。</span>
+        </div>
+        <button class="tool-button" id="closeOpenProjectModal" type="button" aria-label="关闭"><i data-lucide="x"></i></button>
+      </header>
+
+      <div class="open-project-grid">
+        <button class="open-project-option" id="openLocalProjectFromMenu" type="button">
+          <i data-lucide="folder-open"></i>
+          <strong>打开本地项目</strong>
+          <span>选择包含 protodock.project.json 的本地目录，可编辑并保存。</span>
+        </button>
+        <button class="open-project-option" id="openPublicPreviewFromMenu" type="button">
+          <i data-lucide="globe-2"></i>
+          <strong>打开公开预览</strong>
+          <span>从当前服务已有分享链接中选择一个只读项目。</span>
+        </button>
+      </div>
+
+      <section class="github-open-panel">
+        <div>
+          <strong>从 GitHub 仓库打开</strong>
+          <span>下载指定仓库和分支中的 ProtoDock 项目，并作为只读预览打开。</span>
+        </div>
+        <label>
+          <span>仓库地址</span>
+          <input id="githubOpenRepo" type="url" autocomplete="off" placeholder="https://github.com/company/protodock-prototypes.git">
+        </label>
+        <div class="github-form-grid">
+          <label>
+            <span>分支</span>
+            <input id="githubOpenBranch" type="text" autocomplete="off" placeholder="pictale/v1">
+          </label>
+          <label>
+            <span>项目路径</span>
+            <input id="githubOpenProjectPath" type="text" autocomplete="off" placeholder="留空表示仓库根目录">
+          </label>
+        </div>
+        <div class="share-status" id="githubOpenStatus" aria-live="polite">等待填写仓库地址和分支</div>
+        <button class="primary" id="openGithubProject" type="button">打开 GitHub 项目</button>
+      </section>
     </section>
   </div>
 
