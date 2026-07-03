@@ -1,7 +1,7 @@
 const MANIFEST_FILE = 'protodock.project.json';
 const INSPECTOR_WIDTH_STORAGE_KEY = 'protodock.inspectorWidth';
 const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 1.8;
+const MAX_ZOOM = 3;
 const VIRTUAL_CANVAS_LIMIT = 100000;
 const MIN_INSPECTOR_WIDTH = 320;
 const MAX_INSPECTOR_WIDTH = 760;
@@ -136,7 +136,7 @@ const canvasPresets = {
     shellClass: 'web web-landscape',
     width: 1440,
     height: 900,
-    thumbnailWidth: 236
+    thumbnailWidth: 480
   },
   'web-portrait': {
     label: 'Web 竖版',
@@ -144,7 +144,7 @@ const canvasPresets = {
     shellClass: 'web web-portrait',
     width: 900,
     height: 1440,
-    thumbnailWidth: 158
+    thumbnailWidth: 360
   },
   'iphone-portrait': {
     label: 'iPhone 14 Pro',
@@ -1318,7 +1318,7 @@ function previewActionFor(nodeId) {
       mode: 'active',
       icon: 'mouse-pointer-2',
       label: '退出原型交互',
-      title: '正在操作原型，点击手机外退出'
+      title: '正在操作原型，点击原型外退出'
     };
   }
   if (state.previewResetNodeIds.has(nodeId)) {
@@ -1364,7 +1364,7 @@ function activatePreviewInteraction(nodeId) {
   state.previewResetNodeIds.delete(nodeId);
   selectNode(nodeId);
   syncPreviewInteractionUi();
-  setStatus('已启用原型交互，点击手机外退出');
+  setStatus('已启用原型交互，点击原型外退出');
 }
 
 function exitPreviewInteraction(nodeId = state.activePreviewNodeId, options = {}) {
