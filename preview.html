@@ -6,6 +6,7 @@
   <title>ProtoDock 公开预览</title>
   <link rel="icon" type="image/png" href="/assets/protodock-icon.png">
   <link rel="apple-touch-icon" href="/assets/protodock-icon.png">
+  <link rel="stylesheet" href="/vendor/devices.css">
   <link rel="stylesheet" href="/preview.css">
 </head>
 <body>
@@ -29,13 +30,7 @@
     </header>
 
     <section class="preview-stage" id="previewStage">
-      <div class="preview-shell" id="previewShell">
-        <iframe id="prototypeFrame" title="原型预览"></iframe>
-        <div class="preview-message" id="previewMessage" hidden>
-          <strong id="messageTitle">无法加载</strong>
-          <span id="messageText">分享项目不可用</span>
-        </div>
-      </div>
+      <div class="preview-shell is-plain" id="previewShell"></div>
     </section>
 
     <footer class="preview-controls">

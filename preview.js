@@ -1,16 +1,14 @@
 (() => {
   const MANIFEST_FILE = 'protodock.project.json';
+  const MOBILE_QUERY = '(max-width: 640px)';
   const els = {
+    app: document.querySelector('.preview-app'),
     projectTitle: document.getElementById('projectTitle'),
     pageTitle: document.getElementById('pageTitle'),
     canvasLink: document.getElementById('canvasLink'),
     downloadLink: document.getElementById('downloadLink'),
     stage: document.getElementById('previewStage'),
     shell: document.getElementById('previewShell'),
-    frame: document.getElementById('prototypeFrame'),
-    message: document.getElementById('previewMessage'),
-    messageTitle: document.getElementById('messageTitle'),
-    messageText: document.getElementById('messageText'),
     prev: document.getElementById('prevPage'),
     next: document.getElementById('nextPage'),
     pageSelect: document.getElementById('pageSelect'),
@@ -18,12 +16,52 @@
   };
 
   const devicePresets = {
-    'web-landscape': { label: 'Web 横版', width: 1440, height: 900 },
-    'web-portrait': { label: 'Web 竖版', width: 900, height: 1440 },
-    'iphone-portrait': { label: 'iPhone 14 Pro', width: 390, height: 830 },
-    'iphone-landscape': { label: 'iPhone 横版', width: 844, height: 390 },
-    'ipad-portrait': { label: 'iPad Pro', width: 506, height: 724 },
-    'ipad-landscape': { label: 'iPad 横版', width: 1180, height: 820 }
+    'web-landscape': {
+      label: 'Web 横版',
+      shellClass: 'web web-landscape',
+      width: 1440,
+      height: 900
+    },
+    'web-portrait': {
+      label: 'Web 竖版',
+      shellClass: 'web web-portrait',
+      width: 900,
+      height: 1440
+    },
+    'iphone-portrait': {
+      label: 'iPhone 14 Pro',
+      shellClass: 'iphone iphone-portrait',
+      deviceClass: 'device-iphone-14-pro device-black',
+      width: 390,
+      height: 830,
+      frameWidth: 428,
+      frameHeight: 868,
+      safeTop: 59,
+      safeBottom: 34
+    },
+    'iphone-landscape': {
+      label: 'iPhone 横版',
+      shellClass: 'iphone iphone-landscape',
+      width: 844,
+      height: 390
+    },
+    'ipad-portrait': {
+      label: 'iPad Pro',
+      shellClass: 'ipad ipad-portrait',
+      deviceClass: 'device-ipad-pro device-spacegray',
+      width: 506,
+      height: 724,
+      frameWidth: 560,
+      frameHeight: 778,
+      safeTop: 24,
+      safeBottom: 20
+    },
+    'ipad-landscape': {
+      label: 'iPad 横版',
+      shellClass: 'ipad ipad-landscape',
+      width: 1180,
+      height: 820
+    }
   };
 
   const state = {
@@ -32,7 +70,8 @@
     shareBaseUrl: null,
     pages: [],
     index: 0,
-    preset: devicePresets['iphone-portrait']
+    preset: devicePresets['iphone-portrait'],
+    shellKey: ''
   };
 
   function isValidShareId(value) {
@@ -62,6 +101,92 @@
       return value;
     }
     return new URL(value.replace(/^\/+/, ''), state.shareBaseUrl).toString();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
+  }
+
+  function clampSafeAreaInset(value, fallback = 0) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return fallback;
+    }
+    return Math.max(0, Math.min(240, number));
+  }
+
+  function safeAreaEnabled() {
+    return state.manifest?.project?.safeAreaEnabled !== false;
+  }
+
+  function safeAreaDefaultsFor(preset = state.preset) {
+    return {
+      top: preset?.safeTop || 0,
+      bottom: preset?.safeBottom || 0
+    };
+  }
+
+  function configuredSafeAreaInsets(preset = state.preset) {
+    const defaults = safeAreaDefaultsFor(preset);
+    const project = state.manifest?.project || {};
+    return {
+      top: clampSafeAreaInset(project.safeAreaTop, defaults.top),
+      bottom: clampSafeAreaInset(project.safeAreaBottom, defaults.bottom)
+    };
+  }
+
+  function effectiveSafeAreaInsets(preset = state.preset) {
+    if (!safeAreaEnabled()) {
+      return { top: 0, bottom: 0 };
+    }
+    return configuredSafeAreaInsets(preset);
+  }
+
+  function safeAreaClassFor(preset = state.preset) {
+    const safeArea = effectiveSafeAreaInsets(preset);
+    return safeArea.top > 0 || safeArea.bottom > 0 ? ' safe-area-on' : '';
+  }
+
+  function previewStyleFor(preset, previewWidth) {
+    const width = preset.width || 390;
+    const height = preset.height || 830;
+    const frameWidth = preset.frameWidth || width;
+    const frameHeight = preset.frameHeight || height;
+    const safeArea = effectiveSafeAreaInsets(preset);
+    const scale = previewWidth / frameWidth;
+    const viewportWidth = frameWidth * scale;
+    const viewportHeight = frameHeight * scale;
+    return [
+      `--preview-width:${width}px`,
+      `--preview-height:${height}px`,
+      `--device-frame-width:${frameWidth}px`,
+      `--device-frame-height:${frameHeight}px`,
+      `--safe-top:${safeArea.top}px`,
+      `--safe-bottom:${safeArea.bottom}px`,
+      `--preview-scale:${scale.toFixed(5)}`,
+      `--viewport-width:${viewportWidth.toFixed(2)}px`,
+      `--viewport-height:${viewportHeight.toFixed(2)}px`
+    ].join(';');
+  }
+
+  function desktopPreviewStyleFor(preset) {
+    const frameWidth = preset.frameWidth || preset.width || 390;
+    const frameHeight = preset.frameHeight || preset.height || 830;
+    const stageRect = els.stage?.getBoundingClientRect();
+    const availableWidth = Math.max(240, (stageRect?.width || frameWidth) - 48);
+    const availableHeight = Math.max(240, (stageRect?.height || frameHeight) - 48);
+    const scale = Math.min(1, availableWidth / frameWidth, availableHeight / frameHeight);
+    return previewStyleFor(preset, Math.round(frameWidth * scale));
+  }
+
+  function isMobileLayout() {
+    return window.matchMedia(MOBILE_QUERY).matches;
   }
 
   function pageRecord(pageId, page = {}) {
@@ -98,24 +223,119 @@
     return ordered;
   }
 
+  function frameMarkup() {
+    return `
+      <iframe class="preview-frame" id="prototypeFrame" title="原型预览"></iframe>
+      <div class="preview-message" id="previewMessage" hidden>
+        <strong id="messageTitle">无法加载</strong>
+        <span id="messageText">分享项目不可用</span>
+      </div>
+    `;
+  }
+
+  function deviceChromeMarkup(preset) {
+    return `
+      <div class="preview-device-viewport">
+        <div class="preview-device device ${escapeHtml(preset.deviceClass)}">
+          <div class="device-frame">
+            <div class="device-screen">
+              ${frameMarkup()}
+            </div>
+          </div>
+          <div class="device-stripe"></div>
+          <div class="device-header"></div>
+          <div class="device-sensors"></div>
+          <div class="device-btns"></div>
+          <div class="device-power"></div>
+          <div class="device-home"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function webChromeMarkup(preset, page) {
+    return `
+      <div class="shell-bar">
+        <span>${escapeHtml(preset.label)}</span>
+        <span>${escapeHtml(page?.entry || '未设置入口')}</span>
+      </div>
+      <div class="shell-viewport">
+        <div class="preview-frame-stage">
+          ${frameMarkup()}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderShell(page = null) {
+    if (!els.shell) {
+      return;
+    }
+    const preset = state.preset || devicePresets['iphone-portrait'];
+    const mobile = isMobileLayout();
+    const mode = mobile ? 'mobile' : (preset.deviceClass ? 'device' : 'web');
+    const safeAreaClass = safeAreaClassFor(preset);
+    const shellKey = [
+      mode,
+      state.manifest?.project?.devicePreset || '',
+      safeAreaClass,
+      mode === 'web' ? page?.entry || '' : ''
+    ].join(':');
+
+    els.app?.classList.toggle('is-mobile', mobile);
+    els.app?.classList.toggle('is-desktop', !mobile);
+
+    if (state.shellKey !== shellKey) {
+      state.shellKey = shellKey;
+      if (mode === 'mobile') {
+        els.shell.className = 'preview-shell is-plain';
+        els.shell.innerHTML = frameMarkup();
+      } else if (mode === 'device') {
+        els.shell.className = `preview-shell is-device-backed${safeAreaClass}`;
+        els.shell.innerHTML = deviceChromeMarkup(preset);
+      } else {
+        els.shell.className = `preview-shell is-web-backed ${preset.shellClass || ''}`;
+        els.shell.innerHTML = webChromeMarkup(preset, page);
+      }
+    }
+
+    if (mode === 'mobile') {
+      els.shell.removeAttribute('style');
+    } else {
+      els.shell.style.cssText = desktopPreviewStyleFor(preset);
+    }
+  }
+
+  function frameElement() {
+    return document.getElementById('prototypeFrame');
+  }
+
+  function messageElement() {
+    return document.getElementById('previewMessage');
+  }
+
   function showMessage(title, text) {
-    if (els.messageTitle) {
-      els.messageTitle.textContent = title;
+    renderShell(state.pages[state.index] || null);
+    const titleElement = document.getElementById('messageTitle');
+    const textElement = document.getElementById('messageText');
+    const frame = frameElement();
+    if (titleElement) {
+      titleElement.textContent = title;
     }
-    if (els.messageText) {
-      els.messageText.textContent = text;
+    if (textElement) {
+      textElement.textContent = text;
     }
-    if (els.message) {
-      els.message.hidden = false;
+    if (messageElement()) {
+      messageElement().hidden = false;
     }
-    if (els.frame) {
-      els.frame.removeAttribute('src');
+    if (frame) {
+      frame.removeAttribute('src');
     }
   }
 
   function hideMessage() {
-    if (els.message) {
-      els.message.hidden = true;
+    if (messageElement()) {
+      messageElement().hidden = true;
     }
   }
 
@@ -131,28 +351,6 @@
     }));
   }
 
-  function renderShellSize() {
-    const preset = state.preset || devicePresets['iphone-portrait'];
-    const stageRect = els.stage?.getBoundingClientRect();
-    if (!stageRect || window.innerWidth <= 640) {
-      els.shell?.style.removeProperty('width');
-      els.shell?.style.removeProperty('height');
-      return;
-    }
-
-    const scale = Math.min(
-      stageRect.width / preset.width,
-      stageRect.height / preset.height,
-      1
-    );
-    const width = Math.max(240, Math.floor(preset.width * scale));
-    const height = Math.max(240, Math.floor(preset.height * scale));
-    if (els.shell) {
-      els.shell.style.width = `${width}px`;
-      els.shell.style.height = `${height}px`;
-    }
-  }
-
   function renderCurrentPage() {
     if (!state.pages.length) {
       showMessage('没有可预览页面', 'manifest 中没有找到 pages 或 canvas 节点。');
@@ -164,6 +362,8 @@
 
     state.index = Math.min(Math.max(state.index, 0), state.pages.length - 1);
     const page = state.pages[state.index];
+    renderShell(page);
+
     if (els.projectTitle) {
       els.projectTitle.textContent = state.manifest?.project?.name || 'ProtoDock 公开预览';
     }
@@ -183,12 +383,16 @@
     if (els.next) {
       els.next.disabled = state.index >= state.pages.length - 1;
     }
-    if (els.frame) {
-      els.frame.src = projectFileUrl(page.entry);
-      els.frame.title = `${page.title || page.pageId} 预览`;
+
+    const frame = frameElement();
+    if (frame) {
+      const nextSrc = projectFileUrl(page.entry);
+      if (frame.getAttribute('src') !== nextSrc) {
+        frame.src = nextSrc;
+      }
+      frame.title = `${page.title || page.pageId} 预览`;
     }
     hideMessage();
-    renderShellSize();
   }
 
   function goToPage(index) {
@@ -220,6 +424,7 @@
     state.preset = devicePresets[presetId] || devicePresets['iphone-portrait'];
     state.pages = orderedPages(manifest);
     state.index = 0;
+    state.shellKey = '';
     renderOptions();
     renderCurrentPage();
   }
@@ -227,7 +432,7 @@
   els.prev?.addEventListener('click', () => goToPage(state.index - 1));
   els.next?.addEventListener('click', () => goToPage(state.index + 1));
   els.pageSelect?.addEventListener('change', (event) => goToPage(event.target.value));
-  window.addEventListener('resize', renderShellSize);
+  window.addEventListener('resize', () => renderCurrentPage());
   window.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft') {
       goToPage(state.index - 1);
@@ -236,6 +441,7 @@
     }
   });
 
+  renderShell(null);
   const shareId = shareIdFromLocation();
   if (!shareId) {
     showMessage('分享链接无效', '请确认链接中包含有效的分享 ID。');
