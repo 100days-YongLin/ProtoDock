@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ProtoDock 公开预览</title>
+  <link rel="icon" type="image/png" href="/assets/protodock-icon.png">
+  <link rel="apple-touch-icon" href="/assets/protodock-icon.png">
+  <link rel="stylesheet" href="/preview.css">
+</head>
+<body>
+  <main class="preview-app">
+    <header class="preview-topbar">
+      <div class="preview-brand">
+        <img src="/assets/protodock-icon.png" alt="">
+        <div>
+          <strong id="projectTitle">ProtoDock 公开预览</strong>
+          <span id="pageTitle">正在加载</span>
+        </div>
+      </div>
+      <nav class="preview-actions" aria-label="预览操作">
+        <a class="icon-action" id="canvasLink" href="#" title="打开画布" aria-label="打开画布">
+          <i data-lucide="network"></i>
+        </a>
+        <a class="icon-action" id="downloadLink" href="#" title="下载项目包" aria-label="下载项目包">
+          <i data-lucide="download"></i>
+        </a>
+      </nav>
+    </header>
+
+    <section class="preview-stage" id="previewStage">
+      <div class="preview-shell" id="previewShell">
+        <iframe id="prototypeFrame" title="原型预览"></iframe>
+        <div class="preview-message" id="previewMessage" hidden>
+          <strong id="messageTitle">无法加载</strong>
+          <span id="messageText">分享项目不可用</span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="preview-controls">
+      <button class="control-button" id="prevPage" type="button" title="上一页" aria-label="上一页">
+        <i data-lucide="chevron-left"></i>
+      </button>
+      <label class="page-picker" for="pageSelect">
+        <span>页面</span>
+        <select id="pageSelect"></select>
+      </label>
+      <span class="page-counter" id="pageCounter">0 / 0</span>
+      <button class="control-button" id="nextPage" type="button" title="下一页" aria-label="下一页">
+        <i data-lucide="chevron-right"></i>
+      </button>
+    </footer>
+  </main>
+
+  <script src="/vendor/lucide.min.js"></script>
+  <script src="/preview.js"></script>
+</body>
+</html>

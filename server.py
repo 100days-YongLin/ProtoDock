@@ -1132,18 +1132,22 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         parts = [part for part in path.split("/") if part]
         if len(parts) < 2 or parts[0] != "s" or not is_valid_share_id(parts[1]):
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享链接不存在")
+        is_canvas_route = len(parts) == 3 and parts[2] == "canvas"
+        if len(parts) > 2 and not is_canvas_route:
+            raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享链接不存在")
         if not (SHARES_DIR / parts[1] / MANIFEST_FILE).is_file():
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
-        index_path = ROOT / "index.html"
+        index_path = ROOT / ("index.html" if is_canvas_route else "preview.html")
         html = index_path.read_text(encoding="utf-8")
-        if "<base " not in html:
+        if is_canvas_route and "<base " not in html:
             html = html.replace("<head>", '<head>\n  <base href="/">', 1)
         data = html.encode("utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        if self.command != "HEAD":
+            self.wfile.write(data)
 
     def serve_share_asset(self, path: str) -> None:
         parts = [part for part in unquote(path).split("/") if part]
