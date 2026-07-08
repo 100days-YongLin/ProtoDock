@@ -1,6 +1,7 @@
 (() => {
   const MANIFEST_FILE = 'protodock.project.json';
   const MOBILE_QUERY = '(max-width: 640px)';
+  const CONTROL_AUTO_COLLAPSE_MS = 3600;
   const els = {
     app: document.querySelector('.preview-app'),
     projectTitle: document.getElementById('projectTitle'),
@@ -9,6 +10,7 @@
     downloadLink: document.getElementById('downloadLink'),
     stage: document.getElementById('previewStage'),
     shell: document.getElementById('previewShell'),
+    controls: document.getElementById('previewControls'),
     prev: document.getElementById('prevPage'),
     next: document.getElementById('nextPage'),
     pageSelect: document.getElementById('pageSelect'),
@@ -71,8 +73,11 @@
     pages: [],
     index: 0,
     preset: devicePresets['iphone-portrait'],
-    shellKey: ''
+    shellKey: '',
+    mobileControlsCollapsed: true,
+    controlsTimer: null
   };
+  const interactionTargets = new WeakSet();
 
   function isValidShareId(value) {
     return /^[a-zA-Z0-9_-]{6,80}$/.test(value || '');
@@ -189,6 +194,52 @@
     return window.matchMedia(MOBILE_QUERY).matches;
   }
 
+  function clearControlsTimer() {
+    if (state.controlsTimer) {
+      window.clearTimeout(state.controlsTimer);
+      state.controlsTimer = null;
+    }
+  }
+
+  function renderControlState() {
+    const mobile = isMobileLayout();
+    const collapsed = mobile && state.mobileControlsCollapsed;
+    if (!els.controls) {
+      return;
+    }
+    els.controls.classList.toggle('is-collapsed', collapsed);
+    els.controls.classList.toggle('is-expanded', mobile && !collapsed);
+    els.controls.setAttribute('aria-expanded', String(!collapsed));
+    els.controls.title = collapsed ? '展开切页控制' : '切页控制';
+    if (!mobile) {
+      clearControlsTimer();
+    }
+  }
+
+  function scheduleControlsAutoCollapse() {
+    clearControlsTimer();
+    if (!isMobileLayout() || state.mobileControlsCollapsed) {
+      return;
+    }
+    state.controlsTimer = window.setTimeout(() => {
+      setControlsCollapsed(true);
+    }, CONTROL_AUTO_COLLAPSE_MS);
+  }
+
+  function setControlsCollapsed(collapsed) {
+    if (!isMobileLayout()) {
+      renderControlState();
+      return;
+    }
+    state.mobileControlsCollapsed = !!collapsed;
+    renderControlState();
+    if (state.mobileControlsCollapsed) {
+      clearControlsTimer();
+    } else {
+      scheduleControlsAutoCollapse();
+    }
+  }
+
   function pageRecord(pageId, page = {}) {
     return {
       pageId,
@@ -284,6 +335,7 @@
 
     els.app?.classList.toggle('is-mobile', mobile);
     els.app?.classList.toggle('is-desktop', !mobile);
+    renderControlState();
 
     if (state.shellKey !== shellKey) {
       state.shellKey = shellKey;
@@ -312,6 +364,34 @@
 
   function messageElement() {
     return document.getElementById('previewMessage');
+  }
+
+  function installPreviewSurfaceInteraction(target) {
+    if (!target || interactionTargets.has(target)) {
+      return;
+    }
+    interactionTargets.add(target);
+    target.addEventListener('pointerdown', () => {
+      if (isMobileLayout() && !state.mobileControlsCollapsed) {
+        setControlsCollapsed(true);
+      }
+    }, { capture: true, passive: true });
+  }
+
+  function bindFrameInteractions(frame) {
+    if (!frame || frame.dataset.previewInteractionBound === 'true') {
+      return;
+    }
+    frame.dataset.previewInteractionBound = 'true';
+    const bindFrameWindow = () => {
+      try {
+        installPreviewSurfaceInteraction(frame.contentDocument);
+      } catch (error) {
+        // External entries cannot be instrumented; controls still work.
+      }
+    };
+    frame.addEventListener('load', bindFrameWindow);
+    bindFrameWindow();
   }
 
   function showMessage(title, text) {
@@ -386,6 +466,7 @@
 
     const frame = frameElement();
     if (frame) {
+      bindFrameInteractions(frame);
       const nextSrc = projectFileUrl(page.entry);
       if (frame.getAttribute('src') !== nextSrc) {
         frame.src = nextSrc;
@@ -393,6 +474,8 @@
       frame.title = `${page.title || page.pageId} 预览`;
     }
     hideMessage();
+    renderControlState();
+    scheduleControlsAutoCollapse();
   }
 
   function goToPage(index) {
@@ -425,14 +508,34 @@
     state.pages = orderedPages(manifest);
     state.index = 0;
     state.shellKey = '';
+    state.mobileControlsCollapsed = true;
     renderOptions();
     renderCurrentPage();
   }
 
   els.prev?.addEventListener('click', () => goToPage(state.index - 1));
   els.next?.addEventListener('click', () => goToPage(state.index + 1));
-  els.pageSelect?.addEventListener('change', (event) => goToPage(event.target.value));
-  window.addEventListener('resize', () => renderCurrentPage());
+  els.pageSelect?.addEventListener('focus', clearControlsTimer);
+  els.pageSelect?.addEventListener('blur', scheduleControlsAutoCollapse);
+  els.pageSelect?.addEventListener('change', (event) => {
+    goToPage(event.target.value);
+    window.setTimeout(() => setControlsCollapsed(true), 500);
+  });
+  els.controls?.addEventListener('click', (event) => {
+    if (!isMobileLayout()) {
+      return;
+    }
+    if (state.mobileControlsCollapsed) {
+      event.preventDefault();
+      setControlsCollapsed(false);
+      return;
+    }
+    scheduleControlsAutoCollapse();
+  });
+  window.addEventListener('resize', () => {
+    renderCurrentPage();
+    renderControlState();
+  });
   window.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft') {
       goToPage(state.index - 1);
