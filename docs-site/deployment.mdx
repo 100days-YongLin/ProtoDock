@@ -26,3 +26,13 @@ npx mint export
 ## 公开访问
 
 如果服务通过 FRP 或反向代理暴露，主应用仍然使用当前访问地址生成分享链接。文档入口固定为 `/docs`，跟随同一个域名访问。
+
+## GitHub 出站代理
+
+如果服务器需要对 GitHub 单独走转发，而用户访问 ProtoDock 后端仍然直连，可以只给 GitHub 操作配置代理：
+
+```bash
+PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890 PROTODOCK_PORT=6080 python3 server.py
+```
+
+这个变量只作用于 GitHub App API、从 GitHub 打开项目、推送到 GitHub 这些出站操作，不会影响公开预览和静态资源访问。推荐配合 HTTPS 仓库和 GitHub App 模式使用；Deploy Key 的 SSH 推送需要另行配置 SSH 代理。

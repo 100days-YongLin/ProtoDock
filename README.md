@@ -188,6 +188,14 @@ PROTODOCK_PORT=6080 python3 server.py
 
 GitHub App 模式下，前端不会展示或复制私钥；服务端只在推送时临时换取 installation token，并通过 git 的凭据回调使用这个 token。`.pem`、`.secrets/` 和 `.github-work/` 都不应进入 git。
 
+如果服务所在机器需要让 GitHub 出站单独走转发，可以配置：
+
+```bash
+export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
+```
+
+这个代理只会用于 GitHub App API、从 GitHub 打开项目、推送到 GitHub 这些出站操作；不会影响用户访问 ProtoDock 后端、公开预览链接或静态资源。当前实现面向 HTTPS GitHub 仓库和 GitHub App 模式；如果使用 Deploy Key 的 SSH 推送，仍需要在 SSH 层单独配置代理。
+
 推送时用户填写：
 
 - `产品名`：例如 `pictale`

@@ -45,6 +45,7 @@ GITHUB_AUTHOR_NAME = os.environ.get("PROTODOCK_GITHUB_AUTHOR_NAME", "ProtoDock")
 GITHUB_AUTHOR_EMAIL = os.environ.get("PROTODOCK_GITHUB_AUTHOR_EMAIL", "protodock@localhost")
 GITHUB_PUSH_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_PUSH_TIMEOUT_SECONDS", "120"))
 GITHUB_OPEN_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_OPEN_TIMEOUT_SECONDS", "120"))
+GITHUB_PROXY = os.environ.get("PROTODOCK_GITHUB_PROXY", "").strip()
 
 ALLOWED_ROOT_FILES = {MANIFEST_FILE}
 ALLOWED_ROOT_DIRS = {"pages", "docs", "assets"}
@@ -449,6 +450,7 @@ def github_auth_mode() -> str:
 
 def github_config_payload() -> dict:
     mode = github_auth_mode()
+    github_proxy_configured = bool(GITHUB_PROXY)
     if mode == "app":
         key_ready = GITHUB_APP_KEY_PATH.is_file()
         return {
@@ -462,6 +464,7 @@ def github_config_payload() -> dict:
             "keyReady": key_ready,
             "publicKey": "",
             "keyError": "" if key_ready else "服务器未找到 GitHub App PEM 私钥",
+            "githubProxyConfigured": github_proxy_configured,
             "branchPattern": "产品名/版本号",
         }
 
@@ -480,19 +483,48 @@ def github_config_payload() -> dict:
         "publicKey": public_key,
         "keyReady": bool(public_key),
         "keyError": key_error,
+        "githubProxyConfigured": github_proxy_configured,
         "branchPattern": "产品名/版本号",
     }
 
 
+def merge_env(*envs: dict[str, str]) -> dict[str, str]:
+    merged = {}
+    for env in envs:
+        merged.update(env)
+    return merged
+
+
+def github_proxy_env() -> dict[str, str]:
+    if not GITHUB_PROXY:
+        return {}
+    return {
+        "HTTP_PROXY": GITHUB_PROXY,
+        "HTTPS_PROXY": GITHUB_PROXY,
+        "http_proxy": GITHUB_PROXY,
+        "https_proxy": GITHUB_PROXY,
+    }
+
+
+def github_urlopen(request: urllib_request.Request, timeout: int = 20):
+    if not GITHUB_PROXY:
+        return urllib_request.urlopen(request, timeout=timeout)
+    opener = urllib_request.build_opener(urllib_request.ProxyHandler({
+        "http": GITHUB_PROXY,
+        "https": GITHUB_PROXY,
+    }))
+    return opener.open(request, timeout=timeout)
+
+
 def github_deploy_key_git_env() -> dict[str, str]:
     ensure_github_deploy_key()
-    return {
+    return merge_env(github_proxy_env(), {
         "GIT_SSH_COMMAND": (
             f"ssh -i {GITHUB_KEY_PATH} "
             "-o IdentitiesOnly=yes "
             "-o StrictHostKeyChecking=accept-new"
         )
-    }
+    })
 
 
 def base64url_bytes(data: bytes) -> str:
@@ -552,7 +584,7 @@ def github_app_installation_token() -> str:
         },
     )
     try:
-        with urllib_request.urlopen(request, timeout=20) as response:
+        with github_urlopen(request, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib_error.HTTPError as error:
         body = error.read().decode("utf-8", "replace")
@@ -631,17 +663,17 @@ def github_app_clone_context(work_dir: Path) -> dict[str, str]:
         encoding="utf-8",
     )
     askpass_path.chmod(0o700)
-    return {
+    return merge_env(github_proxy_env(), {
         "GIT_ASKPASS": str(askpass_path),
         "GIT_TERMINAL_PROMPT": "0",
         "PROTODOCK_GITHUB_TOKEN": token,
-    }
+    })
 
 
 def github_open_git_env(work_dir: Path) -> dict[str, str]:
     if github_auth_mode() == "app" and GITHUB_APP_ID and GITHUB_INSTALLATION_ID and GITHUB_APP_KEY_PATH.is_file():
         return github_app_clone_context(work_dir)
-    return {"GIT_TERMINAL_PROMPT": "0"}
+    return merge_env(github_proxy_env(), {"GIT_TERMINAL_PROMPT": "0"})
 
 
 def github_app_git_context(work_dir: Path) -> tuple[str, dict[str, str]]:
@@ -660,11 +692,11 @@ def github_app_git_context(work_dir: Path) -> tuple[str, dict[str, str]]:
         encoding="utf-8",
     )
     askpass_path.chmod(0o700)
-    return github_https_repo_url(GITHUB_REPO_URL), {
+    return github_https_repo_url(GITHUB_REPO_URL), merge_env(github_proxy_env(), {
         "GIT_ASKPASS": str(askpass_path),
         "GIT_TERMINAL_PROMPT": "0",
         "PROTODOCK_GITHUB_TOKEN": token,
-    }
+    })
 
 
 def github_git_context(work_dir: Path) -> tuple[str, dict[str, str]]:
