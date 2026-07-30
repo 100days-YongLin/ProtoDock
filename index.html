@@ -176,9 +176,19 @@
                 <span id="inspectorType">小程序 / 首次使用</span>
               </div>
               <div class="inspector-title-actions">
-                <button class="panel-icon-button" id="copyPagePngButton" type="button" title="复制页面 PNG" aria-label="复制页面 PNG" data-requires-project>
-                  <i data-lucide="copy"></i>
-                </button>
+                <div class="capture-png-controls" id="capturePngControls">
+                  <button class="panel-icon-button" id="copyPagePngButton" type="button" title="复制页面 PNG" aria-label="复制页面 PNG" data-requires-project>
+                    <i data-lucide="copy"></i>
+                  </button>
+                  <div class="capture-mode-segment" role="group" aria-label="截图边框">
+                    <button class="capture-mode-button active" type="button" data-capture-mode="frame" title="带设备框" aria-label="带设备框" aria-pressed="true" data-requires-project>
+                      <i data-lucide="smartphone"></i>
+                    </button>
+                    <button class="capture-mode-button" type="button" data-capture-mode="screen" title="无设备框" aria-label="无设备框" aria-pressed="false" data-requires-project>
+                      <i data-lucide="crop"></i>
+                    </button>
+                  </div>
+                </div>
                 <button class="panel-icon-button" id="pageSettingsButton" type="button" title="设置页面信息" aria-label="设置页面信息" aria-expanded="false" aria-controls="pageSettingsPanel" data-requires-project>
                   <i data-lucide="settings-2"></i>
                 </button>
@@ -560,6 +570,7 @@
   <script src="./placement.js"></script>
   <script src="./zip.js"></script>
   <script src="./capture.js"></script>
+  <script src="./capture-options.js"></script>
   <script src="./app.js"></script>
   <script src="./project-name.js"></script>
   <script src="./share.js"></script>

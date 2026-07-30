@@ -67,6 +67,7 @@ const els = {
   sourcePath: document.getElementById('sourcePath'),
   entryPath: document.getElementById('entryPath'),
   docPath: document.getElementById('docPath'),
+  capturePngControls: document.getElementById('capturePngControls'),
   copyPagePngButton: document.getElementById('copyPagePngButton'),
   nodeInspectorPanel: document.getElementById('nodeInspectorPanel'),
   markdownMount: document.getElementById('pageMarkdown'),
@@ -831,13 +832,14 @@ async function createShareArchive(options = {}) {
   return window.ProtoDockZip.createZipFile(entries, safeShareArchiveFileName());
 }
 
-function safePngFileName(page) {
+function safePngFileName(page, captureMode = 'frame') {
   const rawName = page?.title || activeNode()?.pageId || 'protodock-page';
   const safeName = String(rawName)
     .replace(/[^\p{L}\p{N} ._-]+/gu, '-')
     .replace(/^[ ._-]+|[ ._-]+$/g, '')
     .slice(0, 80);
-  return `${safeName || 'protodock-page'}.png`;
+  const suffix = captureMode === 'screen' ? '-无框' : '';
+  return `${safeName || 'protodock-page'}${suffix}.png`;
 }
 
 function captureFrameSizeForPreset(preset) {
@@ -994,11 +996,14 @@ async function copySelectedPagePng() {
     return;
   }
 
+  const captureMode = window.ProtoDockCaptureOptions?.getMode?.() === 'screen' ? 'screen' : 'frame';
+  const modeLabel = captureMode === 'screen' ? '无框' : '带框';
   const previousDisabled = els.copyPagePngButton?.disabled;
   if (els.copyPagePngButton) {
     els.copyPagePngButton.disabled = true;
   }
-  setStatus('正在生成页面 PNG...');
+  window.ProtoDockCaptureOptions?.setDisabled?.(true);
+  setStatus(`正在生成${modeLabel}页面 PNG...`);
 
   let capture = null;
   try {
@@ -1010,10 +1015,11 @@ async function copySelectedPagePng() {
       preset,
       safeAreaEnabled: safeAreaEnabled(),
       safeAreaTop: safeArea.top,
-      safeAreaBottom: safeArea.bottom
+      safeAreaBottom: safeArea.bottom,
+      includeFrame: captureMode === 'frame'
     });
-    const result = await window.ProtoDockCapture.copyPngBlob(blob, safePngFileName(page));
-    setStatus(result.copied ? '已复制页面 PNG' : '当前浏览器不能直接复制图片，已下载 PNG');
+    const result = await window.ProtoDockCapture.copyPngBlob(blob, safePngFileName(page, captureMode));
+    setStatus(result.copied ? `已复制${modeLabel}页面 PNG` : `当前浏览器不能直接复制图片，已下载${modeLabel} PNG`);
   } catch (error) {
     console.error(error);
     setStatus(`复制 PNG 失败：${error.message || '无法生成图片'}`);
@@ -1563,9 +1569,11 @@ function renderPageSettingsControls() {
     els.pageSettingsButton.setAttribute('aria-expanded', String(state.pageSettingsOpen));
   }
   if (els.copyPagePngButton) {
+    els.capturePngControls.hidden = !hasActivePage;
     els.copyPagePngButton.hidden = !hasActivePage;
     els.copyPagePngButton.disabled = !hasActivePage;
   }
+  window.ProtoDockCaptureOptions?.setDisabled?.(!hasActivePage);
   [
     els.pageTitleInput,
     els.pageKindInput,

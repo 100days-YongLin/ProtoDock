@@ -1873,6 +1873,65 @@ select {
   gap: 8px;
 }
 
+.capture-png-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.capture-png-controls[hidden] {
+  display: none;
+}
+
+.capture-mode-segment {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  padding: 2px;
+}
+
+.capture-mode-button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.capture-mode-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.capture-mode-button:hover:not(:disabled) {
+  color: var(--primary);
+}
+
+.capture-mode-button.active {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.14);
+}
+
+.capture-mode-button:focus-visible {
+  outline: 2px solid rgba(0, 113, 227, 0.26);
+  outline-offset: 1px;
+}
+
+.capture-mode-button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
 .inspector-title strong {
   display: block;
   overflow: hidden;

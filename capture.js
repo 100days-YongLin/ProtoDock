@@ -290,6 +290,14 @@
     ctx.drawImage(pageImage, x, y + barHeight, screenWidth, screenHeight);
   }
 
+  function drawScreenOnly(ctx, pageImage, metrics) {
+    const { screenWidth, screenHeight, safeTop, safeBottom } = metrics;
+    const contentHeight = Math.max(1, screenHeight - safeTop - safeBottom);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, screenWidth, screenHeight);
+    ctx.drawImage(pageImage, 0, safeTop, screenWidth, contentHeight);
+  }
+
   function createCanvas(width, height) {
     const ratio = Math.min(2, Math.max(1, Math.floor(2200 / Math.max(width, height))));
     const canvas = document.createElement('canvas');
@@ -320,6 +328,18 @@
     const screenHeight = Number(preset.height || 830);
     const contentHeight = Math.max(1, screenHeight - safeTop - safeBottom);
     const pageImage = await iframeToImage(options.iframe, screenWidth, contentHeight);
+
+    if (options.includeFrame === false) {
+      const { canvas, ctx } = createCanvas(screenWidth, screenHeight);
+      ctx.clearRect(0, 0, screenWidth, screenHeight);
+      drawScreenOnly(ctx, pageImage, {
+        screenWidth,
+        screenHeight,
+        safeTop,
+        safeBottom
+      });
+      return canvasToPngBlob(canvas);
+    }
 
     const frameWidth = Number(preset.frameWidth || screenWidth);
     const frameHeight = Number(preset.frameHeight || screenHeight);
