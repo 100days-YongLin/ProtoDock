@@ -2045,8 +2045,23 @@ select {
 
 .markdown-panel.is-readonly .markdown-editor-shell,
 .markdown-panel.is-readonly .markdown-fallback {
-  pointer-events: none;
-  opacity: 0.72;
+  pointer-events: auto;
+  user-select: text;
+}
+
+.markdown-panel.is-readonly .markdown-editor-shell {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.markdown-panel.is-readonly .toastui-editor-defaultUI-toolbar {
+  display: none !important;
+}
+
+.markdown-panel.is-readonly .toastui-editor-contents {
+  cursor: text;
+  user-select: text;
 }
 
 .source-panel {

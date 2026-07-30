@@ -1489,6 +1489,7 @@ function renderProjectActions() {
   els.productSelect?.setAttribute('title', canEdit ? '修改项目名称' : (hasProject ? '当前项目（只读）' : '未打开项目'));
   els.productSelect?.setAttribute('aria-label', canEdit ? '修改项目名称' : '当前项目');
   els.nodeInspectorPanel?.classList.toggle('is-readonly', hasProject && state.readOnly);
+  syncMarkdownReadOnlyState(hasProject && state.readOnly);
 }
 
 function syncSafeAreaInputs() {
@@ -2098,6 +2099,15 @@ async function loadDocForPage(pageId, page) {
 
 function initMarkdownEditor() {
   if (window.toastui?.Editor && els.markdownMount) {
+    if (shareIdFromLocation() && typeof toastui.Editor.factory === 'function') {
+      state.markdownEditor = toastui.Editor.factory({
+        el: els.markdownMount,
+        height: '100%',
+        viewer: true,
+        initialValue: ''
+      });
+      return;
+    }
     state.markdownEditor = new toastui.Editor({
       el: els.markdownMount,
       height: '100%',
@@ -2114,10 +2124,22 @@ function initMarkdownEditor() {
 }
 
 function getEditorValue() {
-  if (state.markdownEditor) {
+  if (typeof state.markdownEditor?.getMarkdown === 'function') {
     return state.markdownEditor.getMarkdown();
   }
   return els.markdownFallback.value;
+}
+
+function syncMarkdownReadOnlyState(readOnly) {
+  els.markdownFallback.readOnly = !!readOnly;
+  if (readOnly) {
+    els.markdownMount?.setAttribute('tabindex', '0');
+  } else {
+    els.markdownMount?.removeAttribute('tabindex');
+  }
+  els.markdownMount?.querySelectorAll('[contenteditable]').forEach((element) => {
+    element.setAttribute('contenteditable', readOnly ? 'false' : 'true');
+  });
 }
 
 function setEditorValue(value) {
@@ -2127,6 +2149,7 @@ function setEditorValue(value) {
   } else {
     els.markdownFallback.value = value || '';
   }
+  syncMarkdownReadOnlyState(!!state.manifest && state.readOnly);
   state.isSettingEditorValue = false;
 }
 
