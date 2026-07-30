@@ -145,6 +145,7 @@ select {
   flex: 0 1 320px;
   justify-content: center;
   align-items: center;
+  gap: 6px;
   width: clamp(180px, 24vw, 320px);
   min-width: 0;
   height: 30px;
@@ -153,12 +154,40 @@ select {
   background: #1d1d1f;
   color: #fff;
   padding: 0 12px;
+  cursor: pointer;
   font-size: 12px;
   font-weight: 650;
   overflow: hidden;
-  text-overflow: ellipsis;
   text-align: center;
   white-space: nowrap;
+}
+
+.project-display span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.project-display svg {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.project-display:hover:not(:disabled),
+.project-display:focus-visible {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: #2c2c2e;
+  outline: none;
+}
+
+.project-display:disabled {
+  cursor: default;
+}
+
+.project-display:disabled svg {
+  display: none;
 }
 
 .canvas-badge {
@@ -202,8 +231,7 @@ select {
   color: #fff;
 }
 
-.tool-button:disabled,
-.project-display[aria-disabled="true"] {
+.tool-button:disabled {
   cursor: default;
   opacity: 0.42;
 }
@@ -1688,6 +1716,17 @@ select {
   border-radius: 18px;
   background: #fff;
   padding: 24px;
+}
+
+.rename-project-modal {
+  width: min(460px, 100%);
+}
+
+.field-message {
+  min-height: 18px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .modal-head {

@@ -37,7 +37,10 @@
           <button class="tool-button" id="playFlow" title="播放原型" aria-label="播放原型" data-requires-project><i data-lucide="play"></i></button>
         </div>
       </nav>
-      <div class="project-display" id="productSelect" aria-label="当前项目">未打开项目</div>
+      <button class="project-display" id="productSelect" type="button" title="修改项目名称" aria-label="修改项目名称" disabled>
+        <span id="currentProjectName">未打开项目</span>
+        <i data-lucide="pencil"></i>
+      </button>
       <button class="share-button" id="openShareModal" type="button" title="分享项目包" aria-label="分享项目包">
         <i data-lucide="share-2"></i>
         <span>分享</span>
@@ -293,6 +296,29 @@
     </section>
   </div>
 
+  <div class="project-modal-backdrop" id="renameProjectModal" hidden>
+    <section class="project-modal rename-project-modal" role="dialog" aria-modal="true" aria-labelledby="renameProjectModalTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="renameProjectModalTitle">修改项目名称</strong>
+          <span>新名称会显示在画布和后续公开预览中，点击顶部保存按钮后写入项目配置。</span>
+        </div>
+        <button class="tool-button" id="closeRenameProjectModal" type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      </header>
+
+      <div class="field">
+        <label for="renameProjectName">项目名称</label>
+        <input id="renameProjectName" maxlength="120" autocomplete="off">
+        <span class="field-message" id="renameProjectMessage" aria-live="polite"></span>
+      </div>
+
+      <div class="action-row">
+        <button class="primary" id="applyProjectRename" type="button">应用</button>
+        <button class="secondary" id="cancelProjectRename" type="button">取消</button>
+      </div>
+    </section>
+  </div>
+
   <div class="project-modal-backdrop" id="conflictModal" hidden>
     <section class="project-modal conflict-modal" role="dialog" aria-modal="true" aria-labelledby="conflictModalTitle">
       <header class="modal-head">
@@ -535,6 +561,7 @@
   <script src="./zip.js"></script>
   <script src="./capture.js"></script>
   <script src="./app.js"></script>
+  <script src="./project-name.js"></script>
   <script src="./share.js"></script>
   <script src="./github.js"></script>
 </body>

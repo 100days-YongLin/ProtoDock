@@ -39,6 +39,7 @@ const els = {
   noteMount: document.getElementById('noteMount'),
   zoomValue: document.getElementById('zoomValue'),
   productSelect: document.getElementById('productSelect'),
+  currentProjectName: document.getElementById('currentProjectName'),
   pageList: document.getElementById('pageList'),
   sortPagesButton: document.getElementById('sortPagesButton'),
   canvasPresetName: document.getElementById('canvasPresetName'),
@@ -1477,7 +1478,10 @@ function renderProjectActions() {
     control?.toggleAttribute('disabled', !canEdit);
   });
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
-  els.productSelect?.setAttribute('aria-disabled', String(!hasProject));
+  els.productSelect?.toggleAttribute('disabled', !canEdit);
+  els.productSelect?.setAttribute('aria-disabled', String(!canEdit));
+  els.productSelect?.setAttribute('title', canEdit ? '修改项目名称' : (hasProject ? '当前项目（只读）' : '未打开项目'));
+  els.productSelect?.setAttribute('aria-label', canEdit ? '修改项目名称' : '当前项目');
   els.nodeInspectorPanel?.classList.toggle('is-readonly', hasProject && state.readOnly);
 }
 
@@ -1635,7 +1639,7 @@ function renderChrome() {
     els.canvasProductDesc.textContent = '选择工作目录开始';
     els.canvasPresetName.textContent = '未选择';
     els.canvasPresetDesc.textContent = '打开项目后显示设备壳';
-    els.productSelect.textContent = '未打开项目';
+    els.currentProjectName.textContent = '未打开项目';
     renderSafeAreaSettingsControls();
     return;
   }
@@ -1649,8 +1653,31 @@ function renderChrome() {
     els.safeAreaToggle.checked = safeAreaEnabled();
   }
   renderSafeAreaSettingsControls();
-  els.productSelect.textContent = state.manifest.project.name;
+  els.currentProjectName.textContent = state.manifest.project.name;
   renderPageList();
+}
+
+function renameProject(name) {
+  if (!state.manifest) {
+    setStatus('请先打开一个项目');
+    return { ok: false, message: '请先打开一个项目' };
+  }
+  if (state.readOnly) {
+    const message = readonlyProjectMessage();
+    setStatus(message);
+    return { ok: false, message };
+  }
+  const nextName = String(name || '').trim();
+  if (!nextName) {
+    return { ok: false, message: '项目名称不能为空' };
+  }
+  if (nextName === state.manifest.project.name) {
+    return { ok: true, changed: false, name: nextName };
+  }
+  state.manifest.project.name = nextName;
+  renderChrome();
+  markDirty('项目名称已修改，保存后写入配置');
+  return { ok: true, changed: true, name: nextName };
 }
 
 function renderCanvas() {
@@ -3725,6 +3752,7 @@ window.ProtoDock = {
     };
   },
   openProjectDirectory,
+  renameProject,
   saveProject,
   reloadProject,
   checkExternalManifestChange,
