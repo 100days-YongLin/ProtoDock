@@ -26,6 +26,7 @@
   let config = null;
   let isLoadingConfig = false;
   let isPushing = false;
+  let formProjectId = null;
 
   function setStatus(message) {
     if (els.status) {
@@ -116,6 +117,25 @@
     }
     if (els.message && !els.message.value) {
       els.message.value = `update ${els.product?.value || 'prototype'} ${els.version?.value || 'v1'}`;
+    }
+  }
+
+  function preparePushTarget() {
+    const state = protoDockState();
+    const projectId = state.projectId || null;
+    if (formProjectId === projectId) {
+      return;
+    }
+    formProjectId = projectId;
+    const target = window.ProtoDockGithubPreferences?.getPushTarget?.(projectId) || {};
+    if (els.product) {
+      els.product.value = target.productName || '';
+    }
+    if (els.version) {
+      els.version.value = target.version || '';
+    }
+    if (els.message) {
+      els.message.value = '';
     }
   }
 
@@ -353,6 +373,10 @@
       setProgress(0);
       setStatus('正在上传项目包...');
       const payload = await uploadGithubArchive(body);
+      window.ProtoDockGithubPreferences?.setPushTarget?.(protoDockState().projectId, {
+        productName: els.product.value,
+        version: els.version.value
+      });
       setProgress(100);
       renderResult(payload);
       setStatus(payload.action === 'unchanged' ? 'GitHub 分支内容无变化' : '已推送到 GitHub');
@@ -380,6 +404,7 @@
     if (!els.modal) {
       return;
     }
+    preparePushTarget();
     fillDefaults();
     resetProgress();
     if (els.result) {

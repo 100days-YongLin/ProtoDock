@@ -2877,6 +2877,16 @@ function openProjectMenuModal() {
     openProjectDirectory();
     return;
   }
+  const githubPreferences = window.ProtoDockGithubPreferences?.getOpenProject?.() || {};
+  if (els.githubOpenRepo && !els.githubOpenRepo.value) {
+    els.githubOpenRepo.value = githubPreferences.repoUrl || '';
+  }
+  if (els.githubOpenBranch && !els.githubOpenBranch.value) {
+    els.githubOpenBranch.value = githubPreferences.branch || '';
+  }
+  if (els.githubOpenProjectPath && !els.githubOpenProjectPath.value) {
+    els.githubOpenProjectPath.value = githubPreferences.projectPath || '';
+  }
   if (els.githubOpenStatus) {
     els.githubOpenStatus.textContent = '等待填写仓库地址和分支';
   }
@@ -2935,6 +2945,7 @@ async function openGithubProjectFromMenu() {
     if (!response.ok) {
       throw new Error(payload.error || '无法打开 GitHub 项目');
     }
+    window.ProtoDockGithubPreferences?.setOpenProject?.({ repoUrl, branch, projectPath });
     els.githubOpenStatus.textContent = '已生成只读预览，正在打开...';
     window.location.href = payload.url || appUrl(payload.path || `/s/${encodeURIComponent(payload.id)}`);
   } catch (error) {

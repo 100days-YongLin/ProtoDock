@@ -152,7 +152,7 @@ http://<server-ip>:6080/index.html
 
 - `打开本地项目`：选择包含 `protodock.project.json` 的本地目录，可编辑并保存。
 - `打开公开预览`：读取 `GET /api/shares`，列出当前服务上已经上传过的分享项目，点击后进入对应 `/s/<share-id>` 公开预览。
-- `从 GitHub 仓库打开`：填写 GitHub 仓库地址、分支和可选项目路径。服务端会下载指定分支中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 公开预览。分支为必填；项目路径留空时默认读取仓库根目录。
+- `从 GitHub 仓库打开`：填写 GitHub 仓库地址、分支和可选项目路径。服务端会下载指定分支中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 公开预览。分支为必填；项目路径留空时默认读取仓库根目录。浏览器会记住上一次成功打开时使用的这三项。
 
 进入 `/s/<share-id>` 后，顶部会提供“打开画布”和“下载项目包”两个操作；下载会拿到该只读项目对应的 zip 包。
 
@@ -205,6 +205,8 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 - `Commit message`：本次提交说明
 
 后端会组合分支名为 `产品名/版本号`，例如 `pictale/v1`。每次推送都会覆盖该分支中的受控内容，再执行 commit 和 `git push --force-with-lease`。产品名和版本号只允许英文、数字、点、中横线和下划线，避免生成非法 Git 分支名。
+
+推送成功后，浏览器会按 `project.id` 记住该项目使用的产品名和版本号；下次打开 GitHub 弹窗时自动恢复。Commit message 不会复用，避免误用上一次提交说明。
 
 ## 冲突处理
 
