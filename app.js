@@ -1685,7 +1685,7 @@ function renameProject(name) {
   }
   state.manifest.project.name = nextName;
   renderChrome();
-  markDirty('项目名称已修改，保存后写入配置');
+  markDirty('项目名称已修改，正在等待保存');
   return { ok: true, changed: true, name: nextName };
 }
 
@@ -3186,8 +3186,9 @@ async function writeInitialFile(rootHandle, path, text) {
 
 async function saveProject() {
   if (!state.manifest || state.readOnly || !state.manifestHandle) {
-    setStatus(state.readOnly ? '示例项目只读，请打开本地目录' : '没有可保存的项目');
-    return;
+    const message = state.readOnly ? readonlyProjectMessage() : '没有可保存的项目';
+    setStatus(message);
+    return { ok: false, message };
   }
   try {
     const currentText = await (await state.manifestHandle.getFile()).text();
@@ -3202,11 +3203,11 @@ async function saveProject() {
       });
       if (choice === 'reload') {
         await reloadProject();
-        return;
+        return { ok: false, message: '已读取本地变更，名称未保存' };
       }
       if (choice !== 'overwrite') {
         setStatus('已取消保存');
-        return;
+        return { ok: false, message: '已取消保存' };
       }
     }
 
@@ -3226,9 +3227,12 @@ async function saveProject() {
     state.docDirty.clear();
     setStatus('已保存到本地文件');
     renderProjectActions();
+    return { ok: true };
   } catch (error) {
     console.error(error);
-    setStatus(`保存失败：${error.message || '无法写入文件'}`);
+    const message = `保存失败：${error.message || '无法写入文件'}`;
+    setStatus(message);
+    return { ok: false, message };
   }
 }
 

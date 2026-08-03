@@ -8,6 +8,8 @@
     input: document.getElementById('renameProjectName'),
     message: document.getElementById('renameProjectMessage')
   };
+  let originalName = '';
+  let applying = false;
 
   function projectState() {
     return window.ProtoDock?.getState?.() || {};
@@ -24,6 +26,7 @@
     if (!state.projectName || state.readOnly || !els.modal) {
       return;
     }
+    originalName = state.projectName;
     els.input.value = state.projectName;
     setMessage();
     els.modal.hidden = false;
@@ -34,19 +37,47 @@
   }
 
   function closeModal() {
+    if (applying) {
+      return;
+    }
     if (els.modal) {
       els.modal.hidden = true;
     }
     setMessage();
   }
 
-  function applyRename() {
+  function setApplying(nextApplying) {
+    applying = nextApplying;
+    [els.apply, els.cancel, els.close, els.input].forEach((control) => {
+      control?.toggleAttribute('disabled', applying);
+    });
+  }
+
+  async function applyRename() {
+    if (applying) {
+      return;
+    }
     const result = window.ProtoDock?.renameProject?.(els.input?.value);
     if (!result?.ok) {
       setMessage(result?.message || '无法修改项目名称');
       els.input?.focus();
       return;
     }
+    if (!result.changed && result.name === originalName) {
+      closeModal();
+      return;
+    }
+
+    setApplying(true);
+    setMessage('正在写入本地项目配置...');
+    const saveResult = await window.ProtoDock?.saveProject?.();
+    setApplying(false);
+    if (!saveResult?.ok) {
+      setMessage(saveResult?.message || '名称未能写入本地项目配置');
+      els.input?.focus();
+      return;
+    }
+    originalName = result.name;
     closeModal();
   }
 
