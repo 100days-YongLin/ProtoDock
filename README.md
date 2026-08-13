@@ -230,3 +230,17 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 ## 设计 Agent
 
 设计 Agent 不需要理解 ProtoDock 的内部画布实现，只需要遵守 [DESIGN_AGENT_CONTRACT.md](./DESIGN_AGENT_CONTRACT.md)。
+
+## 安装 ProtoDock Skill
+
+可分发 Skill 位于 `skills/protodock-canvas/SKILL.md`。在仓库根目录执行：
+
+```bash
+# 同时安装到 Codex 和 Claude Code 的用户级 Skill 目录
+./scripts/install-protodock-skill.sh both
+
+# 安装到指定项目，让规则只在该项目生效
+./scripts/install-protodock-skill.sh both project /path/to/prototype-project
+```
+
+Codex 使用 `~/.agents/skills` 或项目内 `.agents/skills`；Claude Code 使用 `~/.claude/skills` 或项目内 `.claude/skills`。完整说明见使用文档的“Skill 安装与文件契约”。
