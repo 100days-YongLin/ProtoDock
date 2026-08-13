@@ -135,7 +135,11 @@ PROTODOCK_PORT=6080 python3 server.py
 http://<server-ip>:6080/index.html
 ```
 
-右上角“分享”按钮会上传项目包到后端。打开本地项目目录后，ProtoDock 会优先在浏览器内自动打包当前项目，不需要手动压缩；如果没有本地目录权限，也可以手动选择 `.zip` 项目包。压缩包根目录可以直接包含 `protodock.project.json`，也可以外层包一层项目文件夹；服务端只解压 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`。
+右上角“分享”按钮会上传项目包到后端。打开本地项目目录后，ProtoDock 会优先在浏览器内自动打包当前项目，不需要手动压缩；如果没有本地目录权限，也可以手动选择 `.zip` 项目包。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，禁止额外套项目名、版本号或交付目录。ProtoDock 专用上传包必须与完整交付包分开生成。
+
+服务端会在导入前按 manifest 一次性校验所有 `pages.*.entry` 和 `pages.*.doc`。路径不是 ZIP 根目录相对路径、文件缺失，或清单被放在外层目录时，上传会直接失败并返回具体路径，不会等进入画布后再逐页报 `NotFoundError`。
+
+建议分别命名为 `<project>-<version>-protodock-upload.zip` 和 `<project>-<version>-full-release.zip`，不要向用户推荐后者用于 ProtoDock 上传。
 
 自动打包只读取当前项目目录中的 `pages/**`、`docs/**` 和 `assets/**`，并把当前内存里的 manifest 状态写入包内的 `protodock.project.json`。如果右侧文档有未保存修改，也会进入分享包，但不会因此写回本地磁盘。
 

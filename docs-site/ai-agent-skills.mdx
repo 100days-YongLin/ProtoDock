@@ -30,6 +30,25 @@ prototype-project/
 
 `protodock.project.json` 是项目清单。它告诉 ProtoDock 项目有哪些页面、每个页面的入口在哪里，以及画布节点和连线应该如何恢复。
 
+## 最终 ZIP 契约
+
+ProtoDock 上传包是独立交付物，ZIP 根目录必须直接包含：
+
+```text
+protodock.project.json
+pages/
+docs/
+assets/（如有）
+```
+
+不能在外层再套项目名、版本号、“完整交付包”或“ProtoDock上传包”目录。完整交付包与 ProtoDock 专用上传包必须分别生成，不要让用户拿完整交付包上传 ProtoDock。
+
+Agent 必须重新解压最终 ZIP，并按其中的 manifest 验证每个 `pages.*.entry` 和 `pages.*.doc` 都存在且相对于 ZIP 根目录。只校验打包前的源码目录，不算完成交付。
+
+<Warning>
+  `document missing`、`NotFoundError`、所有页面同时无法预览时，优先检查 ZIP 根目录。浏览器扩展产生的报错不应误判为 ProtoDock 页面错误。
+</Warning>
+
 ## Agent 应该更新什么
 
 Agent 通常可以更新：

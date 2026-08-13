@@ -39,7 +39,7 @@
       "minProperties": 1,
       "additionalProperties": {
         "type": "object",
-        "required": ["title", "entry"],
+        "required": ["title", "entry", "doc"],
         "additionalProperties": false,
         "properties": {
           "title": { "type": "string", "minLength": 1 },

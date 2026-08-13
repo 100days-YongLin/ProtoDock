@@ -78,10 +78,12 @@ DOCS_PAGE_ROOTS = {
 
 
 class ProtoDockError(Exception):
-    def __init__(self, status: HTTPStatus, message: str):
+    def __init__(self, status: HTTPStatus, message: str, *, code: str = "", details: list[str] | None = None):
         super().__init__(message)
         self.status = status
         self.message = message
+        self.code = code
+        self.details = details or []
 
 
 def is_valid_share_id(value: str) -> bool:
@@ -98,32 +100,32 @@ def clean_zip_name(name: str) -> PurePosixPath | None:
     return path
 
 
-def choose_project_prefix(zip_file: zipfile.ZipFile) -> PurePosixPath:
+def validate_archive_root(zip_file: zipfile.ZipFile) -> None:
     paths = [clean_zip_name(info.filename) for info in zip_file.infolist()]
     paths = [path for path in paths if path is not None]
     if any(str(path) == MANIFEST_FILE for path in paths):
-        return PurePosixPath(".")
-    candidates = {
-        path.parts[0]
-        for path in paths
-        if len(path.parts) >= 2 and path.parts[1] == MANIFEST_FILE
-    }
-    if len(candidates) == 1:
-        return PurePosixPath(next(iter(candidates)))
-    raise ProtoDockError(HTTPStatus.BAD_REQUEST, "zip 中未找到 protodock.project.json")
-
-
-def relative_project_path(path: PurePosixPath, prefix: PurePosixPath) -> PurePosixPath | None:
-    if str(prefix) == ".":
-        return path
-    if not path.parts or path.parts[0] != str(prefix):
-        return None
-    rest = path.parts[1:]
-    if not rest:
-        return None
-    return PurePosixPath(*rest)
-
-
+        return
+    nested_manifests = sorted(str(path) for path in paths if path.name == MANIFEST_FILE)
+    if len(nested_manifests) == 1:
+        manifest_path = nested_manifests[0]
+        raise ProtoDockError(
+            HTTPStatus.BAD_REQUEST,
+            f"检测到多余外层目录：{manifest_path}。请让 {MANIFEST_FILE} 直接位于 ZIP 根目录后重新打包。",
+            code="INVALID_ARCHIVE_ROOT",
+            details=[manifest_path],
+        )
+    if nested_manifests:
+        raise ProtoDockError(
+            HTTPStatus.BAD_REQUEST,
+            "ZIP 中存在多个 protodock.project.json，无法确定项目根目录。",
+            code="MULTIPLE_MANIFESTS",
+            details=nested_manifests,
+        )
+    raise ProtoDockError(
+        HTTPStatus.BAD_REQUEST,
+        "ZIP 根目录缺少 protodock.project.json。请上传 ProtoDock 专用上传包，不要上传完整交付包。",
+        code="MANIFEST_MISSING",
+    )
 def allowed_project_path(path: PurePosixPath) -> bool:
     if len(path.parts) == 1:
         return path.name in ALLOWED_ROOT_FILES
@@ -143,11 +145,84 @@ def is_zip_symlink(info: zipfile.ZipInfo) -> bool:
     return stat.S_ISLNK(mode)
 
 
+def manifest_relative_path(value, label: str, expected_root: str) -> PurePosixPath:
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError(f"{label} 未填写")
+    if "\\" in text or text.startswith(("/", "//")) or re.match(r"^[A-Za-z]:", text):
+        raise ValueError(f"{label} 必须是相对于项目根目录（ZIP 根目录）的路径：{text}")
+    if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", text) or "localhost" in text.lower():
+        raise ValueError(f"{label} 不能使用 URL、localhost 或外部依赖：{text}")
+    if "?" in text or "#" in text:
+        raise ValueError(f"{label} 不能包含查询参数或锚点：{text}")
+    path = clean_zip_name(text)
+    if path is None or not path.parts or path.parts[0] != expected_root:
+        raise ValueError(f"{label} 必须位于 {expected_root}/ 并相对于项目根目录（ZIP 根目录）：{text}")
+    return path
+
+
+def validate_project_manifest_files(
+    project_dir: Path,
+    *,
+    source_label: str = "项目根目录",
+    remediation: str = "请修复项目文件后重试。",
+) -> dict:
+    manifest_path = project_dir / MANIFEST_FILE
+    try:
+        with manifest_path.open("r", encoding="utf-8") as file:
+            manifest = json.load(file)
+    except FileNotFoundError as error:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"项目根目录缺少 {MANIFEST_FILE}") from error
+    except json.JSONDecodeError as error:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{MANIFEST_FILE} 不是合法 JSON") from error
+
+    pages = manifest.get("pages") if isinstance(manifest, dict) else None
+    if not isinstance(pages, dict) or not pages:
+        raise ProtoDockError(
+            HTTPStatus.BAD_REQUEST,
+            "项目包校验失败：protodock.project.json 中 pages 必须是非空对象。",
+            code="INVALID_MANIFEST_PAGES",
+        )
+
+    issues = []
+    entry_count = 0
+    doc_count = 0
+    for page_id, page in pages.items():
+        page_label = f"pages.{page_id}"
+        if not isinstance(page, dict):
+            issues.append(f"{page_label} 必须是对象")
+            continue
+        for field, root_name in (("entry", "pages"), ("doc", "docs")):
+            label = f"{page_label}.{field}"
+            try:
+                path = manifest_relative_path(page.get(field), label, root_name)
+            except ValueError as error:
+                issues.append(str(error))
+                continue
+            target = safe_target_path(project_dir, path)
+            if not target.is_file():
+                issues.append(f"缺少 {label} 文件：{path.as_posix()}")
+                continue
+            if field == "entry":
+                entry_count += 1
+            else:
+                doc_count += 1
+
+    if issues:
+        raise ProtoDockError(
+            HTTPStatus.BAD_REQUEST,
+            f"项目包校验失败。请确保所有路径相对于{source_label}。{remediation}",
+            code="PROJECT_FILES_INVALID",
+            details=issues,
+        )
+    return {"manifest": manifest, "pageCount": len(pages), "entryCount": entry_count, "docCount": doc_count}
+
+
 def safe_extract_project_zip(archive_bytes: bytes, destination: Path) -> None:
     total_size = 0
     try:
         with zipfile.ZipFile(BytesIO(archive_bytes)) as zip_file:
-            prefix = choose_project_prefix(zip_file)
+            validate_archive_root(zip_file)
             extracted_manifest = False
             for info in zip_file.infolist():
                 if info.is_dir():
@@ -163,8 +238,8 @@ def safe_extract_project_zip(archive_bytes: bytes, destination: Path) -> None:
                 clean_path = clean_zip_name(info.filename)
                 if clean_path is None:
                     raise ProtoDockError(HTTPStatus.BAD_REQUEST, "zip 包含非法路径")
-                relative_path = relative_project_path(clean_path, prefix)
-                if relative_path is None or not allowed_project_path(relative_path):
+                relative_path = clean_path
+                if not allowed_project_path(relative_path):
                     continue
 
                 target = safe_target_path(destination, relative_path)
@@ -179,12 +254,11 @@ def safe_extract_project_zip(archive_bytes: bytes, destination: Path) -> None:
     except zipfile.BadZipFile as error:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "无法读取 zip 压缩包") from error
 
-    manifest_path = destination / MANIFEST_FILE
-    try:
-        with manifest_path.open("r", encoding="utf-8") as file:
-            json.load(file)
-    except json.JSONDecodeError as error:
-        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "protodock.project.json 不是合法 JSON") from error
+    validate_project_manifest_files(
+        destination,
+        source_label="上传 ZIP 根目录",
+        remediation="请重新生成 ProtoDock 专用上传包。",
+    )
 
 
 def parse_multipart_upload(headers, body: bytes) -> tuple[str, bytes, dict[str, str]]:
@@ -782,6 +856,12 @@ def copy_project_snapshot(source_dir: Path, destination: Path) -> None:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, target)
 
+    validate_project_manifest_files(
+        destination,
+        source_label="GitHub 项目路径",
+        remediation="请修复仓库中的 manifest 或缺失文件后重试。",
+    )
+
 
 def github_share_id(repo_url: str, branch: str) -> str:
     seed = f"{repo_url}@{branch}-{secrets.token_urlsafe(6)}"
@@ -972,7 +1052,12 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def send_error_json(self, error: ProtoDockError) -> None:
-        self.send_json(error.status, {"error": error.message})
+        payload = {"error": error.message}
+        if error.code:
+            payload["code"] = error.code
+        if error.details:
+            payload["details"] = error.details
+        self.send_json(error.status, payload)
 
     def do_GET(self) -> None:
         try:

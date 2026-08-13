@@ -29,6 +29,9 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 11. Do not delete or overwrite user-authored pages, docs, or assets without explicit instruction.
 12. Keep the project-level `devicePreset` consistent. v1 assumes one device shell per project.
 13. Use `docs/<page-id>.md` for page intent, states, and acceptance notes.
+14. A ProtoDock upload ZIP must place `protodock.project.json`, `pages/`, `docs/`, and optional `assets/` directly at the archive root. Never add an outer delivery, project-name, or version directory.
+15. Generate the ProtoDock upload ZIP separately from the full release package. Never recommend the full release package for ProtoDock upload.
+16. Re-extract and validate the final ZIP, not only the source directory. Every `pages.*.entry` and `pages.*.doc` must exist relative to the extracted ZIP root before delivery is complete.
 
 ## React / Vue Recommended Build
 

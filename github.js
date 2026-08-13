@@ -292,6 +292,18 @@
     }
   }
 
+  function responseError(payload, responseText, fallback) {
+    const details = Array.isArray(payload.details) ? payload.details.filter(Boolean).map(String) : [];
+    const rawText = String(responseText || '').trim();
+    const htmlText = rawText.startsWith('<')
+      ? new DOMParser().parseFromString(rawText, 'text/html').body.textContent.replace(/\s+/g, ' ').trim()
+      : '';
+    const responseMessage = rawText && !rawText.startsWith('<') ? rawText : htmlText;
+    const message = payload.error || responseMessage.slice(0, 1000) || fallback;
+    const visibleDetails = details.filter((detail) => !message.includes(detail));
+    return visibleDetails.length ? `${message} ${visibleDetails.join('；')}` : message;
+  }
+
   function uploadGithubArchive(body) {
     return new Promise((resolve, reject) => {
       const request = new XMLHttpRequest();
@@ -316,7 +328,7 @@
       request.addEventListener('load', () => {
         const payload = parseJsonResponse(request.responseText);
         if (request.status < 200 || request.status >= 300) {
-          reject(new Error(payload.error || 'GitHub 推送失败'));
+          reject(new Error(responseError(payload, request.responseText, 'GitHub 推送失败')));
           return;
         }
         resolve(payload);

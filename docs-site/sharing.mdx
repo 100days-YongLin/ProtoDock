@@ -11,7 +11,11 @@ PROTODOCK_PORT=6080 python3 server.py
 
 ## 上传
 
-右上角 **分享** 按钮支持拖入项目 zip。压缩包根目录可以直接包含 `protodock.project.json`，也可以外层包一层项目文件夹。
+右上角 **分享** 按钮支持拖入项目 zip。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，不能再套项目名、版本号或交付目录。
+
+ProtoDock 上传包应与完整交付包分开生成。服务端会在导入前一次性检查 manifest 中全部 `entry` 和 `doc`；缺失文件或非根目录相对路径会显示具体问题并停止导入。
+
+建议使用 `<project>-<version>-protodock-upload.zip` 与 `<project>-<version>-full-release.zip` 区分两类产物，完整交付包不要用于 ProtoDock 上传。
 
 服务端只解压：
 

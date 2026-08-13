@@ -171,7 +171,7 @@
     if (els.dropHint) {
       els.dropHint.textContent = autoAvailable
         ? '自动打包失败或想上传其他版本时，可以在这里选择 zip。'
-        : '支持根目录直接包含 protodock.project.json，或外层包一层项目文件夹。';
+        : 'ZIP 根目录必须直接包含 protodock.project.json、pages/ 和 docs/。';
     }
   }
 
@@ -210,6 +210,18 @@
     }
   }
 
+  function responseError(payload, responseText, fallback) {
+    const details = Array.isArray(payload.details) ? payload.details.filter(Boolean).map(String) : [];
+    const rawText = String(responseText || '').trim();
+    const htmlText = rawText.startsWith('<')
+      ? new DOMParser().parseFromString(rawText, 'text/html').body.textContent.replace(/\s+/g, ' ').trim()
+      : '';
+    const responseMessage = rawText && !rawText.startsWith('<') ? rawText : htmlText;
+    const message = payload.error || responseMessage.slice(0, 1000) || fallback;
+    const visibleDetails = details.filter((detail) => !message.includes(detail));
+    return visibleDetails.length ? `${message} ${visibleDetails.join('；')}` : message;
+  }
+
   function uploadArchive(body) {
     return new Promise((resolve, reject) => {
       const request = new XMLHttpRequest();
@@ -234,7 +246,7 @@
       request.addEventListener('load', () => {
         const payload = parseJsonResponse(request.responseText);
         if (request.status < 200 || request.status >= 300) {
-          reject(new Error(payload.error || '上传失败'));
+          reject(new Error(responseError(payload, request.responseText, '上传失败')));
           return;
         }
         resolve(payload);
