@@ -70,7 +70,19 @@
     }
   }
 
-  async function createZipFile(entries, fileName = 'protodock-project.zip') {
+  async function deflateRaw(bytes) {
+    if (typeof CompressionStream !== 'function' || !bytes.byteLength) {
+      return null;
+    }
+    try {
+      const compressedStream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      return new Uint8Array(await new Response(compressedStream).arrayBuffer());
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function createZipFile(entries, fileName = 'protodock-project.zip', options = {}) {
     if (!Array.isArray(entries) || !entries.length) {
       throw new Error('没有可打包的文件');
     }
@@ -78,8 +90,12 @@
     const parts = [];
     const centralParts = [];
     let offset = 0;
+    let sourceBytes = 0;
+    let archiveBytes = 0;
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : () => {};
 
-    for (const entry of entries) {
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
       const path = normalizePath(entry.path);
       const nameBytes = encoder.encode(path);
       const data = await entryBytes(entry.data);
@@ -88,33 +104,38 @@
       assertZip32Size(offset);
 
       const checksum = crc32(data);
+      const compressed = await deflateRaw(data);
+      const shouldCompress = compressed && compressed.byteLength + 16 < size;
+      const payload = shouldCompress ? compressed : data;
+      const compressionMethod = shouldCompress ? 8 : 0;
+      const compressedSize = payload.byteLength;
       const stamp = dosDateTime(entry.lastModified);
       const localHeader = new Uint8Array(30);
 
       writeUint32(localHeader, 0, 0x04034b50);
       writeUint16(localHeader, 4, 20);
       writeUint16(localHeader, 6, 0x0800);
-      writeUint16(localHeader, 8, 0);
+      writeUint16(localHeader, 8, compressionMethod);
       writeUint16(localHeader, 10, stamp.time);
       writeUint16(localHeader, 12, stamp.date);
       writeUint32(localHeader, 14, checksum);
-      writeUint32(localHeader, 18, size);
+      writeUint32(localHeader, 18, compressedSize);
       writeUint32(localHeader, 22, size);
       writeUint16(localHeader, 26, nameBytes.byteLength);
       writeUint16(localHeader, 28, 0);
 
-      parts.push(localHeader, nameBytes, data);
+      parts.push(localHeader, nameBytes, payload);
 
       const centralHeader = new Uint8Array(46);
       writeUint32(centralHeader, 0, 0x02014b50);
       writeUint16(centralHeader, 4, 20);
       writeUint16(centralHeader, 6, 20);
       writeUint16(centralHeader, 8, 0x0800);
-      writeUint16(centralHeader, 10, 0);
+      writeUint16(centralHeader, 10, compressionMethod);
       writeUint16(centralHeader, 12, stamp.time);
       writeUint16(centralHeader, 14, stamp.date);
       writeUint32(centralHeader, 16, checksum);
-      writeUint32(centralHeader, 20, size);
+      writeUint32(centralHeader, 20, compressedSize);
       writeUint32(centralHeader, 24, size);
       writeUint16(centralHeader, 28, nameBytes.byteLength);
       writeUint16(centralHeader, 30, 0);
@@ -125,7 +146,16 @@
       writeUint32(centralHeader, 42, offset);
       centralParts.push(centralHeader, nameBytes);
 
-      offset += localHeader.byteLength + nameBytes.byteLength + size;
+      offset += localHeader.byteLength + nameBytes.byteLength + compressedSize;
+      sourceBytes += size;
+      archiveBytes += compressedSize;
+      onProgress({
+        current: index + 1,
+        total: entries.length,
+        path,
+        sourceBytes,
+        archiveBytes
+      });
     }
 
     const centralOffset = offset;

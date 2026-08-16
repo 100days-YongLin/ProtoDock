@@ -829,7 +829,9 @@ async function createShareArchive(options = {}) {
   }
 
   onProgress({ phase: 'zipping', current: entries.length, total: entries.length });
-  return window.ProtoDockZip.createZipFile(entries, safeShareArchiveFileName());
+  return window.ProtoDockZip.createZipFile(entries, safeShareArchiveFileName(), {
+    onProgress: (progress) => onProgress({ phase: 'compressing', ...progress })
+  });
 }
 
 function safePngFileName(page, captureMode = 'frame') {

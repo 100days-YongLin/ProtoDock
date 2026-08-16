@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import mimetypes
 import os
 import posixpath
@@ -46,6 +47,7 @@ GITHUB_AUTHOR_EMAIL = os.environ.get("PROTODOCK_GITHUB_AUTHOR_EMAIL", "protodock
 GITHUB_PUSH_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_PUSH_TIMEOUT_SECONDS", "120"))
 GITHUB_OPEN_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_OPEN_TIMEOUT_SECONDS", "120"))
 GITHUB_PROXY = os.environ.get("PROTODOCK_GITHUB_PROXY", "").strip()
+UPLOAD_ORIGIN = os.environ.get("PROTODOCK_UPLOAD_ORIGIN", "").strip()
 
 ALLOWED_ROOT_FILES = {MANIFEST_FILE}
 ALLOWED_ROOT_DIRS = {"pages", "docs", "assets"}
@@ -161,6 +163,240 @@ def manifest_relative_path(value, label: str, expected_root: str) -> PurePosixPa
     return path
 
 
+CANVAS_NODE_SIZES = {
+    "web-landscape": (480, 348),
+    "web-portrait": (360, 624),
+    "iphone-portrait": (188, 429),
+    "iphone-landscape": (236, 157),
+    "ipad-portrait": (174, 290),
+    "ipad-landscape": (236, 212),
+}
+
+
+def finite_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def canvas_node_rect(node: dict, size: tuple[int, int]) -> tuple[float, float, float, float]:
+    x = float(node["x"])
+    y = float(node["y"])
+    return x, y, x + size[0], y + size[1]
+
+
+def rects_overlap(first, second) -> bool:
+    return first[0] < second[2] and first[2] > second[0] and first[1] < second[3] and first[3] > second[1]
+
+
+def rect_gap(first, second) -> tuple[float, float]:
+    horizontal = max(0.0, max(first[0], second[0]) - min(first[2], second[2]))
+    vertical = max(0.0, max(first[1], second[1]) - min(first[3], second[3]))
+    return horizontal, vertical
+
+
+def segment_orientation(first, second, third) -> float:
+    return (second[0] - first[0]) * (third[1] - first[1]) - (second[1] - first[1]) * (third[0] - first[0])
+
+
+def segments_cross(first_start, first_end, second_start, second_end) -> bool:
+    first_a = segment_orientation(first_start, first_end, second_start)
+    first_b = segment_orientation(first_start, first_end, second_end)
+    second_a = segment_orientation(second_start, second_end, first_start)
+    second_b = segment_orientation(second_start, second_end, first_end)
+    epsilon = 1e-9
+    return first_a * first_b < -epsilon and second_a * second_b < -epsilon
+
+
+def segment_intersects_rect(start, end, rect) -> bool:
+    left, top, right, bottom = rect
+    if left <= start[0] <= right and top <= start[1] <= bottom:
+        return True
+    if left <= end[0] <= right and top <= end[1] <= bottom:
+        return True
+    corners = ((left, top), (right, top), (right, bottom), (left, bottom))
+    return any(
+        segments_cross(start, end, corners[index], corners[(index + 1) % 4])
+        for index in range(4)
+    )
+
+
+def validate_canvas_layout(manifest: dict) -> dict:
+    pages = manifest.get("pages") if isinstance(manifest, dict) else {}
+    canvas = manifest.get("canvas") if isinstance(manifest, dict) else None
+    issues = []
+    warnings = []
+    if not isinstance(canvas, dict):
+        return {
+            "issues": ["canvas 必须是对象"],
+            "warnings": [],
+            "stats": {
+                "pageCount": len(pages) if isinstance(pages, dict) else 0,
+                "nodeCount": 0,
+                "uniqueNodeCount": 0,
+                "duplicateNodeCount": 0,
+                "duplicatePageNodeCount": 0,
+                "danglingEdgeCount": 0,
+                "duplicateEdgeCount": 0,
+                "nodeOverlapCount": 0,
+                "unrelatedEdgeCrossingCount": 0,
+                "edgeThroughNodeCount": 0,
+                "insufficientSpacingCount": 0,
+            },
+        }
+
+    nodes = canvas.get("nodes")
+    edges = canvas.get("edges")
+    if not isinstance(nodes, list):
+        issues.append("canvas.nodes 必须是数组")
+        nodes = []
+    if not isinstance(edges, list):
+        issues.append("canvas.edges 必须是数组")
+        edges = []
+
+    page_ids = set(pages) if isinstance(pages, dict) else set()
+    node_by_id = {}
+    node_id_counts = {}
+    page_node_counts = {}
+    for index, node in enumerate(nodes):
+        label = f"canvas.nodes[{index}]"
+        if not isinstance(node, dict):
+            issues.append(f"{label} 必须是对象")
+            continue
+        node_id = str(node.get("id") or "").strip()
+        page_id = str(node.get("pageId") or "").strip()
+        if not node_id:
+            issues.append(f"{label}.id 未填写")
+        else:
+            node_id_counts[node_id] = node_id_counts.get(node_id, 0) + 1
+        if not page_id:
+            issues.append(f"{label}.pageId 未填写")
+        else:
+            page_node_counts[page_id] = page_node_counts.get(page_id, 0) + 1
+        if not finite_number(node.get("x")) or not finite_number(node.get("y")):
+            issues.append(f"{label} 的 x/y 必须是有限数字")
+            continue
+        if node_id and node_id not in node_by_id:
+            node_by_id[node_id] = node
+
+    duplicate_node_ids = sorted(node_id for node_id, count in node_id_counts.items() if count > 1)
+    duplicate_page_ids = sorted(page_id for page_id, count in page_node_counts.items() if count > 1)
+    missing_page_ids = sorted(page_ids - set(page_node_counts))
+    unknown_page_ids = sorted(set(page_node_counts) - page_ids)
+    if duplicate_node_ids:
+        issues.append(f"存在重复节点 id：{', '.join(duplicate_node_ids)}")
+    if duplicate_page_ids:
+        issues.append(f"同一 pageId 对应多个节点：{', '.join(duplicate_page_ids)}")
+    if missing_page_ids:
+        issues.append(f"页面缺少 canvas node：{', '.join(missing_page_ids)}")
+    if unknown_page_ids:
+        issues.append(f"canvas node 引用了不存在的页面：{', '.join(unknown_page_ids)}")
+
+    valid_edges = []
+    edge_id_counts = {}
+    edge_key_counts = {}
+    dangling_edges = []
+    for index, edge in enumerate(edges):
+        label = f"canvas.edges[{index}]"
+        if not isinstance(edge, dict):
+            issues.append(f"{label} 必须是对象")
+            continue
+        edge_id = str(edge.get("id") or "").strip()
+        from_id = str(edge.get("from") or "").strip()
+        to_id = str(edge.get("to") or "").strip()
+        if not edge_id:
+            issues.append(f"{label}.id 未填写")
+        else:
+            edge_id_counts[edge_id] = edge_id_counts.get(edge_id, 0) + 1
+        edge_key = (from_id, to_id)
+        if from_id and to_id:
+            edge_key_counts[edge_key] = edge_key_counts.get(edge_key, 0) + 1
+        if from_id not in node_by_id or to_id not in node_by_id:
+            dangling_edges.append(edge_id or label)
+            continue
+        valid_edges.append((edge_id or label, from_id, to_id))
+
+    duplicate_edge_ids = sorted(edge_id for edge_id, count in edge_id_counts.items() if count > 1)
+    duplicate_edge_keys = sorted(key for key, count in edge_key_counts.items() if count > 1)
+    if duplicate_edge_ids:
+        issues.append(f"存在重复连线 id：{', '.join(duplicate_edge_ids)}")
+    if duplicate_edge_keys:
+        labels = ", ".join(f"{from_id} -> {to_id}" for from_id, to_id in duplicate_edge_keys)
+        issues.append(f"存在重复业务连线：{labels}")
+    if dangling_edges:
+        issues.append(f"存在悬空连线：{', '.join(dangling_edges)}")
+
+    preset = str(manifest.get("project", {}).get("devicePreset") or "iphone-portrait")
+    node_size = CANVAS_NODE_SIZES.get(preset, CANVAS_NODE_SIZES["iphone-portrait"])
+    rects = {node_id: canvas_node_rect(node, node_size) for node_id, node in node_by_id.items()}
+    node_ids = list(rects)
+    overlap_count = 0
+    insufficient_spacing_count = 0
+    for index, first_id in enumerate(node_ids):
+        for second_id in node_ids[index + 1:]:
+            first_rect = rects[first_id]
+            second_rect = rects[second_id]
+            if rects_overlap(first_rect, second_rect):
+                overlap_count += 1
+                continue
+            horizontal_gap, vertical_gap = rect_gap(first_rect, second_rect)
+            if (horizontal_gap == 0 and 0 < vertical_gap < 80) or (vertical_gap == 0 and 0 < horizontal_gap < 80):
+                insufficient_spacing_count += 1
+    if overlap_count:
+        issues.append(f"检测到 {overlap_count} 组节点重叠")
+
+    centers = {
+        node_id: ((rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2)
+        for node_id, rect in rects.items()
+    }
+    crossing_count = 0
+    for index, (_, first_from, first_to) in enumerate(valid_edges):
+        for _, second_from, second_to in valid_edges[index + 1:]:
+            if {first_from, first_to} & {second_from, second_to}:
+                continue
+            if segments_cross(centers[first_from], centers[first_to], centers[second_from], centers[second_to]):
+                crossing_count += 1
+
+    edge_through_node_count = 0
+    for _, from_id, to_id in valid_edges:
+        start = centers[from_id]
+        end = centers[to_id]
+        for node_id, rect in rects.items():
+            if node_id in (from_id, to_id):
+                continue
+            if segment_intersects_rect(start, end, rect):
+                edge_through_node_count += 1
+
+    if crossing_count:
+        warnings.append(f"检测到 {crossing_count} 处非共享端点连线交叉，请调整关键流程布局")
+    if edge_through_node_count:
+        warnings.append(f"检测到 {edge_through_node_count} 条连线穿过无关节点，请调整锚点或节点位置")
+    if insufficient_spacing_count:
+        warnings.append(f"检测到 {insufficient_spacing_count} 组节点间距不足 80px")
+
+    duplicate_node_count = sum(max(0, count - 1) for count in node_id_counts.values())
+    duplicate_page_node_count = sum(max(0, count - 1) for count in page_node_counts.values())
+    duplicate_edge_count = (
+        sum(max(0, count - 1) for count in edge_id_counts.values())
+        + sum(max(0, count - 1) for count in edge_key_counts.values())
+    )
+    return {
+        "issues": issues,
+        "warnings": warnings,
+        "stats": {
+            "pageCount": len(page_ids),
+            "nodeCount": len(nodes),
+            "uniqueNodeCount": len(page_node_counts),
+            "duplicateNodeCount": duplicate_node_count,
+            "duplicatePageNodeCount": duplicate_page_node_count,
+            "danglingEdgeCount": len(dangling_edges),
+            "duplicateEdgeCount": duplicate_edge_count,
+            "nodeOverlapCount": overlap_count,
+            "unrelatedEdgeCrossingCount": crossing_count,
+            "edgeThroughNodeCount": edge_through_node_count,
+            "insufficientSpacingCount": insufficient_spacing_count,
+        },
+    }
+
+
 def validate_project_manifest_files(
     project_dir: Path,
     *,
@@ -208,17 +444,32 @@ def validate_project_manifest_files(
             else:
                 doc_count += 1
 
-    if issues:
+    canvas_validation = validate_canvas_layout(manifest)
+    canvas_issues = canvas_validation["issues"]
+    if issues or canvas_issues:
+        if issues and canvas_issues:
+            code = "PROJECT_VALIDATION_FAILED"
+        elif canvas_issues:
+            code = "CANVAS_LAYOUT_INVALID"
+        else:
+            code = "PROJECT_FILES_INVALID"
         raise ProtoDockError(
             HTTPStatus.BAD_REQUEST,
-            f"项目包校验失败。请确保所有路径相对于{source_label}。{remediation}",
-            code="PROJECT_FILES_INVALID",
-            details=issues,
+            f"项目包校验失败。请确保文件路径相对于{source_label}，且 Canvas 编排符合契约。{remediation}",
+            code=code,
+            details=issues + canvas_issues,
         )
-    return {"manifest": manifest, "pageCount": len(pages), "entryCount": entry_count, "docCount": doc_count}
+    return {
+        "manifest": manifest,
+        "pageCount": len(pages),
+        "entryCount": entry_count,
+        "docCount": doc_count,
+        "canvas": canvas_validation["stats"],
+        "warnings": canvas_validation["warnings"],
+    }
 
 
-def safe_extract_project_zip(archive_bytes: bytes, destination: Path) -> None:
+def safe_extract_project_zip(archive_bytes: bytes, destination: Path) -> dict:
     total_size = 0
     try:
         with zipfile.ZipFile(BytesIO(archive_bytes)) as zip_file:
@@ -254,7 +505,7 @@ def safe_extract_project_zip(archive_bytes: bytes, destination: Path) -> None:
     except zipfile.BadZipFile as error:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "无法读取 zip 压缩包") from error
 
-    validate_project_manifest_files(
+    return validate_project_manifest_files(
         destination,
         source_label="上传 ZIP 根目录",
         remediation="请重新生成 ProtoDock 专用上传包。",
@@ -1037,6 +1288,20 @@ def header_first(headers, name: str) -> str:
     return value.split(",", 1)[0].strip()
 
 
+def configured_upload_url(origin: str = UPLOAD_ORIGIN) -> str:
+    value = str(origin or "").strip().rstrip("/")
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        return ""
+    if parsed.path not in {"", "/"}:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}/api/shares"
+
+
 class ProtoDockHandler(BaseHTTPRequestHandler):
     server_version = "ProtoDockShare/1.0"
 
@@ -1048,8 +1313,20 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
+        self.send_upload_cors_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def send_upload_cors_headers(self) -> None:
+        if urlparse(self.path).path != "/api/shares":
+            return
+        origin = self.headers.get("Origin", "").strip()
+        self.send_header("Access-Control-Allow-Origin", origin or "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        if origin:
+            self.send_header("Vary", "Origin")
 
     def send_error_json(self, error: ProtoDockError) -> None:
         payload = {"error": error.message}
@@ -1071,6 +1348,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/shares":
                 self.handle_share_list()
+                return
+            if path == "/api/upload/config":
+                self.send_json(HTTPStatus.OK, {"uploadUrl": configured_upload_url()})
                 return
             if path == "/api/github/config":
                 self.handle_github_config()
@@ -1099,6 +1379,15 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
 
     def do_HEAD(self) -> None:
         self.do_GET()
+
+    def do_OPTIONS(self) -> None:
+        if urlparse(self.path).path != "/api/shares":
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self.end_headers()
+            return
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_upload_cors_headers()
+        self.end_headers()
 
     def do_POST(self) -> None:
         try:
@@ -1161,7 +1450,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             status = HTTPStatus.CREATED
         temp_dir = Path(tempfile.mkdtemp(prefix=".upload-", dir=SHARES_DIR))
         try:
-            safe_extract_project_zip(archive, temp_dir)
+            validation = safe_extract_project_zip(archive, temp_dir)
             replace_share_directory(final_dir, temp_dir, share_id)
         except Exception:
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -1172,7 +1461,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             "id": share_id,
             "path": path,
             "url": self.absolute_url(path),
-            "action": "updated" if is_update else "created"
+            "action": "updated" if is_update else "created",
+            "canvasValidation": validation["canvas"],
+            "warnings": validation["warnings"],
         })
 
     def handle_github_config(self) -> None:

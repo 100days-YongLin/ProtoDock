@@ -23,7 +23,11 @@ def project_manifest(entry="pages/login/index.html", doc="docs/login.md"):
                 "doc": doc,
             }
         },
-        "canvas": {"nodes": [], "edges": [], "notes": []},
+        "canvas": {
+            "nodes": [{"id": "node-login", "pageId": "login", "x": 0, "y": 0}],
+            "edges": [],
+            "notes": [],
+        },
     }
 
 
@@ -91,6 +95,91 @@ class UploadPackageTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "PROJECT_FILES_INVALID")
         self.assertTrue(any("localhost" in issue for issue in context.exception.details))
         self.assertTrue(any("ZIP 根目录" in issue for issue in context.exception.details))
+
+    def test_rejects_missing_canvas_node(self):
+        manifest = project_manifest()
+        manifest["canvas"]["nodes"] = []
+        files = {
+            server.MANIFEST_FILE: json.dumps(manifest),
+            "pages/login/index.html": "<!doctype html>",
+            "docs/login.md": "# Login",
+        }
+        with tempfile.TemporaryDirectory() as destination:
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.safe_extract_project_zip(build_zip(files), Path(destination))
+
+        self.assertEqual(context.exception.code, "CANVAS_LAYOUT_INVALID")
+        self.assertTrue(any("login" in issue for issue in context.exception.details))
+
+    def test_rejects_duplicate_nodes_dangling_edges_and_overlap(self):
+        manifest = project_manifest()
+        manifest["canvas"] = {
+            "nodes": [
+                {"id": "node-login", "pageId": "login", "x": 0, "y": 0},
+                {"id": "node-login-copy", "pageId": "login", "x": 0, "y": 0},
+            ],
+            "edges": [{"id": "edge-missing", "from": "node-login", "to": "node-missing"}],
+            "notes": [],
+        }
+        result = server.validate_canvas_layout(manifest)
+
+        self.assertTrue(result["issues"])
+        self.assertEqual(result["stats"]["duplicatePageNodeCount"], 1)
+        self.assertEqual(result["stats"]["danglingEdgeCount"], 1)
+        self.assertEqual(result["stats"]["nodeOverlapCount"], 1)
+
+    def test_reports_crossing_edges_as_warning(self):
+        manifest = {
+            "project": {"devicePreset": "iphone-landscape"},
+            "pages": {page_id: {} for page_id in ("a", "b", "c", "d")},
+            "canvas": {
+                "nodes": [
+                    {"id": "a", "pageId": "a", "x": 0, "y": 0},
+                    {"id": "b", "pageId": "b", "x": 500, "y": 500},
+                    {"id": "c", "pageId": "c", "x": 500, "y": 0},
+                    {"id": "d", "pageId": "d", "x": 0, "y": 500},
+                ],
+                "edges": [
+                    {"id": "ab", "from": "a", "to": "b"},
+                    {"id": "cd", "from": "c", "to": "d"},
+                ],
+            },
+        }
+        result = server.validate_canvas_layout(manifest)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["stats"]["unrelatedEdgeCrossingCount"], 1)
+        self.assertTrue(any("连线交叉" in warning for warning in result["warnings"]))
+
+    def test_rejects_duplicate_edges(self):
+        manifest = {
+            "project": {"devicePreset": "iphone-portrait"},
+            "pages": {"a": {}, "b": {}},
+            "canvas": {
+                "nodes": [
+                    {"id": "a", "pageId": "a", "x": -600, "y": -700},
+                    {"id": "b", "pageId": "b", "x": 0, "y": 0},
+                ],
+                "edges": [
+                    {"id": "first", "from": "a", "to": "b"},
+                    {"id": "second", "from": "a", "to": "b"},
+                ],
+            },
+        }
+        result = server.validate_canvas_layout(manifest)
+
+        self.assertTrue(any("重复业务连线" in issue for issue in result["issues"]))
+        self.assertGreater(result["stats"]["duplicateEdgeCount"], 0)
+
+    def test_builds_upload_url_from_valid_origin(self):
+        self.assertEqual(
+            server.configured_upload_url("http://100.113.173.18:6080/"),
+            "http://100.113.173.18:6080/api/shares",
+        )
+
+    def test_rejects_invalid_upload_origin(self):
+        self.assertEqual(server.configured_upload_url("javascript:alert(1)"), "")
+        self.assertEqual(server.configured_upload_url("https://example.com/private"), "")
 
 
 if __name__ == "__main__":

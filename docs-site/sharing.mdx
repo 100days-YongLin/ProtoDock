@@ -13,7 +13,9 @@ PROTODOCK_PORT=6080 python3 server.py
 
 右上角 **分享** 按钮支持拖入项目 zip。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，不能再套项目名、版本号或交付目录。
 
-ProtoDock 上传包应与完整交付包分开生成。服务端会在导入前一次性检查 manifest 中全部 `entry` 和 `doc`；缺失文件或非根目录相对路径会显示具体问题并停止导入。
+ProtoDock 上传包应与完整交付包分开生成。服务端会在导入前一次性检查 manifest 中全部 `entry`、`doc` 和 Canvas 完整性；缺失文件、非根目录相对路径、缺失或重复节点、悬空或重复连线、节点重叠会显示具体问题并停止导入。
+
+连线交叉、连线穿过无关节点和节点间距不足属于布局质量警告。它们不会触发自动重排，上传完成后会在界面中明确提示。
 
 建议使用 `<project>-<version>-protodock-upload.zip` 与 `<project>-<version>-full-release.zip` 区分两类产物，完整交付包不要用于 ProtoDock 上传。
 

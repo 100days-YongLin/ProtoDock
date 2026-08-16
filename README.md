@@ -164,6 +164,14 @@ http://<server-ip>:6080/index.html
 
 如果服务通过 FRP 或反向代理暴露，分享列表和上传结果会按当前访问地址生成链接。也就是说，从哪个域名或端口打开 ProtoDock，公开预览列表里就显示对应入口的 `/s/<share-id>`。
 
+如果主访问入口适合预览但上传链路较慢，可以单独配置高速上传入口：
+
+```bash
+export PROTODOCK_UPLOAD_ORIGIN=http://100.113.173.18:6080
+```
+
+浏览器仍从当前访问地址生成分享链接，但 ZIP 会优先发送到高速入口；高速入口不可达时自动回退当前地址。高速入口只填写 origin，不要包含 `/api/shares` 路径。
+
 ## GitHub 推送
 
 内置 Python 服务也可以把当前本地项目推送到公司内部固定私有 GitHub 仓库。这个能力复用浏览器端自动打包：只读取 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，不会把服务端密钥写入项目包。
@@ -229,7 +237,7 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 
 ## 设计 Agent
 
-设计 Agent 不需要理解 ProtoDock 的内部画布实现，只需要遵守 [DESIGN_AGENT_CONTRACT.md](./DESIGN_AGENT_CONTRACT.md)。
+设计 Agent 不需要理解 ProtoDock 的内部画布实现，只需要遵守 [DESIGN_AGENT_CONTRACT.md](./DESIGN_AGENT_CONTRACT.md)。每个 manifest page 必须恰好对应一个 canvas node；上传会阻止缺失/重复节点、悬空/重复连线和节点重叠，并对连线交叉、穿过无关节点及间距不足给出警告。普通 build/export 和上传不会自动重排画布。
 
 ## 安装 ProtoDock Skill
 

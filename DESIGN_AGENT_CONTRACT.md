@@ -32,6 +32,11 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 14. A ProtoDock upload ZIP must place `protodock.project.json`, `pages/`, `docs/`, and optional `assets/` directly at the archive root. Never add an outer delivery, project-name, or version directory.
 15. Generate the ProtoDock upload ZIP separately from the full release package. Never recommend the full release package for ProtoDock upload.
 16. Re-extract and validate the final ZIP, not only the source directory. Every `pages.*.entry` and `pages.*.doc` must exist relative to the extracted ZIP root before delivery is complete.
+17. Every manifest page must have exactly one canvas node. Missing nodes, duplicate node IDs or page nodes, dangling or duplicate edges, unknown page references, and overlapping nodes are delivery-blocking errors.
+18. Group nodes by top-level business module. Keep module entries, states, and result/detail pages together; never dump new pages at the bottom or assign random coordinates.
+19. Do not draw global Tab or sidebar navigation across modules. Keep only key task-flow actions on canvas and put secondary paths in page documentation.
+20. Prefer `bottom -> top` anchors for vertical flows and `right -> left` for same-level flows. Avoid edge crossings and edges that pass through unrelated nodes.
+21. Normal build/export must preserve canvas. Only explicit `--relayout`, `--reset-canvas`, or a direct user request may change it, after a manifest backup and preview.
 
 ## React / Vue Recommended Build
 
@@ -69,6 +74,17 @@ Design agents should not update:
 - `canvas.notes`
 
 Those fields belong to ProtoDock and product-flow editing. The default behavior is preserve canvas. Use an explicit reset or re-layout option, such as `--reset-canvas`, only when the user asks for it.
+
+## Canvas Layout Quality
+
+Canvas quality is part of the prototype deliverable:
+
+- `pageCount` must equal the number of unique node `pageId` values.
+- Every edge endpoint must exist; duplicate or dangling edges are invalid.
+- Nodes must not overlap. Recommended origin spacing is `480-600px` horizontally and `600-700px` vertically.
+- Non-shared-endpoint edge crossings should be zero. Unavoidable crossings, tight spacing, and paths through unrelated nodes must produce explicit warnings.
+- A layout tool may modify only `canvas`; it must preserve `pages`, `project.id`, and unknown fields.
+- Upload must never trigger an automatic re-layout.
 
 ## Page Sizing
 

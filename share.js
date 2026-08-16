@@ -30,6 +30,7 @@
   let shareTargets = [];
   let selectedShareId = null;
   let isLoadingTargets = false;
+  let uploadEndpointPromise = null;
   const activeShareId = shareIdFromLocation();
 
   function appBaseUrl() {
@@ -222,10 +223,30 @@
     return visibleDetails.length ? `${message} ${visibleDetails.join('；')}` : message;
   }
 
-  function uploadArchive(body) {
+  function currentUploadEndpoint() {
+    return appUrl('/api/shares');
+  }
+
+  function loadUploadEndpoint() {
+    if (!uploadEndpointPromise) {
+      uploadEndpointPromise = fetch('/api/upload/config', { cache: 'no-store' })
+        .then((response) => response.ok ? response.json() : {})
+        .then((payload) => {
+          const candidate = String(payload.uploadUrl || '').trim();
+          if (!/^https?:\/\//i.test(candidate)) {
+            return currentUploadEndpoint();
+          }
+          return new URL(candidate).toString();
+        })
+        .catch(() => currentUploadEndpoint());
+    }
+    return uploadEndpointPromise;
+  }
+
+  function uploadArchive(body, endpoint) {
     return new Promise((resolve, reject) => {
       const request = new XMLHttpRequest();
-      request.open('POST', '/api/shares');
+      request.open('POST', endpoint);
 
       request.upload.addEventListener('progress', (event) => {
         if (!event.lengthComputable) {
@@ -253,7 +274,9 @@
       });
 
       request.addEventListener('error', () => {
-        reject(new Error('网络连接失败'));
+        const error = new Error('网络连接失败');
+        error.isNetworkFailure = true;
+        reject(error);
       });
 
       request.addEventListener('abort', () => {
@@ -286,6 +309,13 @@
     if (progress.phase === 'zipping') {
       setProgress(98, { indeterminate: true, label: '压缩中' });
       setStatus('正在生成 zip...');
+      return;
+    }
+    if (progress.phase === 'compressing') {
+      const total = progress.total || 1;
+      const percent = 95 + Math.round((progress.current / total) * 4);
+      setProgress(Math.min(99, percent), { label: `${progress.current}/${progress.total}` });
+      setStatus(`正在压缩 ${progress.current}/${progress.total}`);
     }
   }
 
@@ -484,7 +514,18 @@
       }
       setProgress(0);
       setStatus(shareMode === 'update' ? '正在上传更新包...' : '正在上传...');
-      const payload = await uploadArchive(body);
+      const uploadEndpoint = await loadUploadEndpoint();
+      let payload;
+      try {
+        payload = await uploadArchive(body, uploadEndpoint);
+      } catch (error) {
+        if (!error.isNetworkFailure || uploadEndpoint === currentUploadEndpoint()) {
+          throw error;
+        }
+        setProgress(0);
+        setStatus('高速通道不可用，正在切换普通通道...');
+        payload = await uploadArchive(body, currentUploadEndpoint());
+      }
       setProgress(100);
       const shareUrl = shareUrlFromPayload(payload);
       if (els.url) {
@@ -494,7 +535,9 @@
       if (els.result) {
         els.result.hidden = false;
       }
-      setStatus(payload.action === 'updated' ? '公开预览已更新，原链接继续有效' : '分享链接已生成');
+      const successMessage = payload.action === 'updated' ? '公开预览已更新，原链接继续有效' : '分享链接已生成';
+      const warnings = Array.isArray(payload.warnings) ? payload.warnings : [];
+      setStatus(warnings.length ? `${successMessage}；布局警告：${warnings.join('；')}` : successMessage);
       if (payload.action === 'updated') {
         await loadShareTargets({ preferredId: payload.id });
       }

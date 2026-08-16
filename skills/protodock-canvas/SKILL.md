@@ -60,6 +60,41 @@ ProtoDock canvas layout is user-owned state.
 - Coordinates may be negative. Do not add positive-only clamps.
 - Export scripts must preserve canvas by default. Only an explicit option such as `--reset-canvas` may replace it.
 
+## Canvas Layout Quality Contract
+
+Treat a readable canvas as part of delivery quality, not as optional decoration.
+
+### Integrity
+
+- Every manifest page must map to exactly one canvas node. The page count must equal the count of unique node `pageId` values.
+- Reject missing page nodes, duplicate node IDs, duplicate page nodes, duplicate edges, dangling edges, nodes that reference unknown pages, and overlapping nodes.
+- Every edge `from` and `to` must reference an existing node.
+
+### Business grouping
+
+- Divide the canvas by top-level business module. Keep each module entry, page states, and detail or result pages in the same local region.
+- Prefer `module entry -> page state -> result/detail`. Never dump new pages at the bottom of the canvas or assign random coordinates.
+- Do not draw global Tab or sidebar navigation across modules. Draw only key task-flow actions. When several actions reach the same target, keep the primary path on canvas and document secondary paths in the page Markdown.
+
+### Geometry and connections
+
+- Keep nodes at the same level aligned in one direction with consistent spacing. Recommended origin spacing is `480-600px` horizontally and `600-700px` vertically.
+- State pages stay close to their owning entry and must not cross unrelated module regions. Negative coordinates are valid.
+- Use the nearest directionally sensible anchors: vertical flow prefers `bottom -> top`; same-level flow prefers `right -> left`.
+- Non-shared-endpoint edge crossings should be zero. Edges must not pass through unrelated nodes or preview areas. Reduce non-core paths or split a crowded flow when a node has too many edges.
+
+### State protection and layout tools
+
+- Normal build and export commands must not modify `canvas.nodes`, `canvas.edges`, or `canvas.notes`.
+- Only an explicit `--relayout`, `--reset-canvas`, or direct user request may update canvas layout. Back up the manifest first and modify only `canvas`; preserve `pages`, `project.id`, and unknown fields.
+- Layout automation must provide a preview before writing. Never silently re-layout during upload.
+
+### Upload gate
+
+Validate the final extracted ZIP and require: `pageCount === uniqueNodeCount`, zero duplicate or missing nodes, zero dangling or duplicate edges, zero node overlaps, valid edge endpoints, and all declared entry/doc files present.
+
+Block upload for integrity failures. Report edge crossings, edges through unrelated nodes, and insufficient spacing as explicit layout warnings. “Every page previews” is not sufficient unless the canvas is also complete and readable.
+
 ## ProtoDock Upload Package Rules
 
 Treat the final upload ZIP as a release artifact with a strict root contract.
@@ -94,6 +129,8 @@ After packaging, extract the final ZIP into a new temporary directory and valida
 - all manifest paths are relative to the extracted root;
 - entries contain no localhost URL, local absolute path, or unavailable external dependency;
 - the validated entry and document counts match the manifest page count.
+- every page has exactly one node, all edge endpoints exist, and no nodes overlap;
+- edge crossings, paths through unrelated nodes, and tight spacing are surfaced as layout warnings.
 
 Do not mark delivery complete until the extracted final upload ZIP passes. Source-directory-only validation does not count.
 

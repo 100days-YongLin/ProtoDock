@@ -105,6 +105,8 @@ assets/（如有）
 
 Agent 必须重新解压最终 ZIP，并按其中的 manifest 验证每个 `pages.*.entry` 和 `pages.*.doc` 都存在且相对于 ZIP 根目录。只校验打包前的源码目录，不算完成交付。
 
+最终 ZIP 还必须通过 Canvas 完整性检查：每个 page 恰好对应一个 node，所有边的端点存在，不允许重复节点、重复连线、悬空连线或节点重叠。连线交叉、穿过无关节点和间距不足必须作为明确警告返回。
+
 <Warning>
   `document missing`、`NotFoundError`、所有页面同时无法预览时，优先检查 ZIP 根目录。浏览器扩展产生的报错不应误判为 ProtoDock 页面错误。
 </Warning>
@@ -138,3 +140,5 @@ Agent 默认不应该整体重写：
 <Warning>
   只有用户明确说“重排画布”“重建 flow”或“覆盖 canvas”时，Agent 才能重写画布数据。
 </Warning>
+
+重排时应先备份 manifest 并生成布局预览；确认后只能修改 `canvas`。普通 build/export 和上传操作都不能自动重排。完整编排规则见 [画布协作](/canvas-workflow)。
