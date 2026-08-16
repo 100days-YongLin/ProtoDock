@@ -28,6 +28,7 @@ assert.equal(ProtoDockNavigation.routeForLabel(
   '查看角色'
 ), 'character');
 assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', '../reader-character/index.html'), 'character');
+assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', '/pages/reader-character/index'), 'character');
 assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', 'protodock:home'), 'home');
 assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', 'protodock:missing'), null);
 assert.equal(ProtoDockNavigation.pageIdFromMessage(
@@ -60,5 +61,93 @@ const legacyControl = {
   }
 };
 assert.equal(ProtoDockNavigation.routeForControl(manifest, 'reader', legacyControl), 'character');
+
+const legacyDataPageControl = {
+  tagName: 'BUTTON',
+  textContent: '精彩瞬间',
+  matches() {
+    return true;
+  },
+  getAttribute(name) {
+    return name === 'data-page' ? 'home' : null;
+  }
+};
+assert.equal(ProtoDockNavigation.routeForControl(manifest, 'reader', legacyDataPageControl), 'home');
+
+const legacyDataUrlControl = {
+  tagName: 'DIV',
+  textContent: '查看角色',
+  getAttribute(name) {
+    return name === 'data-url' ? '/pages/reader-character/index' : null;
+  }
+};
+assert.equal(ProtoDockNavigation.routeForControl(manifest, 'reader', legacyDataUrlControl), 'character');
+
+let frameLoadHandler = null;
+let documentClickHandler = null;
+let documentClickCapture = false;
+let stopped = false;
+let prevented = false;
+let navigatedPageId = null;
+const originalSetTimeout = global.setTimeout;
+global.setTimeout = (callback) => {
+  callback();
+  return 1;
+};
+
+class FakeMutationObserver {
+  observe() {}
+  disconnect() {}
+}
+
+const frameDocument = {
+  documentElement: {},
+  querySelectorAll() {
+    return [];
+  },
+  addEventListener(type, handler, capture) {
+    if (type === 'click') {
+      documentClickHandler = handler;
+      documentClickCapture = capture;
+    }
+  }
+};
+const frame = {
+  dataset: {},
+  contentDocument: frameDocument,
+  contentWindow: { MutationObserver: FakeMutationObserver },
+  addEventListener(type, handler) {
+    if (type === 'load') {
+      frameLoadHandler = handler;
+    }
+  }
+};
+ProtoDockNavigation.bindFrame(frame, {
+  manifest,
+  pageId: 'reader',
+  onNavigate(pageId) {
+    navigatedPageId = pageId;
+  }
+});
+frameLoadHandler();
+documentClickHandler({
+  button: 0,
+  target: legacyDataPageControl,
+  composedPath() {
+    return [legacyDataPageControl];
+  },
+  preventDefault() {
+    prevented = true;
+  },
+  stopImmediatePropagation() {
+    stopped = true;
+  }
+});
+global.setTimeout = originalSetTimeout;
+
+assert.equal(documentClickCapture, true);
+assert.equal(prevented, true);
+assert.equal(stopped, true);
+assert.equal(navigatedPageId, 'home');
 
 console.log('prototype navigation tests passed');

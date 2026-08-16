@@ -1,6 +1,19 @@
 (function initProtoDockNavigation(global) {
   const ACTION_PREFIX = /^(?:请)?(?:点击|进入|打开|前往|跳转到?|查看|选择|返回)/;
-  const CONTROL_SELECTOR = '[data-protodock-page], [data-protodock-target], a[href], button, [role="button"], input[type="button"], input[type="submit"]';
+  const CONTROL_SELECTOR = [
+    '[data-protodock-page]',
+    '[data-protodock-target]',
+    '[data-page]',
+    '[data-page-id]',
+    '[data-target-page]',
+    '[data-url]',
+    '[data-href]',
+    'a[href]',
+    'button',
+    '[role="button"]',
+    'input[type="button"]',
+    'input[type="submit"]'
+  ].join(', ');
 
   function normalizeText(value) {
     return String(value || '')
@@ -89,7 +102,14 @@
     }
     const matches = Object.entries(manifest?.pages || {}).filter(([, page]) => {
       const entry = normalizePath(page?.entry || '');
-      return entry && (resolved === entry || resolved.endsWith(`/${entry}`));
+      const resolvedWithoutHtml = resolved.replace(/\.html?$/i, '');
+      const entryWithoutHtml = entry.replace(/\.html?$/i, '');
+      return entry && (
+        resolved === entry
+        || resolved.endsWith(`/${entry}`)
+        || resolvedWithoutHtml === entryWithoutHtml
+        || resolvedWithoutHtml.endsWith(`/${entryWithoutHtml}`)
+      );
     });
     return matches.length === 1 ? matches[0][0] : null;
   }
@@ -133,13 +153,24 @@
     if (!control) {
       return null;
     }
-    const direct = control.getAttribute?.('data-protodock-page')
-      || control.getAttribute?.('data-protodock-target');
-    if (pageExists(manifest, direct)) {
-      return direct;
+    const directAttributes = [
+      'data-protodock-page',
+      'data-protodock-target',
+      'data-page',
+      'data-page-id',
+      'data-target-page'
+    ];
+    for (const attribute of directAttributes) {
+      const direct = control.getAttribute?.(attribute);
+      if (pageExists(manifest, direct)) {
+        return direct;
+      }
     }
-    if (control.tagName?.toLowerCase() === 'a') {
-      const linkedPageId = pageIdForHref(manifest, currentPageId, control.getAttribute('href'));
+
+    const pathAttributes = ['href', 'data-url', 'data-href'];
+    for (const attribute of pathAttributes) {
+      const href = control.getAttribute?.(attribute);
+      const linkedPageId = pageIdForHref(manifest, currentPageId, href);
       if (linkedPageId) {
         return linkedPageId;
       }
@@ -181,6 +212,7 @@
           }
           handledEvents.add(event);
           event.preventDefault();
+          event.stopImmediatePropagation?.();
           global.setTimeout(() => current.onNavigate(targetPageId, 'control'), 0);
         };
         const bindControl = (control) => {
@@ -226,7 +258,7 @@
         }
         documentForFrame.addEventListener('click', (event) => {
           navigateFromControl(event, controlForEvent(event));
-        });
+        }, true);
       } catch (error) {
         // Cross-origin frontends still work; they can navigate with postMessage.
       }
@@ -235,6 +267,7 @@
       frame.dataset.protoDockNavigationBound = 'true';
       frame.addEventListener('load', install);
     }
+    global.setTimeout(install, 0);
   }
 
   function pageIdFromMessage(event, frame, manifest) {
