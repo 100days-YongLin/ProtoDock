@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./vendor/devices.css">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./canvas-groups.css">
+  <link rel="stylesheet" href="./canvas-minimap.css">
 </head>
 <body>
   <main class="app">
@@ -150,6 +151,13 @@
           <span id="groupLayoutReviewText">正在预览组内布局</span>
           <button class="secondary compact" id="cancelGroupLayout" type="button">取消</button>
           <button class="primary compact" id="applyGroupLayout" type="button">应用布局</button>
+        </div>
+
+        <div class="canvas-minimap" id="canvasMinimap" aria-label="画布缩略图" hidden>
+          <svg id="canvasMinimapSvg" role="img" aria-label="画布全局位置"></svg>
+          <button class="canvas-minimap-fit" id="canvasMinimapFit" type="button" title="适配全部画布" aria-label="适配全部画布">
+            <i data-lucide="scan"></i>
+          </button>
         </div>
 
         <div class="zoom-readout">
@@ -622,6 +630,7 @@
   <script src="./vendor/lucide.min.js"></script>
   <script src="./placement.js"></script>
   <script src="./canvas-groups.js"></script>
+  <script src="./canvas-minimap.js"></script>
   <script src="./prototype-navigation.js"></script>
   <script src="./zip.js"></script>
   <script src="./capture.js"></script>

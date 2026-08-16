@@ -1,6 +1,6 @@
 const MANIFEST_FILE = 'protodock.project.json';
 const INSPECTOR_WIDTH_STORAGE_KEY = 'protodock.inspectorWidth';
-const MIN_ZOOM = 0.5;
+const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
 const VIRTUAL_CANVAS_LIMIT = 100000;
 const MIN_INSPECTOR_WIDTH = 320;
@@ -43,6 +43,9 @@ const els = {
   groupLayoutReviewText: document.getElementById('groupLayoutReviewText'),
   cancelGroupLayout: document.getElementById('cancelGroupLayout'),
   applyGroupLayout: document.getElementById('applyGroupLayout'),
+  canvasMinimap: document.getElementById('canvasMinimap'),
+  canvasMinimapSvg: document.getElementById('canvasMinimapSvg'),
+  canvasMinimapFit: document.getElementById('canvasMinimapFit'),
   zoomValue: document.getElementById('zoomValue'),
   productSelect: document.getElementById('productSelect'),
   currentProjectName: document.getElementById('currentProjectName'),
@@ -257,6 +260,7 @@ const state = {
   playbackActive: false,
   playbackJobId: null,
   edgeFrameId: null,
+  minimapFrameId: null,
   isSettingEditorValue: false,
   markdownEditor: null,
   manifestWatchTimer: null,
@@ -1841,6 +1845,7 @@ function renderCanvas() {
     els.groupLayoutReview.hidden = true;
     renderEdgeLabelEditor();
     renderChrome();
+    renderMinimap();
     return;
   }
   const nodes = visibleCanvasNodes();
@@ -2134,6 +2139,7 @@ function renderEdges() {
     });
   });
   renderEdgeLabelEditor();
+  scheduleRenderMinimap();
 }
 
 function bindRenderedCanvas() {
@@ -2348,6 +2354,100 @@ function handleEditorChange() {
 function updateZoom() {
   els.canvasTransform.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
   els.zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+  scheduleRenderMinimap();
+}
+
+let canvasMinimapController = null;
+
+function worldRectFromElement(element) {
+  return {
+    x: Number.parseFloat(element.style.left) || 0,
+    y: Number.parseFloat(element.style.top) || 0,
+    width: element.offsetWidth,
+    height: element.offsetHeight
+  };
+}
+
+function canvasViewportRect() {
+  const rect = els.canvasShell.getBoundingClientRect();
+  return {
+    x: -state.panX / state.zoom,
+    y: -state.panY / state.zoom,
+    width: rect.width / state.zoom,
+    height: rect.height / state.zoom
+  };
+}
+
+function buildMinimapScene() {
+  if (!state.manifest) {
+    return null;
+  }
+  return {
+    padding: 100,
+    groups: Array.from(els.groupMount.querySelectorAll('.canvas-group-frame')).map(worldRectFromElement),
+    nodes: Array.from(els.nodeMount.querySelectorAll('.page-node')).map((element) => ({
+      ...worldRectFromElement(element),
+      selected: element.dataset.id === state.selectedNodeId
+    })),
+    notes: Array.from(els.noteMount.querySelectorAll('.text-note')).map(worldRectFromElement),
+    edges: Array.from(els.edgeLayer.querySelectorAll('.edge-path')).map((element) => ({
+      path: element.getAttribute('d') || ''
+    })),
+    viewport: canvasViewportRect()
+  };
+}
+
+function centerCanvasAt(point) {
+  const rect = els.canvasShell.getBoundingClientRect();
+  state.panX = rect.width / 2 - point.x * state.zoom;
+  state.panY = rect.height / 2 - point.y * state.zoom;
+  updateZoom();
+  renderEdges();
+}
+
+function fitCanvasToBounds(bounds) {
+  if (!bounds) {
+    return;
+  }
+  const rect = els.canvasShell.getBoundingClientRect();
+  const availableWidth = Math.max(1, rect.width - 96);
+  const availableHeight = Math.max(1, rect.height - 96);
+  state.zoom = Math.min(1, MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(
+    availableWidth / bounds.width,
+    availableHeight / bounds.height
+  )));
+  state.panX = rect.width / 2 - (bounds.x + bounds.width / 2) * state.zoom;
+  state.panY = rect.height / 2 - (bounds.y + bounds.height / 2) * state.zoom;
+  updateZoom();
+  renderEdges();
+  setStatus('已显示全部画布内容');
+}
+
+function ensureCanvasMinimap() {
+  if (!canvasMinimapController && window.ProtoDockMinimap) {
+    canvasMinimapController = window.ProtoDockMinimap.create({
+      root: els.canvasMinimap,
+      svg: els.canvasMinimapSvg,
+      fitButton: els.canvasMinimapFit,
+      onNavigate: centerCanvasAt,
+      onFit: fitCanvasToBounds
+    });
+  }
+  return canvasMinimapController;
+}
+
+function renderMinimap() {
+  ensureCanvasMinimap()?.render(buildMinimapScene());
+}
+
+function scheduleRenderMinimap() {
+  if (state.minimapFrameId) {
+    return;
+  }
+  state.minimapFrameId = window.requestAnimationFrame(() => {
+    state.minimapFrameId = null;
+    renderMinimap();
+  });
 }
 
 function zoomFromCenter(delta) {
@@ -2561,6 +2661,7 @@ function moveActiveDrags(event) {
     drag.note.y = clampCanvasCoord(drag.originalY + dy);
     drag.element.style.left = `${drag.note.x}px`;
     drag.element.style.top = `${drag.note.y}px`;
+    scheduleRenderMinimap();
   }
   if (state.activeEdgeDrag) {
     state.activeEdgeDrag.currentPoint = screenToWorld(event.clientX, event.clientY);
@@ -4116,6 +4217,7 @@ function bindGlobalEvents() {
       setInspectorWidth(currentWidth);
     }
     renderPlayback();
+    scheduleRenderMinimap();
   });
   window.addEventListener('beforeunload', (event) => {
     if (!state.dirty) {
