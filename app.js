@@ -67,6 +67,8 @@ const els = {
   inspectorName: document.getElementById('inspectorName'),
   inspectorType: document.getElementById('inspectorType'),
   pageSettingsButton: document.getElementById('pageSettingsButton'),
+  pageSettingsView: document.getElementById('pageSettingsView'),
+  closePageSettings: document.getElementById('closePageSettings'),
   pageSettingsPanel: document.getElementById('pageSettingsPanel'),
   pageTitleInput: document.getElementById('pageTitleInput'),
   pageKindInput: document.getElementById('pageKindInput'),
@@ -1627,7 +1629,6 @@ function renderProjectActions() {
     els.saveSafeAreaSettings,
     els.addGroupButton,
     els.sortPagesButton,
-    els.pageSettingsButton,
     els.savePageSettings
   ].forEach((control) => {
     control?.toggleAttribute('disabled', !canEdit);
@@ -1706,17 +1707,26 @@ function renderPageSettingsControls() {
     state.pageSettingsOpen = false;
     state.pageSettingsNodeId = null;
   }
+  if (els.pageSettingsView) {
+    els.pageSettingsView.hidden = !hasActivePage || !state.pageSettingsOpen;
+  }
   if (els.sourceMeta) {
-    els.sourceMeta.hidden = !hasActivePage || (canEdit && state.pageSettingsOpen);
+    els.sourceMeta.hidden = !hasActivePage || !state.pageSettingsOpen || canEdit;
   }
   if (els.pageSettingsPanel) {
     els.pageSettingsPanel.hidden = !canEdit || !state.pageSettingsOpen;
   }
+  if (els.nodeInspectorPanel) {
+    els.nodeInspectorPanel.hidden = hasActivePage && state.pageSettingsOpen;
+  }
+  els.inspector?.classList.toggle('is-page-settings', hasActivePage && state.pageSettingsOpen);
   if (els.pageSettingsButton) {
     els.pageSettingsButton.hidden = !hasActivePage;
-    els.pageSettingsButton.disabled = !canEdit;
+    els.pageSettingsButton.disabled = !hasActivePage;
     els.pageSettingsButton.classList.toggle('active', state.pageSettingsOpen);
     els.pageSettingsButton.setAttribute('aria-expanded', String(state.pageSettingsOpen));
+    els.pageSettingsButton.setAttribute('title', state.pageSettingsOpen ? '返回 PRD' : '查看页面信息');
+    els.pageSettingsButton.setAttribute('aria-label', state.pageSettingsOpen ? '返回 PRD' : '查看页面信息');
   }
   if (els.copyPagePngButton) {
     els.capturePngControls.hidden = !hasActivePage;
@@ -1741,10 +1751,6 @@ function renderPageSettingsControls() {
 
 function setPageSettingsOpen(open) {
   if (!activeNode() || !activePage()) {
-    return;
-  }
-  if (state.readOnly) {
-    setStatus(readonlyProjectMessage());
     return;
   }
   state.pageSettingsOpen = !!open;
@@ -4117,6 +4123,7 @@ function bindGlobalEvents() {
   els.pageSettingsButton?.addEventListener('click', () => {
     setPageSettingsOpen(!state.pageSettingsOpen);
   });
+  els.closePageSettings?.addEventListener('click', () => setPageSettingsOpen(false));
   els.copyPagePngButton?.addEventListener('click', copySelectedPagePng);
   els.savePageSettings?.addEventListener('click', savePageSettings);
   els.sortPagesButton?.addEventListener('click', () => {

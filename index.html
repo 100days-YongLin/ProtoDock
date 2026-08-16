@@ -223,66 +223,78 @@
                     </button>
                   </div>
                 </div>
-                <button class="panel-icon-button" id="pageSettingsButton" type="button" title="设置页面信息" aria-label="设置页面信息" aria-expanded="false" aria-controls="pageSettingsPanel" data-requires-project>
+                <button class="panel-icon-button" id="pageSettingsButton" type="button" title="查看页面信息" aria-label="查看页面信息" aria-expanded="false" aria-controls="pageSettingsView" data-requires-project>
                   <i data-lucide="settings-2"></i>
                 </button>
               </div>
             </div>
           </div>
 
-          <div class="source-panel" id="sourceMeta">
-            <h2 class="panel-heading">源码位置</h2>
-            <dl class="source-list">
+          <div class="page-settings-view" id="pageSettingsView" hidden>
+            <header class="page-settings-view-head">
+              <button class="panel-icon-button" id="closePageSettings" type="button" title="返回 PRD" aria-label="返回 PRD">
+                <i data-lucide="chevron-left"></i>
+              </button>
               <div>
-                <dt>目录</dt>
-                <dd id="sourcePath">-</dd>
+                <strong>页面信息</strong>
+                <span>源码入口与 PRD 文档绑定</span>
               </div>
-              <div>
-                <dt>入口</dt>
-                <dd id="entryPath">-</dd>
-              </div>
-              <div>
-                <dt>文档</dt>
-                <dd id="docPath">-</dd>
-              </div>
-            </dl>
-          </div>
+            </header>
 
-          <div class="page-settings-panel" id="pageSettingsPanel" hidden>
-            <div class="page-settings-head">
-              <strong>页面设置</strong>
-              <span>修改后会更新 manifest 中的页面元信息。</span>
+            <div class="source-panel" id="sourceMeta" hidden>
+              <h2 class="panel-heading">源码位置</h2>
+              <dl class="source-list">
+                <div>
+                  <dt>目录</dt>
+                  <dd id="sourcePath">-</dd>
+                </div>
+                <div>
+                  <dt>入口</dt>
+                  <dd id="entryPath">-</dd>
+                </div>
+                <div>
+                  <dt>文档</dt>
+                  <dd id="docPath">-</dd>
+                </div>
+              </dl>
             </div>
-            <div class="page-settings-grid">
-              <fieldset>
-                <legend>基础信息</legend>
-                <label>
-                  <span>页面名称</span>
-                  <input id="pageTitleInput" autocomplete="off">
-                </label>
-                <label>
-                  <span>类型</span>
-                  <input id="pageKindInput" autocomplete="off">
-                </label>
-              </fieldset>
-              <fieldset>
-                <legend>路径绑定</legend>
-                <label>
-                  <span>源码目录</span>
-                  <input id="pageSourceDirInput" autocomplete="off" spellcheck="false">
-                </label>
-                <label>
-                  <span>入口文件</span>
-                  <input id="pageEntryInput" autocomplete="off" spellcheck="false">
-                </label>
-                <label>
-                  <span>页面文档</span>
-                  <input id="pageDocInput" autocomplete="off" spellcheck="false">
-                </label>
-              </fieldset>
-            </div>
-            <div class="page-settings-actions">
-              <button class="safe-area-save" id="savePageSettings" type="button">保存</button>
+
+            <div class="page-settings-panel" id="pageSettingsPanel" hidden>
+              <div class="page-settings-head">
+                <strong>编辑页面信息</strong>
+                <span>保存后会更新 manifest 中的页面元信息。</span>
+              </div>
+              <div class="page-settings-grid">
+                <fieldset>
+                  <legend>基础信息</legend>
+                  <label>
+                    <span>页面名称</span>
+                    <input id="pageTitleInput" autocomplete="off">
+                  </label>
+                  <label>
+                    <span>类型</span>
+                    <input id="pageKindInput" autocomplete="off">
+                  </label>
+                </fieldset>
+                <fieldset>
+                  <legend>路径绑定</legend>
+                  <label>
+                    <span>源码目录</span>
+                    <input id="pageSourceDirInput" autocomplete="off" spellcheck="false">
+                  </label>
+                  <label>
+                    <span>入口文件</span>
+                    <input id="pageEntryInput" autocomplete="off" spellcheck="false">
+                  </label>
+                  <label>
+                    <span>页面文档</span>
+                    <input id="pageDocInput" autocomplete="off" spellcheck="false">
+                  </label>
+                </fieldset>
+              </div>
+              <div class="page-settings-actions">
+                <button class="safe-area-save" id="savePageSettings" type="button">保存</button>
+              </div>
             </div>
           </div>
         </section>

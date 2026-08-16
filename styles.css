@@ -1966,6 +1966,54 @@ select {
   padding: 14px;
 }
 
+.page-settings-view {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.page-settings-view[hidden],
+.markdown-panel[hidden] {
+  display: none;
+}
+
+.page-settings-view-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.page-settings-view-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.page-settings-view-head strong {
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.page-settings-view-head span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector.is-page-settings .inspector-summary {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
 .page-settings-panel[hidden] {
   display: none;
 }
