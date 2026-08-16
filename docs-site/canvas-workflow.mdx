@@ -28,7 +28,7 @@ ProtoDock 是展示和编排工具，不是页面源码生成器。页面源码�
 
 顶部“播放原型”打开的右侧设备预览会直接运行页面 iframe，不是页面截图。页面入口中已有的点击、输入、滚动、弹窗和本地状态逻辑会原样执行。
 
-跨 manifest 页面跳转建议在控件上显式声明目标：
+跨 manifest 页面跳转必须在控件上显式声明目标：
 
 ```html
 <button data-protodock-page="reader-character">查看角色</button>
@@ -36,6 +36,8 @@ ProtoDock 是展示和编排工具，不是页面源码生成器。页面源码�
 ```
 
 页面脚本也可以调用 `window.ProtoDockPreview?.navigate(pageId)`，或向父窗口发送 `{ type: 'protodock:navigate', pageId }`。为了兼容旧的 HTML-only 原型，当当前页面的唯一出边标签与按钮文案明确一致时，播放器会自动切换到目标页面；不会进行模糊匹配或按控件顺序猜测。
+
+旧版恢复逻辑只用于兼容，不计入新交付验收。Agent 必须在最终 ZIP 中扫描跨页控件和脚本；`window.location`、旧 `data-page`、根路径 `/pages/...`、未注册目标或重复目标节点都要作为错误处理。查询参数对应的状态已有独立 manifest 页面时，控件应直接声明该状态的 `pageId`。
 
 <Warning>
   可部署静态文件不等于静态 DOM。React/Vue/Svelte 导出必须包含构建后的 JavaScript；只输出 `renderToStaticMarkup`、`outerHTML` 或截图会让控件失去事件处理。
@@ -113,6 +115,7 @@ ProtoDock 解压最终 ZIP 后会检查：
 - 节点重叠为 0
 - 每条边的 `from/to` 节点存在
 - 所有页面 `entry` 和 `doc` 文件存在
+- 所有跨页控件都有显式且唯一的 manifest 目标，不存在根路径或脚本-only 跳转
 - 页面组 ID 唯一，组成员和主入口均引用现有节点
 - 同一节点不能同时属于多个组
 

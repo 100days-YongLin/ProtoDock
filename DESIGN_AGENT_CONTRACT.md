@@ -38,8 +38,10 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 20. Prefer `bottom -> top` anchors for vertical flows and `right -> left` for same-level flows. Avoid edge crossings and edges that pass through unrelated nodes.
 21. Normal build/export must preserve canvas. Only explicit `--relayout`, `--reset-canvas`, or a direct user request may change it, after a manifest backup and preview.
 22. A static build must remain executable. Do not replace an interactive React/Vue/Svelte page with server-rendered DOM that has lost event handlers.
-23. Mark cross-page controls with `data-protodock-page="<pageId>"`, `href="protodock:<pageId>"`, `window.ProtoDockPreview.navigate(pageId)`, or the documented `protodock:navigate` postMessage protocol.
+23. Every cross-page control must declare its exact manifest target with `data-protodock-page="<pageId>"`, `href="protodock:<pageId>"`, `window.ProtoDockPreview.navigate(pageId)`, or the documented `protodock:navigate` postMessage protocol. Script-only navigation and legacy `data-page` do not pass new-delivery validation.
 24. Smoke-test representative clicks, inputs, scrolling, local state changes, and one cross-page transition in both the right-side player and the public Share preview.
+25. Validate navigation against the extracted final ZIP: scan controls and scripts, reject root-absolute `/pages/...`, localhost, local absolute paths, undeclared targets, ambiguous targets, and targets without exactly one canvas node.
+26. If a query parameter represents a state already registered as a manifest page, link directly to that state `pageId` instead of routing through a generic page plus query parameters.
 
 ## React / Vue Recommended Build
 
@@ -65,6 +67,8 @@ For transitions between registered ProtoDock pages, annotate the triggering cont
 ```
 
 Framework code can also call `window.ProtoDockPreview?.navigate(pageId)`. Cross-origin entries can send `window.parent.postMessage({ type: 'protodock:navigate', pageId }, '*')`; ProtoDock accepts the message only from the active preview iframe and only for an existing manifest page.
+
+Before delivery, produce a route table containing source page, visible control, declared target `pageId`, and target entry. Every cross-page control in a new or modified page must appear exactly once. A route that works only because ProtoDock recovered a legacy `window.location` request is still a validation failure.
 
 ## Manifest Responsibilities
 

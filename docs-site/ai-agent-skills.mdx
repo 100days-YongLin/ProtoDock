@@ -149,6 +149,19 @@ Agent 必须重新解压最终 ZIP，并按其中的 manifest 验证每个 `page
 
 最终 ZIP 还必须通过 Canvas 完整性检查：每个 page 恰好对应一个 node，所有边的端点存在，不允许重复节点、重复连线、悬空连线或节点重叠。连线交叉、穿过无关节点和间距不足必须作为明确警告返回。
 
+## 跨页导航验收
+
+Agent 必须扫描最终 ZIP 中每个页面的控件和脚本，并输出“来源页面、控件文案、目标 `pageId`、目标入口”的路由表。每个跨页控件都要显式声明 `data-protodock-page`、`protodock:` 链接或导航协议，目标必须存在于 manifest 且只对应一个 Canvas 节点。
+
+以下情况会阻止交付：
+
+- 仅使用 `window.location`、旧 `data-page` 或按钮文案猜测目标
+- 使用脱离项目作用域的 `/pages/...` 根路径
+- 目标页面未注册、入口或文档缺失、目标节点重复
+- 用查询参数切换一个已经单独注册为 manifest 页面的业务状态
+
+ProtoDock 会尽量恢复旧原型的脚本跳转，方便历史文件继续预览；这只是兼容能力，不能替代 Agent 的交付校验。页面状态已经有独立 `pageId` 时，应直接指向该页面，例如“饮奶”应指向饮奶历史状态页，而不是通用 `record?type=milk`。
+
 <Warning>
   `document missing`、`NotFoundError`、所有页面同时无法预览时，优先检查 ZIP 根目录。浏览器扩展产生的报错不应误判为 ProtoDock 页面错误。
 </Warning>

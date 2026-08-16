@@ -56,10 +56,25 @@ Before editing, read:
 ProtoDock runs page entries in iframes in the right-side player and the public Share preview. A page’s own JavaScript must remain executable in both surfaces.
 
 - Internal interactions stay inside the page and need no ProtoDock-specific code.
-- For a control that moves to another manifest page, prefer `data-protodock-page="<pageId>"` or an anchor such as `href="protodock:<pageId>"`.
+- Every control that moves to another manifest page must declare the exact target with `data-protodock-page="<pageId>"` or an anchor such as `href="protodock:<pageId>"`. This is required, not optional, for new or modified pages.
 - A runtime may call `window.ProtoDockPreview?.navigate(pageId)` after load, or use `window.parent.postMessage({ type: 'protodock:navigate', pageId }, '*')`.
 - Keep canvas edge labels aligned with visible control labels. Legacy static pages receive a navigation fallback only when one outgoing edge label matches one control exactly after normalization; never rely on fuzzy or positional guessing.
 - Before delivery, smoke-test a key click, input or scroll interaction and one cross-page transition in both the canvas player and `/s/<share-id>`.
+
+### Cross-page navigation gate
+
+Treat navigation validation as a release-blocking check on the extracted final ZIP.
+
+1. Build an index of every manifest `pageId`, `pages.*.entry`, and canvas node before scanning HTML.
+2. Scan every page entry for cross-page controls, including anchors, `data-page`, `data-url`, `data-action` handlers, `window.location`, `location.href`, `location.assign`, and router calls.
+3. Every cross-page control must carry an explicit ProtoDock target. Script-only navigation, legacy `data-page`, root-absolute `/pages/...` navigation, or reliance on edge-label fallback does not pass delivery validation for a new or modified page.
+4. Every declared target must resolve to exactly one existing manifest page whose entry and document exist and whose canvas node is unique.
+5. When a query parameter selects a business state that already has its own manifest page, target that state page directly. For example, a milk-history control should target its declared milk-history `pageId`, not a generic `record` page plus `?type=milk`.
+6. Reject navigation targets containing `localhost`, `file://`, local absolute paths, undeclared entry paths, or paths that escape the ZIP root.
+7. Produce a route table with source page, visible control, declared target page, and target entry. Ambiguous or unresolved rows are errors, not warnings.
+8. Smoke-test at least one transition for every navigation mechanism used by the project in both the right-side player and public Share preview. Confirm the expected page content, not only the absence of a 404.
+
+ProtoDock's runtime recovery for legacy pages is compatibility behavior only. It must not be used as evidence that a new delivery satisfies this gate.
 
 ## Canvas Rules
 
@@ -161,6 +176,7 @@ After packaging, extract the final ZIP into a new temporary directory and valida
 - all manifest paths are relative to the extracted root;
 - entries contain no localhost URL, local absolute path, or unavailable external dependency;
 - the validated entry and document counts match the manifest page count.
+- every cross-page control has an explicit, valid manifest target and no unresolved script-only or root-absolute navigation remains;
 - every page has exactly one node, all edge endpoints exist, and no nodes overlap;
 - edge crossings, paths through unrelated nodes, and tight spacing are surfaced as layout warnings.
 
@@ -174,6 +190,8 @@ For these symptoms, inspect the archive root and manifest paths before debugging
 - `NotFoundError`;
 - `failed to check external manifest changes`;
 - every page failing to preview at the same time.
+
+When only a clicked control fails, inspect the requested URL and the control's explicit ProtoDock target. A request such as `/pages/record/index.html?type=milk` outside the project/share prefix usually means the page used script-only or root-absolute navigation and failed the cross-page navigation gate.
 
 Browser-extension errors, such as `Immersive Translate dynamic-i18n version mismatch`, are not ProtoDock page errors and must be diagnosed separately.
 
