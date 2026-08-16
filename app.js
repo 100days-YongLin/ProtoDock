@@ -1934,7 +1934,7 @@ function preferredSides(fromRect, toRect) {
   return dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
 }
 
-function edgePath(from, to, fromSide, toSide) {
+function fallbackEdgePath(from, to, fromSide, toSide) {
   const verticalPair = (fromSide === 'top' || fromSide === 'bottom') && (toSide === 'top' || toSide === 'bottom');
   const horizontalPair = (fromSide === 'left' || fromSide === 'right') && (toSide === 'left' || toSide === 'right');
   if (verticalPair) {
@@ -1951,7 +1951,7 @@ function edgePath(from, to, fromSide, toSide) {
   return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
 }
 
-function edgeGeometry(edge) {
+function edgeDescriptor(edge) {
   const fromRect = getRectForNodeId(edge.from);
   const toRect = getRectForNodeId(edge.to);
   if (!fromRect || !toRect) {
@@ -1963,12 +1963,61 @@ function edgeGeometry(edge) {
   const from = connectorPoint(fromRect, fromSide);
   const to = connectorPoint(toRect, toSide);
   return {
+    id: edge.id,
+    toId: edge.to,
+    label: edge.label || '',
     from,
     to,
-    path: edgePath(from, to, fromSide, toSide),
-    labelX: (from.x + to.x) / 2,
-    labelY: (from.y + to.y) / 2 - 8
+    fromSide,
+    toSide
   };
+}
+
+function edgeGeometryMap() {
+  const descriptors = (state.manifest?.canvas.edges || []).map(edgeDescriptor).filter(Boolean);
+  const routed = window.ProtoDockEdgeRouting?.routeEdges(descriptors) || descriptors.map((edge) => ({
+    ...edge,
+    path: fallbackEdgePath(edge.from, edge.to, edge.fromSide, edge.toSide),
+    labelX: (edge.from.x + edge.to.x) / 2,
+    labelY: (edge.from.y + edge.to.y) / 2 - 8,
+    labelWidth: 96,
+    labelHeight: 22,
+    labelDirection: 'right'
+  }));
+  return new Map(routed.map((geometry) => [geometry.id, geometry]));
+}
+
+function edgeGeometry(edge) {
+  return edgeGeometryMap().get(edge.id) || null;
+}
+
+function edgeLabelChevronPath(direction, width) {
+  const x = width / 2 - 11;
+  if (direction === 'down') {
+    return `M ${x - 3} -2 L ${x} 1 L ${x + 3} -2`;
+  }
+  if (direction === 'up') {
+    return `M ${x - 3} 2 L ${x} -1 L ${x + 3} 2`;
+  }
+  if (direction === 'left') {
+    return `M ${x + 2} -3 L ${x - 1} 0 L ${x + 2} 3`;
+  }
+  return `M ${x - 2} -3 L ${x + 1} 0 L ${x - 2} 3`;
+}
+
+function edgeLabelSvg(edge, geometry, selected) {
+  if (!edge.label) {
+    return '';
+  }
+  const width = geometry.labelWidth || 96;
+  const height = geometry.labelHeight || 22;
+  return `
+    <g class="edge-label-tag ${selected ? 'selected' : ''}" transform="translate(${geometry.labelX} ${geometry.labelY})">
+      <rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" rx="5"></rect>
+      <text class="edge-label" x="-5" y="0">${escapeHtml(edge.label)}</text>
+      <path class="edge-label-direction" d="${edgeLabelChevronPath(geometry.labelDirection, width)}"></path>
+    </g>
+  `;
 }
 
 function draftEdgeSvg() {
@@ -2087,8 +2136,9 @@ function renderEdges() {
   if (!state.manifest) {
     return;
   }
+  const geometries = edgeGeometryMap();
   const edgeSvg = state.manifest.canvas.edges.map((edge) => {
-    const geometry = edgeGeometry(edge);
+    const geometry = geometries.get(edge.id);
     if (!geometry) {
       return '';
     }
@@ -2097,7 +2147,7 @@ function renderEdges() {
       <g data-edge-id="${escapeHtml(edge.id)}">
         <path class="edge-path ${selected ? 'selected' : ''}" marker-end="url(#arrow)" d="${geometry.path}"></path>
         <path class="edge-hit" d="${geometry.path}"></path>
-        <text class="edge-label" x="${geometry.labelX}" y="${geometry.labelY}">${escapeHtml(edge.label || '')}</text>
+        ${edgeLabelSvg(edge, geometry, selected)}
       </g>
     `;
   }).join('');

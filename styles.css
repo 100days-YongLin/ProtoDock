@@ -1016,18 +1016,38 @@ select {
   opacity: 0.72;
 }
 
-.edge-label {
-  fill: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  text-anchor: middle;
-  dominant-baseline: middle;
-  paint-order: stroke;
-  stroke: #fff;
-  stroke-width: 5px;
-  stroke-linejoin: round;
+.edge-label-tag {
   pointer-events: auto;
   cursor: pointer;
+}
+
+.edge-label-tag rect {
+  fill: rgba(255, 255, 255, 0.96);
+  stroke: #cfd3da;
+  stroke-width: 1;
+}
+
+.edge-label-tag.selected rect {
+  fill: #f2f8ff;
+  stroke: var(--primary);
+}
+
+.edge-label {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 650;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
+.edge-label-direction {
+  fill: none;
+  stroke: #667085;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  pointer-events: none;
 }
 
 .edge-label-editor-mount {
