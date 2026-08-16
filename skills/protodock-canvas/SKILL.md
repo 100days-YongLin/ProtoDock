@@ -40,6 +40,7 @@ Before editing, read:
 6. Preserve all existing canvas layout data unless the user explicitly requests a reset or re-layout.
 7. Validate every declared page entry and document against the final project artifact.
 8. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
+9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
 
 ## Manifest Contract
 
@@ -168,6 +169,20 @@ Invalid archive root:
 
 ## Final ZIP Validation
 
+Run the executable installed with this Skill, passing the final upload ZIP rather than its source directory:
+
+```bash
+<protodock-canvas-skill-directory>/scripts/protodock-validate ./campus-prototype-v1.1-protodock-upload.zip
+```
+
+When working inside the ProtoDock repository, the equivalent command is:
+
+```bash
+./scripts/protodock-validate ./campus-prototype-v1.1-protodock-upload.zip
+```
+
+Use `--json` when another Agent or CI job needs machine-readable output. Use `--warnings-as-errors` for release pipelines that require layout warnings to block delivery. Exit code `0` is required before delivery or upload.
+
 After packaging, extract the final ZIP into a new temporary directory and validate it against the manifest inside that extracted directory:
 
 - `protodock.project.json` is directly at the extracted root;
@@ -180,7 +195,7 @@ After packaging, extract the final ZIP into a new temporary directory and valida
 - every page has exactly one node, all edge endpoints exist, and no nodes overlap;
 - edge crossings, paths through unrelated nodes, and tight spacing are surfaced as layout warnings.
 
-Do not mark delivery complete until the extracted final upload ZIP passes. Source-directory-only validation does not count.
+Do not mark delivery complete until the extracted final upload ZIP passes the executable validator. Source-directory-only validation or a manually written checklist does not count.
 
 ## Troubleshooting
 

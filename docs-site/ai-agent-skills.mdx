@@ -39,7 +39,7 @@ git pull
 ./scripts/install-protodock-skill.sh both project /path/to/old-prototype-project
 ```
 
-更新 Skill 只会替换 Agent 规则文件并备份旧规则，不会修改该原型的页面或 `protodock.project.json`。之后是否加入页面组，仍由下面的分组迁移流程决定。
+更新 Skill 会替换 Agent 规则文件、安装校验命令并备份旧规则，不会修改该原型的页面或 `protodock.project.json`。之后是否加入页面组，仍由下面的分组迁移流程决定。
 
 ## 安装到项目
 
@@ -75,12 +75,14 @@ Copy-Item "skills/protodock-canvas/SKILL.md" "$HOME/.agents/skills/protodock-can
 
 Claude Code 只需把目标中的 `.agents` 改为 `.claude`。
 
+手动只复制 `SKILL.md` 时只能安装规则，校验器仍需从 ProtoDock 仓库运行。需要 Agent 在任意项目中都能直接找到校验命令时，请优先使用一键安装脚本。
+
 ## 验证安装
 
 - Codex：新建任务后说“使用 `protodock-canvas` Skill 检查这个项目的上传包”。
 - Claude Code：进入项目后输入 `/protodock-canvas`，或直接要求它使用该 Skill 检查项目。
 
-Agent 能说出 ZIP 根目录必须直接包含 `protodock.project.json`、`pages/` 和 `docs/`，即说明加载的是新版规则。
+Agent 能说出 ZIP 根目录必须直接包含 `protodock.project.json`、`pages/` 和 `docs/`，并能运行 Skill 目录中的 `scripts/protodock-validate`，即说明加载的是新版规则与校验器。
 
 ## 用 Skill 升级旧版原型
 
@@ -161,6 +163,18 @@ Agent 必须扫描最终 ZIP 中每个页面的控件和脚本，并输出“来
 - 用查询参数切换一个已经单独注册为 manifest 页面的业务状态
 
 ProtoDock 会尽量恢复旧原型的脚本跳转，方便历史文件继续预览；这只是兼容能力，不能替代 Agent 的交付校验。页面状态已经有独立 `pageId` 时，应直接指向该页面，例如“饮奶”应指向饮奶历史状态页，而不是通用 `record?type=milk`。
+
+## 运行交付校验器
+
+Rule 需要由代码执行，不能只让 Agent 按文字自查。使用安装脚本安装 Skill 后，Skill 目录中会同时提供校验入口；在 ProtoDock 仓库中也可以直接运行：
+
+```bash
+./scripts/protodock-validate /path/to/project-v1.1-protodock-upload.zip
+```
+
+必须校验最终上传 ZIP，并以退出码 `0` 作为交付条件。`--json` 输出可供 Agent 或 CI 读取，`--warnings-as-errors` 会把 Canvas 视觉警告也提升为阻断错误。校验结果包含错误、警告、统计信息和跨页路由表；上传后端还会执行同一套核心校验，避免本地与服务器口径不同。
+
+仅检查源码目录、口头声称“已按 Rule 检查”或依赖 ProtoDock 运行时兜底，都不算完成。
 
 <Warning>
   `document missing`、`NotFoundError`、所有页面同时无法预览时，优先检查 ZIP 根目录。浏览器扩展产生的报错不应误判为 ProtoDock 页面错误。

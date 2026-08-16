@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_FILE="$ROOT_DIR/skills/protodock-canvas/SKILL.md"
+SOURCE_VALIDATOR="$ROOT_DIR/scripts/protodock-validate"
 AGENT="${1:-both}"
 SCOPE="${2:-user}"
 PROJECT_DIR="${3:-$PWD}"
@@ -21,6 +22,11 @@ EOF
 
 if [[ ! -f "$SOURCE_FILE" ]]; then
   printf 'ProtoDock Skill source not found: %s\n' "$SOURCE_FILE" >&2
+  exit 1
+fi
+
+if [[ ! -x "$SOURCE_VALIDATOR" ]]; then
+  printf 'ProtoDock validator not found or not executable: %s\n' "$SOURCE_VALIDATOR" >&2
   exit 1
 fi
 
@@ -57,18 +63,22 @@ install_for() {
 
   local destination="$skill_root/protodock-canvas"
   local target_file="$destination/SKILL.md"
+  local target_validator="$destination/scripts/protodock-validate"
   mkdir -p "$destination"
-  if [[ -f "$target_file" ]] && cmp -s "$SOURCE_FILE" "$target_file"; then
-    printf 'ProtoDock Skill for %s is already up to date: %s\n' "$tool" "$target_file"
-    return
-  fi
-  if [[ -f "$target_file" ]]; then
+  if [[ -f "$target_file" ]] && ! cmp -s "$SOURCE_FILE" "$target_file"; then
     cp "$target_file" "$target_file.backup.$(date +%Y%m%d-%H%M%S)"
   fi
-  local temporary_file="$destination/.SKILL.md.tmp.$$"
-  cp "$SOURCE_FILE" "$temporary_file"
-  mv "$temporary_file" "$target_file"
-  printf 'Installed ProtoDock Skill for %s: %s\n' "$tool" "$target_file"
+  if [[ ! -f "$target_file" ]] || ! cmp -s "$SOURCE_FILE" "$target_file"; then
+    local temporary_file="$destination/.SKILL.md.tmp.$$"
+    cp "$SOURCE_FILE" "$temporary_file"
+    mv "$temporary_file" "$target_file"
+  fi
+  mkdir -p "$(dirname "$target_validator")"
+  local temporary_validator="$target_validator.tmp.$$"
+  printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$SOURCE_VALIDATOR" > "$temporary_validator"
+  chmod +x "$temporary_validator"
+  mv "$temporary_validator" "$target_validator"
+  printf 'Installed ProtoDock Skill and validator for %s: %s\n' "$tool" "$destination"
 }
 
 if [[ "$AGENT" == "codex" || "$AGENT" == "both" ]]; then

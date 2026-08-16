@@ -42,6 +42,7 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 24. Smoke-test representative clicks, inputs, scrolling, local state changes, and one cross-page transition in both the right-side player and the public Share preview.
 25. Validate navigation against the extracted final ZIP: scan controls and scripts, reject root-absolute `/pages/...`, localhost, local absolute paths, undeclared targets, ambiguous targets, and targets without exactly one canvas node.
 26. If a query parameter represents a state already registered as a manifest page, link directly to that state `pageId` instead of routing through a generic page plus query parameters.
+27. Run `scripts/protodock-validate <final-upload.zip>` after packaging. A non-zero exit code blocks delivery; source-directory checks and prose reviews do not satisfy this gate.
 
 ## React / Vue Recommended Build
 

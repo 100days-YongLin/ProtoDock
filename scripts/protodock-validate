@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import server  # noqa: E402
+from protodock_validation import validate_cross_page_navigation  # noqa: E402
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Validate a ProtoDock project directory or final upload ZIP.",
+    )
+    parser.add_argument("target", type=Path, help="Project directory or .zip upload package")
+    parser.add_argument("--json", action="store_true", dest="as_json", help="Print machine-readable JSON")
+    parser.add_argument("--warnings-as-errors", action="store_true", help="Return non-zero when warnings exist")
+    return parser.parse_args()
+
+
+def inspect_target(target: Path) -> dict:
+    errors = []
+    result = None
+    temporary = None
+    project_dir = target
+    source_type = "directory"
+    try:
+        if target.is_file() and target.suffix.lower() == ".zip":
+            source_type = "zip"
+            temporary = tempfile.TemporaryDirectory(prefix="protodock-validate-")
+            project_dir = Path(temporary.name)
+            result = server.safe_extract_project_zip(target.read_bytes(), project_dir)
+        elif target.is_dir():
+            result = server.validate_project_manifest_files(project_dir)
+        else:
+            errors.append(f"目标不存在，或不是项目目录/.zip：{target}")
+    except server.ProtoDockError as error:
+        errors.extend(error.details or [error.message])
+
+    manifest = None
+    manifest_path = project_dir / server.MANIFEST_FILE
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            manifest = None
+    navigation = validate_cross_page_navigation(project_dir, manifest) if isinstance(manifest, dict) else {
+        "issues": [], "warnings": [], "routes": [], "stats": {}
+    }
+    errors.extend(issue for issue in navigation["issues"] if issue not in errors)
+    canvas_validation = server.validate_canvas_layout(manifest) if isinstance(manifest, dict) else {
+        "stats": {}, "warnings": []
+    }
+    canvas = result.get("canvas", {}) if result else canvas_validation["stats"]
+    warnings = list(result.get("warnings", [])) if result else list(canvas_validation["warnings"])
+    warnings.extend(warning for warning in navigation["warnings"] if warning not in warnings)
+    pages = manifest.get("pages", {}) if isinstance(manifest, dict) else {}
+    entry_count = sum(
+        1 for page in pages.values()
+        if isinstance(page, dict) and (project_dir / str(page.get("entry") or "")).is_file()
+    )
+    doc_count = sum(
+        1 for page in pages.values()
+        if isinstance(page, dict) and (project_dir / str(page.get("doc") or "")).is_file()
+    )
+    report = {
+        "ok": not errors,
+        "target": str(target.resolve()),
+        "sourceType": source_type,
+        "errors": errors,
+        "warnings": warnings,
+        "routes": navigation["routes"],
+        "stats": {
+            "pageCount": result.get("pageCount", len(pages)) if result else len(pages),
+            "entryCount": result.get("entryCount", entry_count) if result else entry_count,
+            "docCount": result.get("docCount", doc_count) if result else doc_count,
+            **canvas,
+            **navigation["stats"],
+        },
+    }
+    if temporary is not None:
+        temporary.cleanup()
+    return report
+
+
+def print_text_report(report: dict) -> None:
+    status = "PASS" if report["ok"] else "FAIL"
+    stats = report["stats"]
+    print(f"ProtoDock validation: {status}")
+    print(f"Target: {report['target']}")
+    print(
+        "Summary: "
+        f"pages={stats.get('pageCount', 0)}, "
+        f"nodes={stats.get('nodeCount', 0)}, "
+        f"routes={stats.get('routeCount', 0)}, "
+        f"errors={len(report['errors'])}, warnings={len(report['warnings'])}"
+    )
+    if report["errors"]:
+        print("\nErrors:")
+        for issue in report["errors"]:
+            print(f"  - {issue}")
+    if report["warnings"]:
+        print("\nWarnings:")
+        for warning in report["warnings"]:
+            print(f"  - {warning}")
+    print("\nRoutes:")
+    if not report["routes"]:
+        print("  (none detected)")
+    for route in report["routes"]:
+        print(
+            f"  {route['sourcePageId']} -> {route['targetPageId']} "
+            f"[{route['control']}] ({route['file']}:{route['line']}) "
+            f"=> {route['targetEntry']}"
+        )
+
+
+def main() -> int:
+    args = parse_args()
+    report = inspect_target(args.target)
+    if args.as_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print_text_report(report)
+    return 1 if not report["ok"] or (args.warnings_as_errors and report["warnings"]) else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

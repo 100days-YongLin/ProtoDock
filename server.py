@@ -25,6 +25,8 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 from urllib.parse import quote, unquote, urlparse
 
+from protodock_validation import validate_cross_page_navigation
+
 
 ROOT = Path(__file__).resolve().parent
 SHARES_DIR = ROOT / "shares"
@@ -501,19 +503,24 @@ def validate_project_manifest_files(
                 doc_count += 1
 
     canvas_validation = validate_canvas_layout(manifest)
+    navigation_validation = validate_cross_page_navigation(project_dir, manifest)
     canvas_issues = canvas_validation["issues"]
-    if issues or canvas_issues:
-        if issues and canvas_issues:
+    navigation_issues = navigation_validation["issues"]
+    if issues or canvas_issues or navigation_issues:
+        issue_categories = sum(bool(category) for category in (issues, canvas_issues, navigation_issues))
+        if issue_categories > 1:
             code = "PROJECT_VALIDATION_FAILED"
         elif canvas_issues:
             code = "CANVAS_LAYOUT_INVALID"
+        elif navigation_issues:
+            code = "NAVIGATION_INVALID"
         else:
             code = "PROJECT_FILES_INVALID"
         raise ProtoDockError(
             HTTPStatus.BAD_REQUEST,
-            f"项目包校验失败。请确保文件路径相对于{source_label}，且 Canvas 编排符合契约。{remediation}",
+            f"项目包校验失败。请确保文件路径相对于{source_label}，且 Canvas 与跨页导航符合契约。{remediation}",
             code=code,
-            details=issues + canvas_issues,
+            details=issues + canvas_issues + navigation_issues,
         )
     return {
         "manifest": manifest,
@@ -521,7 +528,11 @@ def validate_project_manifest_files(
         "entryCount": entry_count,
         "docCount": doc_count,
         "canvas": canvas_validation["stats"],
-        "warnings": canvas_validation["warnings"],
+        "navigation": {
+            "stats": navigation_validation["stats"],
+            "routes": navigation_validation["routes"],
+        },
+        "warnings": canvas_validation["warnings"] + navigation_validation["warnings"],
     }
 
 
@@ -1519,6 +1530,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             "url": self.absolute_url(path),
             "action": "updated" if is_update else "created",
             "canvasValidation": validation["canvas"],
+            "navigationValidation": validation["navigation"]["stats"],
             "warnings": validation["warnings"],
         })
 

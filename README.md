@@ -161,6 +161,14 @@ http://<server-ip>:6080/index.html
 
 服务端会在导入前按 manifest 一次性校验所有 `pages.*.entry` 和 `pages.*.doc`。路径不是 ZIP 根目录相对路径、文件缺失，或清单被放在外层目录时，上传会直接失败并返回具体路径，不会等进入画布后再逐页报 `NotFoundError`。
 
+上传前也可以在本地运行同一套校验器。交付时必须传入最终 ZIP，不能只检查打包前目录：
+
+```bash
+./scripts/protodock-validate /path/to/project-v1.1-protodock-upload.zip
+```
+
+校验器会检查 ZIP 根目录、manifest 文件路径、Canvas 节点/连线/分组、节点重叠和跨页导航，并输出跨页路由表。发现缺失文件、重复节点、悬空连线、旧 `data-page`、`window.location`、根路径 `/pages/...` 或无效目标时返回非零退出码。`--json` 可供 Agent 和 CI 读取，`--warnings-as-errors` 可让连线交叉、穿过节点及间距不足也阻止发布。分享上传和 GitHub 导入会在服务端再次执行同一套核心校验。
+
 建议分别命名为 `<project>-<version>-protodock-upload.zip` 和 `<project>-<version>-full-release.zip`，不要向用户推荐后者用于 ProtoDock 上传。
 
 自动打包只读取当前项目目录中的 `pages/**`、`docs/**` 和 `assets/**`，并把当前内存里的 manifest 状态写入包内的 `protodock.project.json`。如果右侧文档有未保存修改，也会进入分享包，但不会因此写回本地磁盘。
