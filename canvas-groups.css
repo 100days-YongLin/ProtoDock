@@ -4,6 +4,78 @@
   gap: 4px;
 }
 
+.page-search {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin: 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 7px 0 10px;
+  color: var(--muted);
+}
+
+.page-search:focus-within {
+  border-color: var(--primary-focus);
+  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.12);
+}
+
+.page-search > svg {
+  width: 15px;
+  height: 15px;
+}
+
+.page-search input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.page-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.page-search input:disabled {
+  cursor: default;
+}
+
+.page-search:has(input:disabled) {
+  opacity: 0.48;
+}
+
+.page-search button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.page-search button[hidden] {
+  display: none;
+}
+
+.page-search button:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.page-search button svg {
+  width: 13px;
+  height: 13px;
+}
+
 .page-group {
   display: grid;
   gap: 6px;
@@ -11,13 +83,9 @@
   padding-left: 7px;
 }
 
-.page-group.is-focused {
-  border-left-color: var(--primary);
-}
-
 .page-group-head {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 4px;
   min-height: 36px;
@@ -94,6 +162,13 @@
   font-weight: 650;
 }
 
+.page-list-empty {
+  padding: 18px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .group-mount {
   position: absolute;
   inset: 0;
@@ -106,11 +181,6 @@
   border: 1px solid #aeb8c8;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.3);
-}
-
-.canvas-group-frame.is-focused {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
 }
 
 .canvas-group-frame header {

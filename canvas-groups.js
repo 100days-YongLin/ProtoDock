@@ -36,31 +36,22 @@
     return (groups || []).find((group) => group.nodeIds.includes(nodeId)) || null;
   }
 
-  function visibleNodeIds(groups, nodes, focusedGroupId = null) {
-    const visible = new Set();
-    const groupList = groups || [];
-    const focusedGroup = focusedGroupId ? groupList.find((group) => group.id === focusedGroupId) : null;
-    if (focusedGroup) {
-      focusedGroup.nodeIds.forEach((nodeId) => visible.add(nodeId));
-      return visible;
+  function visibleNodeIds(groups, nodes) {
+    return new Set((nodes || []).map((node) => node.id));
+  }
+
+  function matchesPageSearch(node, page, group, query) {
+    const normalizedQuery = String(query || '').trim().toLocaleLowerCase();
+    if (!normalizedQuery) {
+      return true;
     }
-    const grouped = new Set();
-    groupList.forEach((group) => {
-      group.nodeIds.forEach((nodeId) => grouped.add(nodeId));
-      if (group.collapsed) {
-        if (group.rootNodeId) {
-          visible.add(group.rootNodeId);
-        }
-        return;
-      }
-      group.nodeIds.forEach((nodeId) => visible.add(nodeId));
-    });
-    nodes.forEach((node) => {
-      if (!grouped.has(node.id)) {
-        visible.add(node.id);
-      }
-    });
-    return visible;
+    return [
+      page?.title,
+      node?.pageId,
+      page?.entry,
+      page?.sourceDir,
+      group?.title
+    ].some((value) => String(value || '').toLocaleLowerCase().includes(normalizedQuery));
   }
 
   function effectiveNodes(nodes, preview) {
@@ -159,6 +150,7 @@
     normalizeGroups,
     groupForNode,
     visibleNodeIds,
+    matchesPageSearch,
     effectiveNodes,
     groupBounds,
     layoutGroup

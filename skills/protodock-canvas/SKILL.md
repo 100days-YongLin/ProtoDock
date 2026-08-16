@@ -102,7 +102,8 @@ Treat adding groups to an older prototype as an explicit, scoped canvas migratio
 5. If group ownership or the main entry is genuinely ambiguous, ask the user to confirm the proposal before writing. Never guess; uncertain pages remain ungrouped.
 6. Add only `canvas.groups`. Preserve `project`, `pages`, `canvas.nodes`, node coordinates, `canvas.edges`, anchors, `canvas.notes`, ordering, and unknown fields byte-for-byte where practical.
 7. Give every group a unique ID and readable title. Its root must be an existing member node, a node may belong to at most one group, and migrated groups default to `collapsed: true` unless the user specifies otherwise.
-8. Re-open and validate the written manifest and final ZIP. Compare page, node, edge, and note counts and identities before and after migration; only `canvas.groups` may be newly introduced.
+8. Treat `group.collapsed` as a left-sidebar navigation preference only. It must never hide, merge, redirect, or remove Canvas nodes, edges, notes, or group bounds; the Canvas always renders page-level detail.
+9. Re-open and validate the written manifest and final ZIP. Compare page, node, edge, and note counts and identities before and after migration; only `canvas.groups` may be newly introduced.
 
 Do not combine group migration with re-layout. A later group-local layout remains a separate preview-and-confirm operation.
 

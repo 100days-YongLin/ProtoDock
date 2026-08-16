@@ -116,7 +116,10 @@
                 "uniqueItems": true,
                 "items": { "type": "string", "minLength": 1 }
               },
-              "collapsed": { "type": "boolean" }
+              "collapsed": {
+                "type": "boolean",
+                "description": "Whether this group is collapsed in the left page list. Canvas nodes and edges remain fully visible."
+              }
             }
           }
         }

@@ -22,8 +22,26 @@ assert.deepEqual(ProtoDockGroups.normalizeGroups(undefined, nodes), []);
 assert.deepEqual(Array.from(ProtoDockGroups.visibleNodeIds(groups, nodes)), ['root', 'child-a', 'child-b', 'outside']);
 
 groups[0].collapsed = true;
-assert.deepEqual(Array.from(ProtoDockGroups.visibleNodeIds(groups, nodes)), ['root', 'outside']);
-assert.deepEqual(Array.from(ProtoDockGroups.visibleNodeIds(groups, nodes, 'life')), ['root', 'child-a', 'child-b']);
+assert.deepEqual(Array.from(ProtoDockGroups.visibleNodeIds(groups, nodes)), ['root', 'child-a', 'child-b', 'outside']);
+
+assert.equal(ProtoDockGroups.matchesPageSearch(
+  nodes[1],
+  { title: '进餐详情', entry: 'pages/meal-detail/index.html' },
+  groups[0],
+  '进餐'
+), true);
+assert.equal(ProtoDockGroups.matchesPageSearch(
+  nodes[1],
+  { title: '进餐详情', entry: 'pages/meal-detail/index.html' },
+  groups[0],
+  '生活记录'
+), true);
+assert.equal(ProtoDockGroups.matchesPageSearch(
+  nodes[1],
+  { title: '进餐详情', entry: 'pages/meal-detail/index.html' },
+  groups[0],
+  '午睡'
+), false);
 
 const positions = ProtoDockGroups.layoutGroup(groups[0], nodes, [
   { from: 'root', to: 'child-a' },

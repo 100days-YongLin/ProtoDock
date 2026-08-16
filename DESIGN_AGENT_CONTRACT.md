@@ -108,11 +108,11 @@ Canvas quality is part of the prototype deliverable:
 - a unique `id` and readable `title`;
 - one `rootNodeId` that is also present in `nodeIds`;
 - one or more unique node IDs;
-- an optional persisted `collapsed` state.
+- an optional persisted `collapsed` state for the left page list only; it never changes Canvas node or edge visibility.
 
 A node may belong to at most one group. Group members and the root must reference existing canvas nodes. Agents must preserve existing groups by default and must not infer or rebuild group membership during a normal page export.
 
-Group-level layout is explicit and local: preview it first, back up the manifest, then update only member node coordinates after user confirmation. Focusing a group and switching its page tabs are viewing operations; they do not replace the group’s internal tree or business edges.
+Group-level layout is explicit and local: preview it first, back up the manifest, then update only member node coordinates after user confirmation. Searching or collapsing the left list and switching group page tabs are navigation operations; they do not replace or hide the group’s internal tree or business edges on Canvas.
 
 Adding groups to a legacy manifest is an explicit migration, not a routine export step. The Agent must validate and back up the existing manifest, derive a reviewable grouping proposal from page docs and key edges, and ask for confirmation when ownership or the root is ambiguous. Applying the proposal may add only `canvas.groups`; it must preserve pages, nodes, coordinates, edges, anchors, notes, ordering, and unknown fields. Group migration and layout changes must be separate operations.
 
