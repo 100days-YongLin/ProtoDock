@@ -129,6 +129,10 @@ http://localhost:4175/index.html
 
 顶部“播放原型”打开的右侧预览与公开 Share 页面都运行真实 iframe。页面自身的点击、输入、滚动、弹窗和 JavaScript 状态会原样执行；跨 manifest 页面必须显式使用 `data-protodock-page="<pageId>"`、`href="protodock:<pageId>"` 或 `protodock:navigate` 消息。旧静态页面仍有兼容恢复能力，但它不代表新交付通过验收；最终 ZIP 必须扫描控件和脚本，阻止根路径 `/pages/...`、目标未注册、目标节点不唯一或仅靠 `window.location` 跳转的页面。
 
+二级页面的返回键使用 `data-protodock-back`，ProtoDock 会回到用户实际访问的上一页并恢复 query/hash；可用 `data-protodock-back="home"` 指定没有访问历史时的兜底页。脚本也可以调用 `window.ProtoDockPreview?.back('home')` 或发送 `{ type: 'protodock:back', fallbackPageId: 'home' }`。iframe 自己的 `history.back()` 不等于 ProtoDock 页面历史，未绑定的返回图标和这类浏览器历史调用会被上传校验器拦截。
+
+公开分享上传和 GitHub 推送共用后端 ZIP 解压校验，提交包每次都会自动检查入口、文档、Canvas、跨页目标和返回协议；任一错误都会在写入分享目录或推送仓库前阻止操作。`scripts/protodock-validate` 用于 Agent 在交付前对同一份最终 ZIP 提前执行相同门禁。
+
 画布右下角的缩略图会显示全部页面节点、页面组、流程连线和文本备注，蓝色边框表示当前视口。点击或拖动缩略图可以快速移动到其他区域；右上角“适配全部”按钮会把所有画布内容放进当前视口。手动缩放范围为 `10%-300%`。
 
 ## 使用文档

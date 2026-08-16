@@ -1,6 +1,7 @@
 (function initProtoDockNavigation(global) {
   const ACTION_PREFIX = /^(?:请)?(?:点击|进入|打开|前往|跳转到?|查看|选择|返回)/;
   const CONTROL_SELECTOR = [
+    '[data-protodock-back]',
     '[data-protodock-page]',
     '[data-protodock-target]',
     '[data-page]',
@@ -8,12 +9,23 @@
     '[data-target-page]',
     '[data-url]',
     '[data-href]',
+    '[data-action="back"]',
+    '[data-action="go-back"]',
+    '[data-action="navigate-back"]',
+    '[onclick*="history.back"]',
+    '[onclick*="history.go(-1)"]',
+    '[class*="-back"]',
+    '[class*="back-"]',
+    '[id*="-back"]',
+    '[id*="back-"]',
     'a[href]',
     'button',
     '[role="button"]',
     'input[type="button"]',
     'input[type="submit"]'
   ].join(', ');
+  const BACK_LABELS = new Set(['返回', '后退', '上一页', '返回上一页', 'back', 'goback']);
+  const BACK_ACTIONS = new Set(['back', 'go-back', 'navigate-back', 'return']);
 
   function normalizeText(value) {
     return String(value || '')
@@ -34,6 +46,28 @@
 
   function pageExists(manifest, pageId) {
     return !!pageId && !!manifest?.pages?.[pageId];
+  }
+
+  function createPageHistory(limit = 100) {
+    const entries = [];
+    const maximum = Math.max(1, Number(limit) || 100);
+    return {
+      push(index, suffix = '') {
+        entries.push({ index, suffix: String(suffix || '') });
+        if (entries.length > maximum) {
+          entries.shift();
+        }
+      },
+      pop() {
+        return entries.pop() || null;
+      },
+      reset() {
+        entries.length = 0;
+      },
+      get size() {
+        return entries.length;
+      }
+    };
   }
 
   function routesForPage(manifest, pageId) {
@@ -161,6 +195,34 @@
       || '';
   }
 
+  function backFallbackForControl(manifest, control) {
+    const fallback = String(control?.getAttribute?.('data-protodock-back') || '').trim();
+    return pageExists(manifest, fallback) ? fallback : null;
+  }
+
+  function isBackControl(control) {
+    if (!control) {
+      return false;
+    }
+    if (control.hasAttribute?.('data-protodock-back')) {
+      return true;
+    }
+    const action = String(control.getAttribute?.('data-action') || '').trim().toLowerCase();
+    if (BACK_ACTIONS.has(action)) {
+      return true;
+    }
+    const inlineHandler = String(control.getAttribute?.('onclick') || '');
+    const href = String(control.getAttribute?.('href') || '');
+    if (/history\s*\.\s*(?:back\s*\(|go\s*\(\s*-1\s*\))/i.test(`${inlineHandler} ${href}`)) {
+      return true;
+    }
+    const identifier = `${control.getAttribute?.('id') || ''} ${control.getAttribute?.('class') || ''}`;
+    if (/(?:^|[\s_-])(?:back|return)(?:$|[\s_-])/i.test(identifier)) {
+      return true;
+    }
+    return BACK_LABELS.has(normalizeText(controlLabel(control)));
+  }
+
   function controlForEvent(event) {
     const pathControl = event.composedPath?.().find((item) => item?.matches?.(CONTROL_SELECTOR));
     if (pathControl) {
@@ -242,6 +304,14 @@
             return;
           }
           const current = frame.__protoDockNavigationOptions;
+          if (isBackControl(control) && typeof current?.onBack === 'function') {
+            handledEvents.add(event);
+            event.preventDefault();
+            event.stopImmediatePropagation?.();
+            const fallbackPageId = backFallbackForControl(current?.manifest, control);
+            global.setTimeout(() => current.onBack(fallbackPageId, 'control'), 0);
+            return;
+          }
           const targetPageId = routeForControl(current?.manifest, current?.pageId, control);
           if (!targetPageId || targetPageId === current?.pageId) {
             return;
@@ -289,6 +359,13 @@
               if (pageExists(current?.manifest, pageId)) {
                 current.onNavigate(pageId, 'api');
               }
+            },
+            back(fallbackPageId = null) {
+              const current = frame.__protoDockNavigationOptions;
+              if (typeof current?.onBack === 'function') {
+                const fallback = pageExists(current?.manifest, fallbackPageId) ? fallbackPageId : null;
+                current.onBack(fallback, 'api');
+              }
             }
           };
         }
@@ -296,7 +373,8 @@
           navigateFromControl(event, controlForEvent(event));
         }, true);
       } catch (error) {
-        // Cross-origin frontends still work; they can navigate with postMessage.
+        // Cross-origin frontends still work through postMessage; same-origin failures need diagnostics.
+        global.console?.warn?.('ProtoDock could not bind iframe navigation controls.', error);
       }
     };
     if (frame.dataset.protoDockNavigationBound !== 'true') {
@@ -317,17 +395,34 @@
     return data.pageId;
   }
 
+  function backActionFromMessage(event, frame, manifest) {
+    if (!frame?.contentWindow || event.source !== frame.contentWindow) {
+      return null;
+    }
+    const data = event.data;
+    if (!data || data.type !== 'protodock:back') {
+      return null;
+    }
+    return {
+      fallbackPageId: pageExists(manifest, data.fallbackPageId) ? data.fallbackPageId : null
+    };
+  }
+
   global.ProtoDockNavigation = {
     normalizeText,
     actionText,
+    createPageHistory,
     routesForPage,
     resolveRelativeEntry,
     pageIdForHref,
     navigationForFrameLocation,
     routeForLabel,
     controlForEvent,
+    isBackControl,
+    backFallbackForControl,
     routeForControl,
     bindFrame,
-    pageIdFromMessage
+    pageIdFromMessage,
+    backActionFromMessage
   };
 })(window);

@@ -111,6 +111,19 @@ class UploadPackageTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "CANVAS_LAYOUT_INVALID")
         self.assertTrue(any("login" in issue for issue in context.exception.details))
 
+    def test_rejects_unbound_back_control_during_zip_upload(self):
+        files = {
+            server.MANIFEST_FILE: json.dumps(project_manifest()),
+            "pages/login/index.html": '<button class="header-back" aria-label="返回"></button>',
+            "docs/login.md": "# Login",
+        }
+        with tempfile.TemporaryDirectory() as destination:
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.safe_extract_project_zip(build_zip(files), Path(destination))
+
+        self.assertEqual(context.exception.code, "NAVIGATION_INVALID")
+        self.assertTrue(any("返回控件但未声明" in issue for issue in context.exception.details))
+
     def test_rejects_duplicate_nodes_dangling_edges_and_overlap(self):
         manifest = project_manifest()
         manifest["canvas"] = {

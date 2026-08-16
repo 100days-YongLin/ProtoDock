@@ -37,6 +37,14 @@ ProtoDock 是展示和编排工具，不是页面源码生成器。页面源码�
 
 页面脚本也可以调用 `window.ProtoDockPreview?.navigate(pageId)`，或向父窗口发送 `{ type: 'protodock:navigate', pageId }`。为了兼容旧的 HTML-only 原型，当当前页面的唯一出边标签与按钮文案明确一致时，播放器会自动切换到目标页面；不会进行模糊匹配或按控件顺序猜测。
 
+二级页面返回上一访问页时，使用统一返回协议：
+
+```html
+<button data-protodock-back="home" aria-label="返回">返回</button>
+```
+
+ProtoDock 会维护播放器自己的访问历史并恢复上一页的 query/hash；`home` 仅在没有历史时作为兜底。脚本可调用 `window.ProtoDockPreview?.back('home')`，跨域页面可发送 `{ type: 'protodock:back', fallbackPageId: 'home' }`。不要使用 iframe 的 `history.back()`，也不要只画一个没有点击实现的返回图标。
+
 旧版恢复逻辑只用于兼容，不计入新交付验收。Agent 必须在最终 ZIP 中扫描跨页控件和脚本；`window.location`、旧 `data-page`、根路径 `/pages/...`、未注册目标或重复目标节点都要作为错误处理。查询参数对应的状态已有独立 manifest 页面时，控件应直接声明该状态的 `pageId`。
 
 <Warning>
@@ -116,6 +124,7 @@ ProtoDock 解压最终 ZIP 后会检查：
 - 每条边的 `from/to` 节点存在
 - 所有页面 `entry` 和 `doc` 文件存在
 - 所有跨页控件都有显式且唯一的 manifest 目标，不存在根路径或脚本-only 跳转
+- 所有返回控件都使用 ProtoDock 返回协议，不存在 `history.back()` 或未绑定返回图标
 - 页面组 ID 唯一，组成员和主入口均引用现有节点
 - 同一节点不能同时属于多个组
 

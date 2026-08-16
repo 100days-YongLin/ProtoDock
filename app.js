@@ -263,6 +263,7 @@ const state = {
   playbackActive: false,
   playbackJobId: null,
   playbackLocationSuffix: '',
+  playbackHistory: window.ProtoDockNavigation.createPageHistory(),
   edgeFrameId: null,
   minimapFrameId: null,
   isSettingEditorValue: false,
@@ -1360,7 +1361,8 @@ async function hydratePlaybackPreview(node) {
     window.ProtoDockNavigation?.bindFrame(iframe, {
       manifest: state.manifest,
       pageId: node.pageId,
-      onNavigate: navigatePlaybackToPage
+      onNavigate: navigatePlaybackToPage,
+      onBack: navigatePlaybackBack
     });
     if (state.playbackJobId !== jobId) {
       return;
@@ -3917,6 +3919,7 @@ function startPlayback() {
   state.playbackActive = true;
   state.playbackIndex = 0;
   state.playbackLocationSuffix = '';
+  state.playbackHistory.reset();
   els.inspector?.classList.add('is-playback');
   if (els.playbackPanel) {
     els.playbackPanel.hidden = false;
@@ -3934,6 +3937,7 @@ function stopPlayback() {
   state.playbackActive = false;
   state.playbackJobId = null;
   state.playbackLocationSuffix = '';
+  state.playbackHistory.reset();
   els.inspector?.classList.remove('is-playback');
   if (els.playbackPanel) {
     els.playbackPanel.hidden = true;
@@ -3991,9 +3995,14 @@ function stepPlayback(delta) {
   if (nextIndex === state.playbackIndex) {
     return;
   }
+  rememberPlaybackLocation();
   state.playbackIndex = nextIndex;
   state.playbackLocationSuffix = '';
   renderPlayback();
+}
+
+function rememberPlaybackLocation() {
+  state.playbackHistory.push(state.playbackIndex, state.playbackLocationSuffix);
 }
 
 function navigatePlaybackToPage(pageId, source, navigation = null) {
@@ -4001,15 +4010,45 @@ function navigatePlaybackToPage(pageId, source, navigation = null) {
     return;
   }
   const index = state.manifest.canvas.nodes.findIndex((node) => node.pageId === pageId);
-  if (index < 0 || index === state.playbackIndex) {
+  if (index < 0) {
     return;
   }
-  state.playbackIndex = index;
-  state.playbackLocationSuffix = source === 'location'
+  const suffix = source === 'location'
     ? normalizedNavigationSuffix(navigation?.suffix || navigation?.url)
     : '';
+  if (index === state.playbackIndex && suffix === state.playbackLocationSuffix) {
+    return;
+  }
+  rememberPlaybackLocation();
+  state.playbackIndex = index;
+  state.playbackLocationSuffix = suffix;
   renderPlayback();
   setStatus(`已进入 ${pageForNode(state.manifest.canvas.nodes[index]).title || pageId}`);
+}
+
+function navigatePlaybackBack(fallbackPageId = null) {
+  if (!state.playbackActive || !state.manifest) {
+    return;
+  }
+  const previous = state.playbackHistory.pop();
+  if (previous) {
+    state.playbackIndex = previous.index;
+    state.playbackLocationSuffix = previous.suffix || '';
+    renderPlayback();
+    setStatus('已返回上一页');
+    return;
+  }
+  const fallbackIndex = fallbackPageId
+    ? state.manifest.canvas.nodes.findIndex((node) => node.pageId === fallbackPageId)
+    : -1;
+  if (fallbackIndex >= 0 && fallbackIndex !== state.playbackIndex) {
+    state.playbackIndex = fallbackIndex;
+    state.playbackLocationSuffix = '';
+    renderPlayback();
+    setStatus(`已返回 ${pageForNode(state.manifest.canvas.nodes[fallbackIndex]).title || fallbackPageId}`);
+    return;
+  }
+  setStatus('当前没有可返回的上一页');
 }
 
 function centerNode(nodeId) {
@@ -4456,6 +4495,11 @@ function bindGlobalEvents() {
       return;
     }
     const frame = els.playbackMount?.querySelector('iframe.playback-frame');
+    const backAction = window.ProtoDockNavigation?.backActionFromMessage(event, frame, state.manifest);
+    if (backAction) {
+      navigatePlaybackBack(backAction.fallbackPageId);
+      return;
+    }
     const pageId = window.ProtoDockNavigation?.pageIdFromMessage(event, frame, state.manifest);
     if (pageId) {
       navigatePlaybackToPage(pageId);

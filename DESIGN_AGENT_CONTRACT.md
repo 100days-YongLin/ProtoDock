@@ -43,6 +43,7 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 25. Validate navigation against the extracted final ZIP: scan controls and scripts, reject root-absolute `/pages/...`, localhost, local absolute paths, undeclared targets, ambiguous targets, and targets without exactly one canvas node.
 26. If a query parameter represents a state already registered as a manifest page, link directly to that state `pageId` instead of routing through a generic page plus query parameters.
 27. Run `scripts/protodock-validate <final-upload.zip>` after packaging. A non-zero exit code blocks delivery; source-directory checks and prose reviews do not satisfy this gate.
+28. Back controls must use `data-protodock-back[="<fallbackPageId>"]`, `ProtoDockPreview.back()`, or the `protodock:back` message. Do not use iframe `history.back()` or ship an unbound back icon; test enter-detail-and-return in both player and Share.
 
 ## React / Vue Recommended Build
 
@@ -68,6 +69,8 @@ For transitions between registered ProtoDock pages, annotate the triggering cont
 ```
 
 Framework code can also call `window.ProtoDockPreview?.navigate(pageId)`. Cross-origin entries can send `window.parent.postMessage({ type: 'protodock:navigate', pageId }, '*')`; ProtoDock accepts the message only from the active preview iframe and only for an existing manifest page.
+
+For visit-history return behavior, use `<button data-protodock-back="home">返回</button>`. ProtoDock returns to the actual previously visited page and restores its query/hash state; `home` is used only when no visit history exists. Framework and cross-origin equivalents are `window.ProtoDockPreview?.back('home')` and `window.parent.postMessage({ type: 'protodock:back', fallbackPageId: 'home' }, '*')`.
 
 Before delivery, produce a route table containing source page, visible control, declared target `pageId`, and target entry. Every cross-page control in a new or modified page must appear exactly once. A route that works only because ProtoDock recovered a legacy `window.location` request is still a validation failure.
 

@@ -75,6 +75,7 @@
     preset: devicePresets['iphone-portrait'],
     shellKey: '',
     locationSuffix: '',
+    history: window.ProtoDockNavigation.createPageHistory(),
     mobileControlsCollapsed: true,
     controlsTimer: null
   };
@@ -399,7 +400,8 @@
     window.ProtoDockNavigation?.bindFrame(frame, {
       manifest: state.manifest,
       pageId: state.pages[state.index]?.pageId,
-      onNavigate: goToPageById
+      onNavigate: goToPageById,
+      onBack: goBack
     });
     if (frame.dataset.previewInteractionBound === 'true') {
       return;
@@ -506,20 +508,43 @@
     scheduleControlsAutoCollapse();
   }
 
-  function goToPage(index, navigation = null) {
+  function rememberCurrentPage() {
+    state.history.push(state.index, state.locationSuffix);
+  }
+
+  function goToPage(index, navigation = null, options = {}) {
     const nextIndex = Number(index);
     if (!Number.isFinite(nextIndex)) {
       return;
     }
-    state.index = Math.min(Math.max(nextIndex, 0), state.pages.length - 1);
-    state.locationSuffix = normalizedNavigationSuffix(navigation?.suffix || navigation?.url);
+    const boundedIndex = Math.min(Math.max(nextIndex, 0), state.pages.length - 1);
+    const suffix = normalizedNavigationSuffix(navigation?.suffix || navigation?.url);
+    if (boundedIndex === state.index && suffix === state.locationSuffix) {
+      return;
+    }
+    if (options.remember !== false) {
+      rememberCurrentPage();
+    }
+    state.index = boundedIndex;
+    state.locationSuffix = suffix;
     renderCurrentPage();
   }
 
-  function goToPageById(pageId, source, navigation = null) {
+  function goToPageById(pageId, source, navigation = null, options = {}) {
     const index = state.pages.findIndex((page) => page.pageId === pageId);
     if (index >= 0) {
-      goToPage(index, source === 'location' ? navigation : null);
+      goToPage(index, source === 'location' ? navigation : null, options);
+    }
+  }
+
+  function goBack(fallbackPageId = null) {
+    const previous = state.history.pop();
+    if (previous) {
+      goToPage(previous.index, { suffix: previous.suffix }, { remember: false });
+      return;
+    }
+    if (fallbackPageId) {
+      goToPageById(fallbackPageId, 'fallback', null, { remember: false });
     }
   }
 
@@ -545,6 +570,7 @@
     state.index = 0;
     state.shellKey = '';
     state.locationSuffix = '';
+    state.history.reset();
     state.mobileControlsCollapsed = true;
     renderOptions();
     renderCurrentPage();
@@ -581,6 +607,15 @@
     }
   });
   window.addEventListener('message', (event) => {
+    const backAction = window.ProtoDockNavigation?.backActionFromMessage(
+      event,
+      frameElement(),
+      state.manifest
+    );
+    if (backAction) {
+      goBack(backAction.fallbackPageId);
+      return;
+    }
     const pageId = window.ProtoDockNavigation?.pageIdFromMessage(
       event,
       frameElement(),

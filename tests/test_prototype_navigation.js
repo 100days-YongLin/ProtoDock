@@ -23,6 +23,18 @@ const manifest = {
   }
 };
 
+const pageHistory = ProtoDockNavigation.createPageHistory(2);
+pageHistory.push(0, '?tab=first');
+pageHistory.push(1, '');
+pageHistory.push(2, '#detail');
+assert.equal(pageHistory.size, 2);
+assert.deepEqual(pageHistory.pop(), { index: 2, suffix: '#detail' });
+assert.deepEqual(pageHistory.pop(), { index: 1, suffix: '' });
+assert.equal(pageHistory.pop(), null);
+pageHistory.push(0, '');
+pageHistory.reset();
+assert.equal(pageHistory.size, 0);
+
 assert.equal(ProtoDockNavigation.actionText('点击绘本'), '绘本');
 assert.equal(ProtoDockNavigation.routeForLabel(
   ProtoDockNavigation.routesForPage(manifest, 'reader'),
@@ -54,6 +66,16 @@ assert.equal(ProtoDockNavigation.pageIdFromMessage(
   { contentWindow: 'frame-window' },
   manifest
 ), null);
+assert.deepEqual(ProtoDockNavigation.backActionFromMessage(
+  { source: 'frame-window', data: { type: 'protodock:back', fallbackPageId: 'home' } },
+  { contentWindow: 'frame-window' },
+  manifest
+), { fallbackPageId: 'home' });
+assert.equal(ProtoDockNavigation.backActionFromMessage(
+  { source: 'other-window', data: { type: 'protodock:back' } },
+  { contentWindow: 'frame-window' },
+  manifest
+), null);
 
 const explicitControl = {
   tagName: 'BUTTON',
@@ -64,6 +86,32 @@ const explicitControl = {
   }
 };
 assert.equal(ProtoDockNavigation.routeForControl(manifest, 'reader', explicitControl), 'home');
+
+const explicitBackControl = {
+  textContent: '返回',
+  matches() {
+    return true;
+  },
+  hasAttribute(name) {
+    return name === 'data-protodock-back';
+  },
+  getAttribute(name) {
+    return name === 'data-protodock-back' ? 'home' : null;
+  }
+};
+assert.equal(ProtoDockNavigation.isBackControl(explicitBackControl), true);
+assert.equal(ProtoDockNavigation.backFallbackForControl(manifest, explicitBackControl), 'home');
+
+const legacyBackControl = {
+  textContent: '',
+  hasAttribute() {
+    return false;
+  },
+  getAttribute(name) {
+    return name === 'class' ? 'header-back-button' : (name === 'aria-label' ? '返回' : null);
+  }
+};
+assert.equal(ProtoDockNavigation.isBackControl(legacyBackControl), true);
 
 const legacyControl = {
   tagName: 'BUTTON',
@@ -102,6 +150,7 @@ let documentClickCapture = false;
 let stopped = false;
 let prevented = false;
 let navigatedPageId = null;
+let backedToPageId = undefined;
 const originalSetTimeout = global.setTimeout;
 global.setTimeout = (callback) => {
   callback();
@@ -140,6 +189,9 @@ ProtoDockNavigation.bindFrame(frame, {
   pageId: 'reader',
   onNavigate(pageId) {
     navigatedPageId = pageId;
+  },
+  onBack(fallbackPageId) {
+    backedToPageId = fallbackPageId;
   }
 });
 frameLoadHandler();
@@ -162,6 +214,24 @@ assert.equal(documentClickCapture, true);
 assert.equal(prevented, true);
 assert.equal(stopped, true);
 assert.equal(navigatedPageId, 'home');
+frame.contentWindow.ProtoDockPreview.back('home');
+assert.equal(backedToPageId, 'home');
+backedToPageId = undefined;
+global.setTimeout = (callback) => {
+  callback();
+  return 1;
+};
+documentClickHandler({
+  button: 0,
+  target: explicitBackControl,
+  composedPath() {
+    return [explicitBackControl];
+  },
+  preventDefault() {},
+  stopImmediatePropagation() {}
+});
+global.setTimeout = originalSetTimeout;
+assert.equal(backedToPageId, 'home');
 
 let recoveredNavigation = null;
 const redirectedFrame = {

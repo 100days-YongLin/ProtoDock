@@ -93,6 +93,71 @@ class PackageValidatorTests(unittest.TestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["stats"]["routeCount"], 2)
 
+    def test_accepts_explicit_back_control_with_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(
+                root,
+                '<button data-protodock-page="detail">查看详情</button>',
+                detail_html='<button data-protodock-back="home" aria-label="返回"></button>',
+            )
+
+            result = validate_cross_page_navigation(root, data)
+
+        self.assertEqual(result["issues"], [])
+        self.assertTrue(any(route["control"] == "返回" for route in result["routes"]))
+        self.assertTrue(any(route["targetPageId"] == "home" for route in result["routes"]))
+
+    def test_accepts_back_api_and_message(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(
+                root,
+                """
+                <script>
+                  window.ProtoDockPreview?.back("home");
+                  window.parent.postMessage({ type: "protodock:back" }, "*");
+                </script>
+                """,
+            )
+
+            result = validate_cross_page_navigation(root, data)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["stats"]["routeCount"], 2)
+
+    def test_accepts_back_api_in_button_handler(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(
+                root,
+                '<button onclick="window.ProtoDockPreview?.back(\'detail\')">返回</button>',
+            )
+
+            result = validate_cross_page_navigation(root, data)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["stats"]["routeCount"], 1)
+        self.assertEqual(result["routes"][0]["targetPageId"], "detail")
+
+    def test_rejects_unimplemented_back_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(root, '<button class="header-back" aria-label="返回"></button>')
+
+            result = validate_cross_page_navigation(root, data)
+
+        self.assertTrue(any("返回控件但未声明" in issue for issue in result["issues"]))
+
+    def test_rejects_browser_history_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(root, '<button onclick="history.back()">返回</button>')
+
+            result = validate_cross_page_navigation(root, data)
+
+        self.assertTrue(any("history.back()" in issue for issue in result["issues"]))
+
     def test_rejects_legacy_data_page(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

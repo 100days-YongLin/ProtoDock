@@ -9,6 +9,7 @@ from urllib.parse import unquote, urlsplit
 
 EXPLICIT_TARGET_ATTRIBUTES = ("data-protodock-page", "data-protodock-target")
 LEGACY_TARGET_ATTRIBUTES = ("data-page", "data-page-id", "data-target-page", "data-url", "data-href")
+BACK_TARGET_ATTRIBUTE = "data-protodock-back"
 CONTROL_TAGS = {"a", "button"}
 VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 ACTION_PREFIX = re.compile(r"^(?:请)?(?:点击|进入|打开|前往|跳转到?|查看|选择|返回)")
@@ -25,7 +26,19 @@ NAVIGATE_CALL_PATTERN = re.compile(
 )
 POST_MESSAGE_PATTERN = re.compile(r"postMessage\s*\(\s*\{(?P<body>.{0,1200}?)\}\s*,", re.DOTALL)
 MESSAGE_TYPE_PATTERN = re.compile(r"(?:['\"]?type['\"]?)\s*:\s*(['\"])protodock:navigate\1", re.IGNORECASE)
+MESSAGE_BACK_TYPE_PATTERN = re.compile(r"(?:['\"]?type['\"]?)\s*:\s*(['\"])protodock:back\1", re.IGNORECASE)
 MESSAGE_PAGE_PATTERN = re.compile(r"(?:['\"]?pageId['\"]?)\s*:\s*(['\"])([^'\"]+)\1", re.IGNORECASE)
+MESSAGE_FALLBACK_PATTERN = re.compile(r"(?:['\"]?fallbackPageId['\"]?)\s*:\s*(['\"])([^'\"]+)\1", re.IGNORECASE)
+PROTODOCK_BACK_PATTERN = re.compile(
+    r"(?:window\s*\.\s*)?ProtoDockPreview\s*\??\.\s*back\s*\(\s*(?:(['\"])([^'\"]+)\1)?",
+    re.IGNORECASE,
+)
+HISTORY_BACK_PATTERN = re.compile(
+    r"(?:window\s*\.\s*)?history\s*\.\s*(?:back\s*\(|go\s*\(\s*-1\s*\))",
+    re.IGNORECASE,
+)
+BACK_LABELS = {"返回", "后退", "上一页", "返回上一页", "back", "goback"}
+BACK_ACTIONS = {"back", "go-back", "navigate-back", "return"}
 
 
 def normalize_text(value: str) -> str:
@@ -100,7 +113,7 @@ class PrototypeHTMLParser(HTMLParser):
         input_type = attributes.get("type", "").lower()
         has_navigation_attribute = any(
             name in attributes
-            for name in (*EXPLICIT_TARGET_ATTRIBUTES, *LEGACY_TARGET_ATTRIBUTES)
+            for name in (*EXPLICIT_TARGET_ATTRIBUTES, *LEGACY_TARGET_ATTRIBUTES, BACK_TARGET_ATTRIBUTE)
         ) or "href" in attributes
         is_control = (
             tag in CONTROL_TAGS
@@ -186,6 +199,38 @@ def control_label(control: dict) -> str:
     return re.sub(r"\s+", " ", value).strip() or f"<{control['tag']}>"
 
 
+def is_back_control(control: dict) -> bool:
+    attributes = control["attrs"]
+    if BACK_TARGET_ATTRIBUTE in attributes:
+        return True
+    if attributes.get("data-action", "").strip().lower() in BACK_ACTIONS:
+        return True
+    inline_navigation = f"{attributes.get('onclick', '')} {attributes.get('href', '')}"
+    if HISTORY_BACK_PATTERN.search(inline_navigation):
+        return True
+    identifier = f"{attributes.get('id', '')} {attributes.get('class', '')}"
+    if re.search(r"(?:^|[\s_-])(?:back|return)(?:$|[\s_-])", identifier, re.IGNORECASE):
+        return True
+    return normalize_text(control_label(control)) in BACK_LABELS
+
+
+def back_target_from_control(control: dict) -> tuple[str, str] | None:
+    attributes = control["attrs"]
+    if BACK_TARGET_ATTRIBUTE in attributes:
+        return BACK_TARGET_ATTRIBUTE, attributes[BACK_TARGET_ATTRIBUTE].strip()
+    inline_handler = attributes.get("onclick", "")
+    api_match = PROTODOCK_BACK_PATTERN.search(inline_handler)
+    if api_match:
+        return "ProtoDockPreview.back", str(api_match.group(2) or "").strip()
+    for message_match in POST_MESSAGE_PATTERN.finditer(inline_handler):
+        body = message_match.group("body")
+        if not MESSAGE_BACK_TYPE_PATTERN.search(body):
+            continue
+        fallback_match = MESSAGE_FALLBACK_PATTERN.search(body)
+        return "protodock:back message", fallback_match.group(2).strip() if fallback_match else ""
+    return None
+
+
 def target_from_control(control: dict) -> tuple[str, str] | None:
     attributes = control["attrs"]
     for name in EXPLICIT_TARGET_ATTRIBUTES:
@@ -238,6 +283,8 @@ def scan_script(
         location_write = LOCATION_WRITE_PATTERN.search(line)
         if location_write:
             issues.append(f"{location} 使用脚本 location 跳转；请改为显式 ProtoDock pageId")
+        if HISTORY_BACK_PATTERN.search(line):
+            issues.append(f"{location} 使用 history.back()/history.go(-1)；请改为 ProtoDockPreview.back()")
         if LOCAL_URL_PATTERN.search(line):
             issues.append(f"{location} 包含 localhost、file:// 或本地绝对路径")
         root_match = ROOT_PAGE_PATTERN.search(line)
@@ -251,14 +298,56 @@ def scan_script(
             if route:
                 route.update({"control": "ProtoDockPreview.navigate", "file": file_label, "line": line_number})
                 routes.append(route)
+        for match in PROTODOCK_BACK_PATTERN.finditer(line):
+            fallback_page_id = str(match.group(2) or "").strip()
+            if fallback_page_id:
+                target_issues, route = validate_route_target(
+                    manifest, counts, page_id, fallback_page_id, location
+                )
+                issues.extend(target_issues)
+                if route:
+                    route.update({"control": "ProtoDockPreview.back", "file": file_label, "line": line_number})
+                    routes.append(route)
+            else:
+                routes.append({
+                    "sourcePageId": page_id,
+                    "targetPageId": "(history)",
+                    "targetEntry": "",
+                    "control": "ProtoDockPreview.back",
+                    "file": file_label,
+                    "line": line_number,
+                })
 
     for match in POST_MESSAGE_PATTERN.finditer(script):
         body = match.group("body")
-        if not MESSAGE_TYPE_PATTERN.search(body):
+        is_navigate_message = MESSAGE_TYPE_PATTERN.search(body)
+        is_back_message = MESSAGE_BACK_TYPE_PATTERN.search(body)
+        if not is_navigate_message and not is_back_message:
             continue
-        page_match = MESSAGE_PAGE_PATTERN.search(body)
         line_number = first_line + script.count("\n", 0, match.start())
         location = f"{page_id} · {file_label}:{line_number}"
+        if is_back_message:
+            fallback_match = MESSAGE_FALLBACK_PATTERN.search(body)
+            fallback_page_id = fallback_match.group(2).strip() if fallback_match else ""
+            if fallback_page_id:
+                target_issues, route = validate_route_target(
+                    manifest, counts, page_id, fallback_page_id, location
+                )
+                issues.extend(target_issues)
+                if route:
+                    route.update({"control": "protodock:back message", "file": file_label, "line": line_number})
+                    routes.append(route)
+            else:
+                routes.append({
+                    "sourcePageId": page_id,
+                    "targetPageId": "(history)",
+                    "targetEntry": "",
+                    "control": "protodock:back message",
+                    "file": file_label,
+                    "line": line_number,
+                })
+            continue
+        page_match = MESSAGE_PAGE_PATTERN.search(body)
         if not page_match:
             issues.append(f"{location} 的 protodock:navigate 消息缺少可静态解析的 pageId")
             continue
@@ -307,6 +396,38 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
         for control in parser.controls:
             label = control_label(control)
             location = f"{page_id} · {entry}:{control['line']} · {label}"
+            attributes = control["attrs"]
+            explicit_back = back_target_from_control(control)
+            if explicit_back:
+                back_mechanism, fallback_page_id = explicit_back
+                if fallback_page_id:
+                    target_issues, route = validate_route_target(
+                        manifest, counts, page_id, fallback_page_id, location
+                    )
+                    issues.extend(target_issues)
+                    if route:
+                        route.update({
+                            "control": label if back_mechanism == BACK_TARGET_ATTRIBUTE else back_mechanism,
+                            "file": entry,
+                            "line": control["line"],
+                        })
+                        routes.append(route)
+                else:
+                    routes.append({
+                        "sourcePageId": page_id,
+                        "targetPageId": "(history)",
+                        "targetEntry": "",
+                        "control": label if back_mechanism == BACK_TARGET_ATTRIBUTE else back_mechanism,
+                        "file": entry,
+                        "line": control["line"],
+                    })
+                continue
+            if is_back_control(control):
+                issues.append(
+                    f"{location} 是返回控件但未声明 data-protodock-back；"
+                    "history.back() 和空点击处理不能通过交付校验"
+                )
+                continue
             explicit = target_from_control(control)
             if explicit:
                 _, target = explicit
@@ -317,7 +438,6 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
                     routes.append(route)
                 continue
 
-            attributes = control["attrs"]
             legacy = next((name for name in LEGACY_TARGET_ATTRIBUTES if name in attributes), None)
             if legacy:
                 target = attributes[legacy].strip()
