@@ -24,6 +24,23 @@ ProtoDock 已把可分发版本放在仓库的 `skills/protodock-canvas/SKILL.md
 
 脚本会在覆盖旧版本前创建时间戳备份。安装完成后，重新打开 Agent 或新建会话，让工具重新扫描 Skill。
 
+## 更新已有 Skill
+
+先拉取最新版 ProtoDock 仓库，再重新执行安装命令即可覆盖用户级旧版本：
+
+```bash
+git pull
+./scripts/install-protodock-skill.sh both
+```
+
+如果旧原型仓库曾使用项目级 Skill，则要把目标改为该原型目录：
+
+```bash
+./scripts/install-protodock-skill.sh both project /path/to/old-prototype-project
+```
+
+更新 Skill 只会替换 Agent 规则文件并备份旧规则，不会修改该原型的页面或 `protodock.project.json`。之后是否加入页面组，仍由下面的分组迁移流程决定。
+
 ## 安装到项目
 
 团队希望 Skill 跟随某个原型项目一起协作时，可以安装到项目级目录：
@@ -64,6 +81,30 @@ Claude Code 只需把目标中的 `.agents` 改为 `.claude`。
 - Claude Code：进入项目后输入 `/protodock-canvas`，或直接要求它使用该 Skill 检查项目。
 
 Agent 能说出 ZIP 根目录必须直接包含 `protodock.project.json`、`pages/` 和 `docs/`，即说明加载的是新版规则。
+
+## 用 Skill 升级旧版原型
+
+旧版原型不需要为了继续打开而升级。`canvas.groups` 是可选字段，没有它时 ProtoDock 会继续显示原来的平铺页面和画布。只有希望按业务模块折叠、聚焦或使用组内 Tab 时，才需要执行一次分组迁移。
+
+先让 Agent 只分析、不修改：
+
+```text
+请使用 protodock-canvas Skill 分析当前旧版 ProtoDock 原型，给出 Canvas Groups 分组提案，暂时不要修改文件。
+请结合页面文档、页面标题和现有关键连线，列出每个组的名称、主入口、成员页面、未分组页面和不确定项；同时先检查 page、node、edge、entry、doc 是否完整。
+```
+
+确认提案后再执行迁移：
+
+```text
+请使用 protodock-canvas Skill，按刚才确认的分组提案升级当前旧版原型。
+迁移前备份 protodock.project.json；只新增 canvas.groups，不修改 project、pages、nodes、坐标、edges、锚点、notes 和未知字段；不执行自动重排。完成后重新读取 manifest，并对比迁移前后的页面、节点、连线和备注，最后校验 ProtoDock 上传 ZIP。
+```
+
+迁移没有把握的页面应继续留在“未分组”，不能根据文件名硬猜。分组完成后如需整理某一组的树形布局，应单独要求“预览该组的局部布局”，确认预览后再应用。
+
+<Warning>
+  不要只说“升级旧版原型”。这可能被理解为重建整个 manifest。明确要求“只新增 canvas.groups，不重排画布”，才能保护产品经理已经整理好的节点和连线。
+</Warning>
 
 ## Skill 解决什么问题
 

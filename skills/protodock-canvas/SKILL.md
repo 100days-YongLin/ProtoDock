@@ -1,6 +1,6 @@
 ---
 name: protodock-canvas
-description: "Use when creating, updating, packaging, or troubleshooting a ProtoDock prototype project, including manifest pages, docs, assets, canvas state, ZIP uploads, and Agent collaboration."
+description: "Use when creating, updating, packaging, or troubleshooting a ProtoDock prototype project, including manifest pages, docs, assets, canvas state, legacy Canvas Groups migration, ZIP uploads, and Agent collaboration."
 ---
 
 # ProtoDock Canvas
@@ -79,6 +79,21 @@ Treat a readable canvas as part of delivery quality, not as optional decoration.
 - When `canvas.groups` exists, each group must have a unique `id`, readable `title`, a `rootNodeId` contained in `nodeIds`, and one or more existing node IDs. A node may belong to at most one group.
 - Old manifests without `canvas.groups` are valid and must not be migrated unless the user creates groups.
 - Group tabs are preview navigation only. They do not replace the group’s internal tree or business edges.
+
+### Legacy group migration
+
+Treat adding groups to an older prototype as an explicit, scoped canvas migration. It is optional and must never happen during a normal page build, export, upload, or content update.
+
+1. Read `protodock.project.json`, all page documents, page titles, and existing key edges. Do not infer business ownership from file names alone.
+2. Validate the existing project before migration: every page has exactly one node, all edge endpoints exist, and there are no duplicate nodes, dangling edges, or missing entry/doc files.
+3. Create the required timestamped manifest backup before writing. Stop if validation or backup fails.
+4. Produce a grouping proposal containing each group title, root page/node, member page/node IDs, pages left ungrouped, and any uncertain assignments.
+5. If group ownership or the main entry is genuinely ambiguous, ask the user to confirm the proposal before writing. Never guess; uncertain pages remain ungrouped.
+6. Add only `canvas.groups`. Preserve `project`, `pages`, `canvas.nodes`, node coordinates, `canvas.edges`, anchors, `canvas.notes`, ordering, and unknown fields byte-for-byte where practical.
+7. Give every group a unique ID and readable title. Its root must be an existing member node, a node may belong to at most one group, and migrated groups default to `collapsed: true` unless the user specifies otherwise.
+8. Re-open and validate the written manifest and final ZIP. Compare page, node, edge, and note counts and identities before and after migration; only `canvas.groups` may be newly introduced.
+
+Do not combine group migration with re-layout. A later group-local layout remains a separate preview-and-confirm operation.
 
 ### Geometry and connections
 

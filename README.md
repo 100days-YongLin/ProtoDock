@@ -105,6 +105,8 @@ protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json
 
 左侧“原型页面”按组显示树形层级。组支持折叠、聚焦、组内页面 Tab 和局部自动布局预览；应用局部布局前会先备份 manifest，并且只更新当前组节点坐标。
 
+旧项目不强制升级。需要分组时，使用 `protodock-canvas` Skill 先生成分组提案，确认后只新增 `canvas.groups`，不得同时重排或改写现有页面、节点、连线与备注。具体步骤和可直接使用的提示词见使用文档的“用 Skill 升级旧版原型”。
+
 ## 本地使用
 
 在 ProtoDock 仓库根目录启动任意静态服务器：
@@ -266,5 +268,7 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 # 安装到指定项目，让规则只在该项目生效
 ./scripts/install-protodock-skill.sh both project /path/to/prototype-project
 ```
+
+更新已安装的旧版 Skill 时，拉取最新版仓库后重新执行同一条安装命令即可；脚本会先备份旧规则。更新 Skill 本身不会修改任何旧原型文件。
 
 Codex 使用 `~/.agents/skills` 或项目内 `.agents/skills`；Claude Code 使用 `~/.claude/skills` 或项目内 `.claude/skills`。完整说明见使用文档的“Skill 安装与文件契约”。
