@@ -1312,6 +1312,11 @@ async function hydratePlaybackPreview(node) {
 
   try {
     const iframe = await buildPreviewIframe(node, 'playback-frame');
+    window.ProtoDockNavigation?.bindFrame(iframe, {
+      manifest: state.manifest,
+      pageId: node.pageId,
+      onNavigate: navigatePlaybackToPage
+    });
     if (state.playbackJobId !== jobId) {
       return;
     }
@@ -3846,6 +3851,19 @@ function stepPlayback(delta) {
   renderPlayback();
 }
 
+function navigatePlaybackToPage(pageId) {
+  if (!state.playbackActive || !state.manifest) {
+    return;
+  }
+  const index = state.manifest.canvas.nodes.findIndex((node) => node.pageId === pageId);
+  if (index < 0 || index === state.playbackIndex) {
+    return;
+  }
+  state.playbackIndex = index;
+  renderPlayback();
+  setStatus(`已进入 ${pageForNode(state.manifest.canvas.nodes[index]).title || pageId}`);
+}
+
 function centerNode(nodeId) {
   const element = document.querySelector(`[data-id="${CSS.escape(nodeId)}"]`);
   if (!element) {
@@ -4257,6 +4275,16 @@ function bindGlobalEvents() {
         event.preventDefault();
         stepPlayback(1);
       }
+    }
+  });
+  window.addEventListener('message', (event) => {
+    if (!state.playbackActive) {
+      return;
+    }
+    const frame = els.playbackMount?.querySelector('iframe.playback-frame');
+    const pageId = window.ProtoDockNavigation?.pageIdFromMessage(event, frame, state.manifest);
+    if (pageId) {
+      navigatePlaybackToPage(pageId);
     }
   });
 }

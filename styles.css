@@ -1476,8 +1476,7 @@ select {
 }
 
 .prototype-device {
-  transform: scale(var(--preview-scale));
-  transform-origin: 0 0;
+  zoom: var(--preview-scale);
 }
 
 .prototype-device .device-screen {
@@ -1574,8 +1573,15 @@ select {
   width: var(--preview-width);
   height: var(--preview-height);
   overflow: hidden;
-  transform: scale(var(--preview-scale));
-  transform-origin: 0 0;
+  zoom: var(--preview-scale);
+}
+
+@supports not (zoom: 1) {
+  .prototype-device,
+  .prototype-frame-stage {
+    transform: scale(var(--preview-scale));
+    transform-origin: 0 0;
+  }
 }
 
 .preview-loading,

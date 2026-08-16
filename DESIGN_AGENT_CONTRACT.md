@@ -37,6 +37,9 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 19. Do not draw global Tab or sidebar navigation across modules. Keep only key task-flow actions on canvas and put secondary paths in page documentation.
 20. Prefer `bottom -> top` anchors for vertical flows and `right -> left` for same-level flows. Avoid edge crossings and edges that pass through unrelated nodes.
 21. Normal build/export must preserve canvas. Only explicit `--relayout`, `--reset-canvas`, or a direct user request may change it, after a manifest backup and preview.
+22. A static build must remain executable. Do not replace an interactive React/Vue/Svelte page with server-rendered DOM that has lost event handlers.
+23. Mark cross-page controls with `data-protodock-page="<pageId>"`, `href="protodock:<pageId>"`, `window.ProtoDockPreview.navigate(pageId)`, or the documented `protodock:navigate` postMessage protocol.
+24. Smoke-test representative clicks, inputs, scrolling, local state changes, and one cross-page transition in both the right-side player and the public Share preview.
 
 ## React / Vue Recommended Build
 
@@ -51,6 +54,17 @@ pages/home/
 ```
 
 For maximum reliability in v1, prefer bundling each page with no dynamic chunk imports. Inline or local relative assets are best.
+
+The build output must include the JavaScript required by the prototype. `renderToStaticMarkup`, copied `outerHTML`, screenshots, or HTML-only exports are insufficient when the source page contains interactions.
+
+For transitions between registered ProtoDock pages, annotate the triggering control explicitly:
+
+```html
+<button data-protodock-page="reader-character">查看角色</button>
+<a href="protodock:parent-center">家长中心</a>
+```
+
+Framework code can also call `window.ProtoDockPreview?.navigate(pageId)`. Cross-origin entries can send `window.parent.postMessage({ type: 'protodock:navigate', pageId }, '*')`; ProtoDock accepts the message only from the active preview iframe and only for an existing manifest page.
 
 ## Manifest Responsibilities
 

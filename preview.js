@@ -379,7 +379,15 @@
   }
 
   function bindFrameInteractions(frame) {
-    if (!frame || frame.dataset.previewInteractionBound === 'true') {
+    if (!frame) {
+      return;
+    }
+    window.ProtoDockNavigation?.bindFrame(frame, {
+      manifest: state.manifest,
+      pageId: state.pages[state.index]?.pageId,
+      onNavigate: goToPageById
+    });
+    if (frame.dataset.previewInteractionBound === 'true') {
       return;
     }
     frame.dataset.previewInteractionBound = 'true';
@@ -487,6 +495,13 @@
     renderCurrentPage();
   }
 
+  function goToPageById(pageId) {
+    const index = state.pages.findIndex((page) => page.pageId === pageId);
+    if (index >= 0) {
+      goToPage(index);
+    }
+  }
+
   async function loadShare(shareId) {
     state.shareId = shareId;
     state.shareBaseUrl = appUrl(`/shares/${encodeURIComponent(shareId)}/`);
@@ -541,6 +556,16 @@
       goToPage(state.index - 1);
     } else if (event.key === 'ArrowRight') {
       goToPage(state.index + 1);
+    }
+  });
+  window.addEventListener('message', (event) => {
+    const pageId = window.ProtoDockNavigation?.pageIdFromMessage(
+      event,
+      frameElement(),
+      state.manifest
+    );
+    if (pageId) {
+      goToPageById(pageId);
     }
   });
 

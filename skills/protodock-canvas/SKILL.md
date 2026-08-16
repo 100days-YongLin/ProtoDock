@@ -49,6 +49,17 @@ Before editing, read:
 - Page resources must be self-contained or use project-relative assets.
 - Do not use localhost URLs, local absolute paths, dev-server-only routes, or unavailable external runtime dependencies.
 - React, Vue, Svelte, and other framework pages must be built into static artifacts before delivery.
+- “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
+
+## Interactive Preview Contract
+
+ProtoDock runs page entries in iframes in the right-side player and the public Share preview. A page’s own JavaScript must remain executable in both surfaces.
+
+- Internal interactions stay inside the page and need no ProtoDock-specific code.
+- For a control that moves to another manifest page, prefer `data-protodock-page="<pageId>"` or an anchor such as `href="protodock:<pageId>"`.
+- A runtime may call `window.ProtoDockPreview?.navigate(pageId)` after load, or use `window.parent.postMessage({ type: 'protodock:navigate', pageId }, '*')`.
+- Keep canvas edge labels aligned with visible control labels. Legacy static pages receive a navigation fallback only when one outgoing edge label matches one control exactly after normalization; never rely on fuzzy or positional guessing.
+- Before delivery, smoke-test a key click, input or scroll interaction and one cross-page transition in both the canvas player and `/s/<share-id>`.
 
 ## Canvas Rules
 
