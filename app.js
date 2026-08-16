@@ -35,12 +35,19 @@ const els = {
   edgeLayer: document.getElementById('edgeLayer'),
   alignmentGuides: document.getElementById('alignmentGuides'),
   edgeLabelEditorMount: document.getElementById('edgeLabelEditorMount'),
+  groupMount: document.getElementById('groupMount'),
   nodeMount: document.getElementById('nodeMount'),
   noteMount: document.getElementById('noteMount'),
+  groupTabs: document.getElementById('groupTabs'),
+  groupLayoutReview: document.getElementById('groupLayoutReview'),
+  groupLayoutReviewText: document.getElementById('groupLayoutReviewText'),
+  cancelGroupLayout: document.getElementById('cancelGroupLayout'),
+  applyGroupLayout: document.getElementById('applyGroupLayout'),
   zoomValue: document.getElementById('zoomValue'),
   productSelect: document.getElementById('productSelect'),
   currentProjectName: document.getElementById('currentProjectName'),
   pageList: document.getElementById('pageList'),
+  addGroupButton: document.getElementById('addGroupButton'),
   sortPagesButton: document.getElementById('sortPagesButton'),
   canvasPresetName: document.getElementById('canvasPresetName'),
   canvasPresetDesc: document.getElementById('canvasPresetDesc'),
@@ -95,7 +102,18 @@ const els = {
   githubOpenStatus: document.getElementById('githubOpenStatus'),
   unsavedHomeModal: document.getElementById('unsavedHomeModal'),
   publicPreviewModal: document.getElementById('publicPreviewModal'),
-  publicPreviewList: document.getElementById('publicPreviewList')
+  publicPreviewList: document.getElementById('publicPreviewList'),
+  groupModal: document.getElementById('groupModal'),
+  groupModalTitle: document.getElementById('groupModalTitle'),
+  groupNameInput: document.getElementById('groupNameInput'),
+  groupPageOptions: document.getElementById('groupPageOptions'),
+  groupPageCount: document.getElementById('groupPageCount'),
+  groupRootSelect: document.getElementById('groupRootSelect'),
+  groupStatus: document.getElementById('groupStatus'),
+  closeGroupModal: document.getElementById('closeGroupModal'),
+  cancelGroupModal: document.getElementById('cancelGroupModal'),
+  saveGroup: document.getElementById('saveGroup'),
+  deleteGroup: document.getElementById('deleteGroup')
 };
 
 const buttons = {
@@ -219,6 +237,10 @@ const state = {
   pageSortMode: false,
   draggingPageNodeId: null,
   activePageSortDrag: null,
+  editingGroupId: null,
+  focusedGroupId: null,
+  groupLayoutPreview: null,
+  canvasBackupCreated: false,
   selectedPresetId: 'iphone-portrait',
   selectedProjectDirectoryHandle: null,
   toolMode: 'select',
@@ -571,6 +593,7 @@ function normalizeManifest(input) {
   manifest.canvas.nodes = Array.isArray(manifest.canvas.nodes) ? manifest.canvas.nodes : [];
   manifest.canvas.edges = Array.isArray(manifest.canvas.edges) ? manifest.canvas.edges : [];
   manifest.canvas.notes = Array.isArray(manifest.canvas.notes) ? manifest.canvas.notes : [];
+  manifest.canvas.groups = window.ProtoDockGroups?.normalizeGroups(manifest.canvas.groups, manifest.canvas.nodes) || [];
 
   manifest.canvas.nodes.forEach((node, index) => {
     node.id ||= `node-${index + 1}`;
@@ -1444,6 +1467,43 @@ function renderNote(note) {
   `;
 }
 
+function canvasGroups() {
+  return state.manifest?.canvas.groups || [];
+}
+
+function groupForNodeId(nodeId) {
+  return window.ProtoDockGroups?.groupForNode(canvasGroups(), nodeId) || null;
+}
+
+function visibleCanvasNodes() {
+  if (!state.manifest) {
+    return [];
+  }
+  const nodes = window.ProtoDockGroups?.effectiveNodes(
+    state.manifest.canvas.nodes,
+    state.groupLayoutPreview
+  ) || state.manifest.canvas.nodes;
+  const visibleIds = window.ProtoDockGroups?.visibleNodeIds(
+    canvasGroups(),
+    nodes,
+    state.focusedGroupId
+  ) || new Set(nodes.map((node) => node.id));
+  return nodes.filter((node) => visibleIds.has(node.id));
+}
+
+function renderPageListItem(node, index) {
+  const page = pageForNode(node);
+  return `
+    <li class="doc-item ${node.id === state.selectedNodeId ? 'active' : ''} ${node.id === state.draggingPageNodeId ? 'dragging' : ''}" data-page-node="${escapeHtml(node.id)}" draggable="false">
+      <button class="page-order-handle" type="button" title="拖拽排序" aria-label="拖拽排序" tabindex="-1"><i data-lucide="grip-vertical"></i></button>
+      <span class="page-list-copy">
+        <strong>${index + 1}. ${escapeHtml(page.title || node.pageId)}</strong>
+        <span>${escapeHtml(page.entry || '未设置入口')}</span>
+      </span>
+    </li>
+  `;
+}
+
 function renderPageList() {
   if (!state.manifest) {
     els.pageList.innerHTML = '';
@@ -1451,19 +1511,92 @@ function renderPageList() {
     return;
   }
   els.pageList.classList.toggle('is-sorting', state.pageSortMode);
-  els.pageList.innerHTML = state.manifest.canvas.nodes.map((node, index) => {
-    const page = pageForNode(node);
+  const nodes = state.manifest.canvas.nodes;
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
+  const groupedNodeIds = new Set(canvasGroups().flatMap((group) => group.nodeIds));
+  const groupHtml = canvasGroups().map((group) => {
+    const members = group.nodeIds.map((nodeId) => nodeById.get(nodeId)).filter(Boolean);
+    const isFocused = state.focusedGroupId === group.id;
+    const isCollapsed = group.collapsed && !isFocused;
     return `
-      <li class="doc-item ${node.id === state.selectedNodeId ? 'active' : ''} ${node.id === state.draggingPageNodeId ? 'dragging' : ''}" data-page-node="${escapeHtml(node.id)}" draggable="false">
-        <button class="page-order-handle" type="button" title="拖拽排序" aria-label="拖拽排序" tabindex="-1"><i data-lucide="grip-vertical"></i></button>
-        <span class="page-list-copy">
-          <strong>${index + 1}. ${escapeHtml(page.title || node.pageId)}</strong>
-          <span>${escapeHtml(page.entry || '未设置入口')}</span>
-        </span>
+      <li class="page-group ${isFocused ? 'is-focused' : ''}" data-page-group="${escapeHtml(group.id)}">
+        <div class="page-group-head">
+          <button type="button" data-group-toggle="${escapeHtml(group.id)}" title="${isCollapsed ? '展开组' : '折叠组'}" aria-label="${isCollapsed ? '展开组' : '折叠组'}" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+            <i data-lucide="${isCollapsed ? 'chevron-right' : 'chevron-down'}"></i>
+          </button>
+          <span class="page-group-title">
+            <strong>${escapeHtml(group.title)}</strong>
+            <span>${members.length} 个页面</span>
+          </span>
+          <button class="${isFocused ? 'active' : ''}" type="button" data-group-focus="${escapeHtml(group.id)}" title="${isFocused ? '退出聚焦' : '聚焦组'}" aria-label="${isFocused ? '退出聚焦' : '聚焦组'}" aria-pressed="${isFocused}">
+            <i data-lucide="${isFocused ? 'minimize-2' : 'focus'}"></i>
+          </button>
+          <button type="button" data-group-layout="${escapeHtml(group.id)}" title="预览组内布局" aria-label="预览组内布局" ${state.readOnly ? 'disabled' : ''}>
+            <i data-lucide="layout-template"></i>
+          </button>
+          <button type="button" data-group-edit="${escapeHtml(group.id)}" title="编辑页面组" aria-label="编辑页面组" ${state.readOnly ? 'disabled' : ''}>
+            <i data-lucide="settings-2"></i>
+          </button>
+        </div>
+        <ul class="page-group-pages" ${isCollapsed ? 'hidden' : ''}>
+          ${members.map((node) => renderPageListItem(node, nodeIndex.get(node.id))).join('')}
+        </ul>
       </li>
     `;
   }).join('');
+  const ungroupedNodes = nodes.filter((node) => !groupedNodeIds.has(node.id));
+  const ungroupedHtml = ungroupedNodes.length
+    ? `${canvasGroups().length ? '<li class="page-list-section-label">未分组</li>' : ''}${ungroupedNodes.map((node) => renderPageListItem(node, nodeIndex.get(node.id))).join('')}`
+    : '';
+  els.pageList.innerHTML = groupHtml + ungroupedHtml;
   window.lucide?.createIcons();
+}
+
+function renderGroupFrames(nodes = visibleCanvasNodes()) {
+  if (!els.groupMount || !state.manifest) {
+    return;
+  }
+  const nodeSize = estimatedNodeSize();
+  els.groupMount.innerHTML = canvasGroups().map((group) => {
+    if (state.focusedGroupId && state.focusedGroupId !== group.id) {
+      return '';
+    }
+    const bounds = window.ProtoDockGroups?.groupBounds(group, nodes, nodeSize);
+    if (!bounds) {
+      return '';
+    }
+    const collapsed = group.collapsed && state.focusedGroupId !== group.id;
+    return `
+      <section class="canvas-group-frame ${state.focusedGroupId === group.id ? 'is-focused' : ''}" data-canvas-group="${escapeHtml(group.id)}" style="left:${bounds.x}px;top:${bounds.y}px;width:${bounds.width}px;height:${bounds.height}px;">
+        <header><strong>${escapeHtml(group.title)}</strong><span>${collapsed ? '已折叠 · 主入口' : `${group.nodeIds.length} 个页面`}</span></header>
+      </section>
+    `;
+  }).join('');
+}
+
+function renderGroupTabs() {
+  if (!els.groupTabs || !state.manifest || state.groupLayoutPreview) {
+    if (els.groupTabs) {
+      els.groupTabs.hidden = true;
+    }
+    return;
+  }
+  const group = state.focusedGroupId
+    ? canvasGroups().find((item) => item.id === state.focusedGroupId)
+    : groupForNodeId(state.selectedNodeId);
+  if (!group) {
+    els.groupTabs.hidden = true;
+    els.groupTabs.innerHTML = '';
+    return;
+  }
+  const nodeById = new Map(state.manifest.canvas.nodes.map((node) => [node.id, node]));
+  els.groupTabs.innerHTML = `<strong>${escapeHtml(group.title)}</strong>${group.nodeIds.map((nodeId) => {
+    const node = nodeById.get(nodeId);
+    const page = node ? pageForNode(node) : null;
+    return node ? `<button class="${node.id === state.selectedNodeId ? 'active' : ''}" type="button" data-group-tab-node="${escapeHtml(node.id)}">${escapeHtml(page?.title || node.pageId)}</button>` : '';
+  }).join('')}`;
+  els.groupTabs.hidden = false;
 }
 
 function renderProjectActions() {
@@ -1479,6 +1612,7 @@ function renderProjectActions() {
     els.safeAreaToggle,
     els.safeAreaSettingsButton,
     els.saveSafeAreaSettings,
+    els.addGroupButton,
     els.sortPagesButton,
     els.pageSettingsButton,
     els.savePageSettings
@@ -1694,23 +1828,44 @@ function renameProject(name) {
 function renderCanvas() {
   if (!state.manifest) {
     state.editingEdgeLabelId = null;
+    els.groupMount.innerHTML = '';
     els.nodeMount.innerHTML = '';
     els.noteMount.innerHTML = '';
     els.edgeLayer.innerHTML = markerDefs();
+    els.groupTabs.hidden = true;
+    els.groupLayoutReview.hidden = true;
     renderEdgeLabelEditor();
     renderChrome();
     return;
   }
-  els.nodeMount.innerHTML = state.manifest.canvas.nodes.map(renderNode).join('');
-  els.noteMount.innerHTML = state.manifest.canvas.notes.map(renderNote).join('');
+  const nodes = visibleCanvasNodes();
+  els.nodeMount.innerHTML = nodes.map((node) => renderNode(node, state.manifest.canvas.nodes.findIndex((item) => item.id === node.id))).join('');
+  els.noteMount.innerHTML = state.focusedGroupId ? '' : state.manifest.canvas.notes.map(renderNote).join('');
+  renderGroupFrames(nodes);
   renderEdges();
   bindRenderedCanvas();
   renderChrome();
+  renderGroupTabs();
+  renderGroupLayoutReview();
   updateInspector();
   updateZoom();
   window.lucide?.createIcons();
   syncPreviewInteractionUi();
-  state.manifest.canvas.nodes.forEach(hydratePreview);
+  nodes.forEach(hydratePreview);
+}
+
+function renderGroupLayoutReview() {
+  if (!els.groupLayoutReview) {
+    return;
+  }
+  const preview = state.groupLayoutPreview;
+  const group = preview ? canvasGroups().find((item) => item.id === preview.groupId) : null;
+  if (!group) {
+    els.groupLayoutReview.hidden = true;
+    return;
+  }
+  els.groupLayoutReviewText.textContent = `预览「${group.title}」组内布局`;
+  els.groupLayoutReview.hidden = false;
 }
 
 function markerDefs() {
@@ -1914,7 +2069,23 @@ function renderEdges() {
   if (!state.manifest) {
     return;
   }
-  const edgeSvg = state.manifest.canvas.edges.map((edge) => {
+  const visibleNodeIds = new Set(visibleCanvasNodes().map((node) => node.id));
+  const displayNodeId = (nodeId) => {
+    if (visibleNodeIds.has(nodeId)) {
+      return nodeId;
+    }
+    const group = groupForNodeId(nodeId);
+    if (group?.collapsed && visibleNodeIds.has(group.rootNodeId)) {
+      return group.rootNodeId;
+    }
+    return null;
+  };
+  const displayEdges = state.manifest.canvas.edges.map((edge) => {
+    const from = displayNodeId(edge.from);
+    const to = displayNodeId(edge.to);
+    return from && to && from !== to ? { ...edge, from, to } : null;
+  }).filter(Boolean);
+  const edgeSvg = displayEdges.map((edge) => {
     const geometry = edgeGeometry(edge);
     if (!geometry) {
       return '';
@@ -2003,6 +2174,7 @@ function selectNode(id) {
   document.querySelectorAll('.text-note').forEach((note) => note.classList.remove('selected'));
   renderEdges();
   renderPageList();
+  renderGroupTabs();
   updateInspector();
 }
 
@@ -2292,6 +2464,12 @@ function handleNodePointerDown(event) {
   }
   const element = event.currentTarget;
   const nodeId = element.dataset.id;
+  if (state.groupLayoutPreview) {
+    selectNode(nodeId);
+    setStatus('当前是布局预览，请先应用或取消');
+    event.preventDefault();
+    return;
+  }
   const previewSurface = event.target.closest('.device-screen, .prototype-frame-stage');
   if (state.activePreviewNodeId === nodeId) {
     if (!previewSurface) {
@@ -2626,13 +2804,24 @@ function deleteSelected() {
     }
     state.manifest.canvas.nodes = state.manifest.canvas.nodes.filter((item) => item.id !== state.selectedNodeId);
     state.manifest.canvas.edges = state.manifest.canvas.edges.filter((edge) => edge.from !== state.selectedNodeId && edge.to !== state.selectedNodeId);
+    state.manifest.canvas.groups = canvasGroups().map((group) => {
+      const nodeIds = group.nodeIds.filter((nodeId) => nodeId !== state.selectedNodeId);
+      return {
+        ...group,
+        nodeIds,
+        rootNodeId: group.rootNodeId === state.selectedNodeId ? nodeIds[0] || '' : group.rootNodeId
+      };
+    }).filter((group) => group.nodeIds.length);
+    if (state.focusedGroupId && !groupById(state.focusedGroupId)) {
+      state.focusedGroupId = null;
+    }
     state.editingEdgeLabelId = null;
     revokePreviewUrls(state.selectedNodeId);
     state.previewResetNodeIds.delete(state.selectedNodeId);
     if (state.activePreviewNodeId === state.selectedNodeId) {
       state.activePreviewNodeId = null;
     }
-    state.selectedNodeId = state.manifest.canvas.nodes[0]?.id || null;
+    state.selectedNodeId = visibleCanvasNodes()[0]?.id || null;
     renderCanvas();
     markDirty('已删除页面节点');
     return;
@@ -2713,6 +2902,10 @@ function showStartScreen(message = '选择工作目录开始') {
   state.pageSortMode = false;
   state.draggingPageNodeId = null;
   state.activePageSortDrag = null;
+  state.editingGroupId = null;
+  state.focusedGroupId = null;
+  state.groupLayoutPreview = null;
+  state.canvasBackupCreated = false;
   state.toolMode = 'select';
   state.panX = 0;
   state.panY = 0;
@@ -2790,6 +2983,10 @@ async function loadManifestText(text, options = {}) {
   state.pageSortMode = false;
   state.draggingPageNodeId = null;
   state.activePageSortDrag = null;
+  state.editingGroupId = null;
+  state.focusedGroupId = null;
+  state.groupLayoutPreview = null;
+  state.canvasBackupCreated = false;
   state.docCache.clear();
   state.docDirty.clear();
   state.manifest = normalizeManifest(JSON.parse(text));
@@ -2802,7 +2999,7 @@ async function loadManifestText(text, options = {}) {
   state.manifestHash = await hashText(text);
   state.ignoredExternalManifestHash = null;
   state.dirty = false;
-  state.selectedNodeId = state.manifest.canvas.nodes[0]?.id || null;
+  state.selectedNodeId = visibleCanvasNodes()[0]?.id || null;
   state.selectedEdgeId = null;
   state.selectedNoteId = null;
   state.panX = 0;
@@ -3058,6 +3255,7 @@ function starterManifest(name, devicePreset) {
         { id: 'node-home', pageId: 'home', x: 120, y: 128 }
       ],
       edges: [],
+      groups: [],
       notes: [
         { id: 'note-contract', text: '设计 Agent 负责 pages/* 静态页面；ProtoDock 负责 flow、文档和预览编排。', x: 420, y: 148 }
       ]
@@ -3141,7 +3339,7 @@ ${pages}
 - 页面源码统一放在 \`pages/<page-id>/\`。
 - 每个页面必须提供静态入口，通常是 \`pages/<page-id>/index.html\`。
 - 页面说明放在 \`docs/<page-id>.md\`。
-- 可以更新 \`${MANIFEST_FILE}\` 中的 \`pages\` 字段，但不要改 \`canvas.nodes[].x\`、\`canvas.nodes[].y\` 或 \`canvas.edges\`，除非用户要求调整 flow。
+- 可以更新 \`${MANIFEST_FILE}\` 中的 \`pages\` 字段，但不要改 \`canvas.nodes[].x\`、\`canvas.nodes[].y\`、\`canvas.edges\` 或 \`canvas.groups\`，除非用户要求调整 flow 或页面组。
 `;
 }
 
@@ -3195,6 +3393,258 @@ async function writeInitialFile(rootHandle, path, text) {
   const writable = await fileHandle.createWritable();
   await writable.write(text);
   await writable.close();
+}
+
+async function ensureCanvasBackup() {
+  if (state.canvasBackupCreated) {
+    return true;
+  }
+  if (!state.projectHandle || state.readOnly) {
+    setStatus(state.readOnly ? readonlyProjectMessage() : '无法创建画布备份');
+    return false;
+  }
+  const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '').replace('T', '-');
+  const path = `protodock/backups/protodock.project.${timestamp}.json`;
+  try {
+    await writeInitialFile(state.projectHandle, path, manifestText(state.manifest));
+    state.canvasBackupCreated = true;
+    return true;
+  } catch (error) {
+    console.error(error);
+    setStatus(`画布备份失败：${error.message || '无法写入备份文件'}`);
+    return false;
+  }
+}
+
+function groupById(groupId) {
+  return canvasGroups().find((group) => group.id === groupId) || null;
+}
+
+function groupOwnerForNode(nodeId, excludingGroupId = null) {
+  return canvasGroups().find((group) => group.id !== excludingGroupId && group.nodeIds.includes(nodeId)) || null;
+}
+
+function renderGroupModal() {
+  if (!state.manifest || !els.groupModal) {
+    return;
+  }
+  const group = groupById(state.editingGroupId);
+  const selectedNodeIds = new Set(group?.nodeIds || []);
+  els.groupModalTitle.textContent = group ? '编辑页面组' : '新建页面组';
+  els.groupNameInput.value = group?.title || '';
+  els.deleteGroup.hidden = !group;
+  els.groupPageOptions.innerHTML = state.manifest.canvas.nodes.map((node) => {
+    const page = pageForNode(node);
+    const owner = groupOwnerForNode(node.id, group?.id);
+    return `
+      <label class="group-page-option ${owner ? 'is-unavailable' : ''}">
+        <input type="checkbox" value="${escapeHtml(node.id)}" ${selectedNodeIds.has(node.id) ? 'checked' : ''} ${owner ? 'disabled' : ''}>
+        <span>
+          <strong>${escapeHtml(page.title || node.pageId)}</strong>
+          <small>${owner ? `已属于「${escapeHtml(owner.title)}」` : escapeHtml(page.entry || node.pageId)}</small>
+        </span>
+      </label>
+    `;
+  }).join('');
+  syncGroupRootOptions(group?.rootNodeId || '');
+  els.groupStatus.textContent = group ? '修改只影响分组，不会删除页面或连线' : '请选择至少一个页面';
+}
+
+function selectedGroupModalNodeIds() {
+  return Array.from(els.groupPageOptions?.querySelectorAll('input[type="checkbox"]:checked') || []).map((input) => input.value);
+}
+
+function syncGroupRootOptions(preferredRootId = els.groupRootSelect?.value || '') {
+  const selectedNodeIds = selectedGroupModalNodeIds();
+  const nodeById = new Map((state.manifest?.canvas.nodes || []).map((node) => [node.id, node]));
+  els.groupRootSelect.innerHTML = selectedNodeIds.map((nodeId) => {
+    const node = nodeById.get(nodeId);
+    const page = node ? pageForNode(node) : null;
+    return `<option value="${escapeHtml(nodeId)}">${escapeHtml(page?.title || node?.pageId || nodeId)}</option>`;
+  }).join('');
+  if (selectedNodeIds.includes(preferredRootId)) {
+    els.groupRootSelect.value = preferredRootId;
+  }
+  els.groupRootSelect.disabled = !selectedNodeIds.length;
+  els.groupPageCount.textContent = `${selectedNodeIds.length} 个页面`;
+  els.groupStatus.textContent = selectedNodeIds.length ? '请选择组的主入口页面' : '请选择至少一个页面';
+}
+
+function openGroupModal(groupId = null) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
+    return;
+  }
+  state.editingGroupId = groupId;
+  renderGroupModal();
+  els.groupModal.hidden = false;
+  window.requestAnimationFrame(() => els.groupNameInput?.focus());
+}
+
+function closeGroupModal() {
+  if (els.groupModal) {
+    els.groupModal.hidden = true;
+  }
+  state.editingGroupId = null;
+}
+
+async function saveGroupFromModal() {
+  if (!state.manifest || state.readOnly) {
+    return;
+  }
+  const title = els.groupNameInput.value.trim();
+  const nodeIds = selectedGroupModalNodeIds();
+  const rootNodeId = els.groupRootSelect.value;
+  if (!title) {
+    els.groupStatus.textContent = '请填写组名称';
+    els.groupNameInput.focus();
+    return;
+  }
+  if (!nodeIds.length || !nodeIds.includes(rootNodeId)) {
+    els.groupStatus.textContent = '请选择组内页面和主入口';
+    return;
+  }
+  if (!await ensureCanvasBackup()) {
+    return;
+  }
+  const existing = groupById(state.editingGroupId);
+  if (existing) {
+    existing.title = title;
+    existing.nodeIds = nodeIds;
+    existing.rootNodeId = rootNodeId;
+  } else {
+    state.manifest.canvas.groups.push({
+      id: `group-${Date.now()}`,
+      title,
+      rootNodeId,
+      nodeIds,
+      collapsed: true
+    });
+  }
+  state.selectedNodeId = rootNodeId;
+  closeGroupModal();
+  renderCanvas();
+  markDirty(existing ? '页面组已更新' : '页面组已创建');
+}
+
+async function deleteEditingGroup() {
+  const group = groupById(state.editingGroupId);
+  if (!group || !confirm(`删除页面组「${group.title}」？组内页面和连线会保留。`)) {
+    return;
+  }
+  if (!await ensureCanvasBackup()) {
+    return;
+  }
+  state.manifest.canvas.groups = canvasGroups().filter((item) => item.id !== group.id);
+  if (state.focusedGroupId === group.id) {
+    state.focusedGroupId = null;
+  }
+  closeGroupModal();
+  renderCanvas();
+  markDirty('页面组已删除，组内页面保持不变');
+}
+
+async function toggleGroupCollapsed(groupId) {
+  const group = groupById(groupId);
+  if (!group) {
+    return;
+  }
+  if (!state.readOnly && !await ensureCanvasBackup()) {
+    return;
+  }
+  group.collapsed = !group.collapsed;
+  if (group.collapsed && group.nodeIds.includes(state.selectedNodeId) && state.selectedNodeId !== group.rootNodeId) {
+    state.selectedNodeId = group.rootNodeId;
+  }
+  renderCanvas();
+  if (!state.readOnly) {
+    markDirty(group.collapsed ? '页面组已折叠' : '页面组已展开');
+  }
+}
+
+function toggleGroupFocus(groupId) {
+  state.focusedGroupId = state.focusedGroupId === groupId ? null : groupId;
+  const group = groupById(state.focusedGroupId);
+  if (group && !group.nodeIds.includes(state.selectedNodeId)) {
+    state.selectedNodeId = group.rootNodeId;
+  }
+  renderCanvas();
+  if (group?.rootNodeId) {
+    centerNode(group.rootNodeId);
+  }
+  setStatus(group ? `正在聚焦「${group.title}」` : '已退出组聚焦');
+}
+
+function previewGroupLayout(groupId) {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
+    return;
+  }
+  const group = groupById(groupId);
+  if (!group) {
+    return;
+  }
+  const positions = window.ProtoDockGroups?.layoutGroup(
+    group,
+    state.manifest.canvas.nodes,
+    state.manifest.canvas.edges
+  ) || {};
+  state.groupLayoutPreview = { groupId, positions };
+  state.focusedGroupId = groupId;
+  state.selectedNodeId = group.rootNodeId;
+  renderCanvas();
+  centerNode(group.rootNodeId);
+  setStatus(`正在预览「${group.title}」组内布局`);
+}
+
+function cancelGroupLayoutPreview() {
+  if (!state.groupLayoutPreview) {
+    return;
+  }
+  state.groupLayoutPreview = null;
+  renderCanvas();
+  setStatus('已取消组内布局预览');
+}
+
+async function applyGroupLayoutPreview() {
+  const preview = state.groupLayoutPreview;
+  if (!preview || !await ensureCanvasBackup()) {
+    return;
+  }
+  state.manifest.canvas.nodes.forEach((node) => {
+    const position = preview.positions[node.id];
+    if (position) {
+      node.x = clampCanvasCoord(position.x);
+      node.y = clampCanvasCoord(position.y);
+    }
+  });
+  const group = groupById(preview.groupId);
+  if (group) {
+    group.collapsed = false;
+  }
+  state.groupLayoutPreview = null;
+  renderCanvas();
+  markDirty('组内布局已应用，仅更新当前组节点');
+}
+
+async function selectGroupTab(nodeId) {
+  const group = groupForNodeId(nodeId);
+  if (group?.collapsed && !state.focusedGroupId) {
+    if (!state.readOnly && !await ensureCanvasBackup()) {
+      return;
+    }
+    group.collapsed = false;
+    if (!state.readOnly) {
+      markDirty('页面组已展开');
+    }
+  }
+  renderCanvas();
+  selectNode(nodeId);
+  centerNode(nodeId);
 }
 
 async function saveProject() {
@@ -3602,6 +4052,20 @@ function bindGlobalEvents() {
   els.sortPagesButton?.addEventListener('click', () => {
     setPageSortMode(!state.pageSortMode);
   });
+  els.addGroupButton?.addEventListener('click', () => openGroupModal());
+  els.closeGroupModal?.addEventListener('click', closeGroupModal);
+  els.cancelGroupModal?.addEventListener('click', closeGroupModal);
+  els.saveGroup?.addEventListener('click', saveGroupFromModal);
+  els.deleteGroup?.addEventListener('click', deleteEditingGroup);
+  els.groupPageOptions?.addEventListener('change', () => syncGroupRootOptions());
+  els.cancelGroupLayout?.addEventListener('click', cancelGroupLayoutPreview);
+  els.applyGroupLayout?.addEventListener('click', applyGroupLayoutPreview);
+  els.groupTabs?.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-group-tab-node]');
+    if (tab) {
+      selectGroupTab(tab.dataset.groupTabNode);
+    }
+  });
   buttons.zoomIn?.addEventListener('click', () => zoomFromCenter(0.1));
   buttons.zoomOut?.addEventListener('click', () => zoomFromCenter(-0.1));
   els.inspectorResizer?.addEventListener('pointerdown', (event) => {
@@ -3690,11 +4154,35 @@ function bindGlobalEvents() {
     }
     window.location.href = item.dataset.shareUrl;
   });
-  els.pageList?.addEventListener('click', (event) => {
+  els.groupModal?.addEventListener('click', (event) => {
+    if (event.target === els.groupModal) {
+      closeGroupModal();
+    }
+  });
+  els.pageList?.addEventListener('click', async (event) => {
+    const toggle = event.target.closest('[data-group-toggle]');
+    if (toggle) {
+      await toggleGroupCollapsed(toggle.dataset.groupToggle);
+      return;
+    }
+    const focus = event.target.closest('[data-group-focus]');
+    if (focus) {
+      toggleGroupFocus(focus.dataset.groupFocus);
+      return;
+    }
+    const layout = event.target.closest('[data-group-layout]');
+    if (layout) {
+      previewGroupLayout(layout.dataset.groupLayout);
+      return;
+    }
+    const edit = event.target.closest('[data-group-edit]');
+    if (edit) {
+      openGroupModal(edit.dataset.groupEdit);
+      return;
+    }
     const item = event.target.closest('[data-page-node]');
     if (item && !state.pageSortMode) {
-      selectNode(item.dataset.pageNode);
-      centerNode(item.dataset.pageNode);
+      await selectGroupTab(item.dataset.pageNode);
     }
   });
   els.pageList?.addEventListener('pointerdown', beginPageSortDrag);
@@ -3748,6 +4236,12 @@ function bindGlobalEvents() {
       saveProject();
     }
     if (event.key === 'Escape') {
+      if (!els.groupModal?.hidden) {
+        closeGroupModal();
+      }
+      if (state.groupLayoutPreview) {
+        cancelGroupLayoutPreview();
+      }
       state.activeEdgeDrag = null;
       els.canvasShell.classList.remove('is-linking');
       renderEdges();
@@ -3796,6 +4290,9 @@ window.ProtoDock = {
       nodeCount: state.manifest?.canvas.nodes.length || 0,
       edgeCount: state.manifest?.canvas.edges.length || 0,
       noteCount: state.manifest?.canvas.notes.length || 0,
+      groupCount: state.manifest?.canvas.groups.length || 0,
+      focusedGroupId: state.focusedGroupId,
+      groupLayoutPreviewActive: !!state.groupLayoutPreview,
       projectDirectoryName: state.projectDirectoryName
     };
   },

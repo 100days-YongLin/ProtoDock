@@ -17,13 +17,16 @@ description: 哪些东西 Agent 可以生成，哪些东西绝对不能覆盖。
 - `canvas.nodes`
 - `canvas.edges`
 - `canvas.notes`
+- `canvas.groups`
 - 节点坐标
 - 锚点方向
 - 未知字段
 
 ## 增量合并
 
-如果确实需要新增页面节点，只能按 `id` 或 `pageId` 增量追加缺失节点，并保留已有节点的 `x`、`y`、`fromSide`、`toSide`、锚点、说明文本以及未知字段。
+如果确实需要新增页面节点，只能按 `id` 或 `pageId` 增量追加缺失节点，并保留已有节点的 `x`、`y`、`fromSide`、`toSide`、锚点、页面组、说明文本以及未知字段。
+
+页面组是产品经理维护的业务分区。Agent 不得在普通 build/export 中猜测或重建组成员；只有用户明确要求打组、拆组或局部重排时才能修改 `canvas.groups`，并且一个节点最多属于一个组。
 
 ## Manifest 备份
 

@@ -240,6 +240,9 @@ def validate_canvas_layout(manifest: dict) -> dict:
                 "unrelatedEdgeCrossingCount": 0,
                 "edgeThroughNodeCount": 0,
                 "insufficientSpacingCount": 0,
+                "groupCount": 0,
+                "groupedNodeCount": 0,
+                "duplicateGroupMembershipCount": 0,
             },
         }
 
@@ -289,6 +292,56 @@ def validate_canvas_layout(manifest: dict) -> dict:
         issues.append(f"页面缺少 canvas node：{', '.join(missing_page_ids)}")
     if unknown_page_ids:
         issues.append(f"canvas node 引用了不存在的页面：{', '.join(unknown_page_ids)}")
+
+    groups = canvas.get("groups", [])
+    if not isinstance(groups, list):
+        issues.append("canvas.groups 必须是数组")
+        groups = []
+    group_id_counts = {}
+    claimed_node_ids = {}
+    grouped_node_ids = set()
+    duplicate_group_membership_count = 0
+    for index, group in enumerate(groups):
+        label = f"canvas.groups[{index}]"
+        if not isinstance(group, dict):
+            issues.append(f"{label} 必须是对象")
+            continue
+        group_id = str(group.get("id") or "").strip()
+        title = str(group.get("title") or "").strip()
+        root_node_id = str(group.get("rootNodeId") or "").strip()
+        node_ids = group.get("nodeIds")
+        if not group_id:
+            issues.append(f"{label}.id 未填写")
+        else:
+            group_id_counts[group_id] = group_id_counts.get(group_id, 0) + 1
+        if not title:
+            issues.append(f"{label}.title 未填写")
+        if not isinstance(node_ids, list) or not node_ids:
+            issues.append(f"{label}.nodeIds 必须是非空数组")
+            continue
+        normalized_node_ids = [str(node_id or "").strip() for node_id in node_ids]
+        duplicate_member_ids = sorted({node_id for node_id in normalized_node_ids if normalized_node_ids.count(node_id) > 1})
+        if duplicate_member_ids:
+            issues.append(f"{label} 内存在重复节点：{', '.join(duplicate_member_ids)}")
+        missing_member_ids = sorted({node_id for node_id in normalized_node_ids if node_id not in node_by_id})
+        if missing_member_ids:
+            issues.append(f"{label} 引用了不存在的节点：{', '.join(missing_member_ids)}")
+        if root_node_id not in node_by_id:
+            issues.append(f"{label}.rootNodeId 引用了不存在的节点：{root_node_id or '(空)'}")
+        elif root_node_id not in normalized_node_ids:
+            issues.append(f"{label}.rootNodeId 必须属于 nodeIds：{root_node_id or '(空)'}")
+        for node_id in set(normalized_node_ids):
+            if node_id not in node_by_id:
+                continue
+            if node_id in claimed_node_ids:
+                duplicate_group_membership_count += 1
+                issues.append(f"节点 {node_id} 同时属于组 {claimed_node_ids[node_id]} 和 {group_id or label}")
+                continue
+            claimed_node_ids[node_id] = group_id or label
+            grouped_node_ids.add(node_id)
+    duplicate_group_ids = sorted(group_id for group_id, count in group_id_counts.items() if count > 1)
+    if duplicate_group_ids:
+        issues.append(f"存在重复页面组 id：{', '.join(duplicate_group_ids)}")
 
     valid_edges = []
     edge_id_counts = {}
@@ -393,6 +446,9 @@ def validate_canvas_layout(manifest: dict) -> dict:
             "unrelatedEdgeCrossingCount": crossing_count,
             "edgeThroughNodeCount": edge_through_node_count,
             "insufficientSpacingCount": insufficient_spacing_count,
+            "groupCount": len(groups),
+            "groupedNodeCount": len(grouped_node_ids),
+            "duplicateGroupMembershipCount": duplicate_group_membership_count,
         },
     }
 

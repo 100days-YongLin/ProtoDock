@@ -171,6 +171,45 @@ class UploadPackageTests(unittest.TestCase):
         self.assertTrue(any("重复业务连线" in issue for issue in result["issues"]))
         self.assertGreater(result["stats"]["duplicateEdgeCount"], 0)
 
+    def test_accepts_optional_canvas_groups(self):
+        manifest = project_manifest()
+        manifest["canvas"]["groups"] = [{
+            "id": "account",
+            "title": "账号绑定",
+            "rootNodeId": "node-login",
+            "nodeIds": ["node-login"],
+            "collapsed": False,
+        }]
+
+        result = server.validate_canvas_layout(manifest)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["stats"]["groupCount"], 1)
+        self.assertEqual(result["stats"]["groupedNodeCount"], 1)
+
+    def test_rejects_invalid_group_membership_and_root(self):
+        manifest = {
+            "project": {"devicePreset": "iphone-portrait"},
+            "pages": {"a": {}, "b": {}},
+            "canvas": {
+                "nodes": [
+                    {"id": "a", "pageId": "a", "x": 0, "y": 0},
+                    {"id": "b", "pageId": "b", "x": 600, "y": 0},
+                ],
+                "edges": [],
+                "groups": [
+                    {"id": "first", "title": "First", "rootNodeId": "missing", "nodeIds": ["a", "missing"]},
+                    {"id": "second", "title": "Second", "rootNodeId": "a", "nodeIds": ["a", "b"]},
+                ],
+            },
+        }
+
+        result = server.validate_canvas_layout(manifest)
+
+        self.assertTrue(any("不存在的节点" in issue for issue in result["issues"]))
+        self.assertTrue(any("rootNodeId" in issue for issue in result["issues"]))
+        self.assertEqual(result["stats"]["duplicateGroupMembershipCount"], 1)
+
     def test_builds_upload_url_from_valid_origin(self):
         self.assertEqual(
             server.configured_upload_url("http://100.113.173.18:6080/"),

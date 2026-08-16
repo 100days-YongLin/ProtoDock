@@ -15,6 +15,8 @@ PROTODOCK_PORT=6080 python3 server.py
 
 ProtoDock 上传包应与完整交付包分开生成。服务端会在导入前一次性检查 manifest 中全部 `entry`、`doc` 和 Canvas 完整性；缺失文件、非根目录相对路径、缺失或重复节点、悬空或重复连线、节点重叠会显示具体问题并停止导入。
 
+项目使用 `canvas.groups` 时，还会检查组 ID、组成员和主入口。重复组 ID、同一节点属于多个组、主入口不在组内或组引用不存在节点都会阻止上传；没有 groups 的旧项目保持兼容。
+
 连线交叉、连线穿过无关节点和节点间距不足属于布局质量警告。它们不会触发自动重排，上传完成后会在界面中明确提示。
 
 建议使用 `<project>-<version>-protodock-upload.zip` 与 `<project>-<version>-full-release.zip` 区分两类产物，完整交付包不要用于 ProtoDock 上传。

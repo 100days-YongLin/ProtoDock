@@ -25,7 +25,9 @@ prototype-project/
 
 ## Manifest
 
-`protodock.project.json` 持久化项目元信息、页面入口、画布节点、流程连线、文本说明和设备壳配置。
+`protodock.project.json` 持久化项目元信息、页面入口、画布节点、流程连线、页面组、文本说明和设备壳配置。
+
+`canvas.groups` 是可选字段。每个组记录 `id`、`title`、`rootNodeId`、`nodeIds` 和可选的 `collapsed`；旧项目没有该字段时无需迁移。
 
 ## Pages
 

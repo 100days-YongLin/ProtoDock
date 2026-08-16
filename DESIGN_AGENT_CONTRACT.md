@@ -23,7 +23,7 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 5. If using React/Vue/Vite, compile the design before handing it to ProtoDock.
 6. Prefer single-page static bundles for v1. Avoid runtime dev servers, API calls, or assets outside the project directory.
 7. Treat `protodock.project.json > project.id` as the only source of truth for project identity.
-8. Treat `canvas.nodes`, `canvas.edges`, and `canvas.notes` as user-owned ProtoDock layout state. Never regenerate, normalize, replace, or reorder them unless the user explicitly asks for canvas reset or re-layout.
+8. Treat `canvas.nodes`, `canvas.edges`, `canvas.notes`, and optional `canvas.groups` as user-owned ProtoDock layout state. Never regenerate, normalize, replace, or reorder them unless the user explicitly asks for canvas reset or re-layout.
 9. When adding a page to an existing manifest, merge by `pageId` or node `id`: append only missing nodes or edges, and preserve existing coordinates, anchor sides, notes, and unknown fields.
 10. Before writing `protodock.project.json`, create a timestamped backup at `protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json`. If backup fails, stop.
 11. Do not delete or overwrite user-authored pages, docs, or assets without explicit instruction.
@@ -72,6 +72,7 @@ Design agents should not update:
 - `canvas.edges[].fromSide`
 - `canvas.edges[].toSide`
 - `canvas.notes`
+- `canvas.groups`
 
 Those fields belong to ProtoDock and product-flow editing. The default behavior is preserve canvas. Use an explicit reset or re-layout option, such as `--reset-canvas`, only when the user asks for it.
 
@@ -85,6 +86,19 @@ Canvas quality is part of the prototype deliverable:
 - Non-shared-endpoint edge crossings should be zero. Unavoidable crossings, tight spacing, and paths through unrelated nodes must produce explicit warnings.
 - A layout tool may modify only `canvas`; it must preserve `pages`, `project.id`, and unknown fields.
 - Upload must never trigger an automatic re-layout.
+
+## Canvas Groups
+
+`canvas.groups` is optional so manifests created before grouping support remain valid. Each group represents one business module and contains:
+
+- a unique `id` and readable `title`;
+- one `rootNodeId` that is also present in `nodeIds`;
+- one or more unique node IDs;
+- an optional persisted `collapsed` state.
+
+A node may belong to at most one group. Group members and the root must reference existing canvas nodes. Agents must preserve existing groups by default and must not infer or rebuild group membership during a normal page export.
+
+Group-level layout is explicit and local: preview it first, back up the manifest, then update only member node coordinates after user confirmation. Focusing a group and switching its page tabs are viewing operations; they do not replace the group’s internal tree or business edges.
 
 ## Page Sizing
 

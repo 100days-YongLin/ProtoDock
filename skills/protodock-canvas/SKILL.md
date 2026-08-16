@@ -55,6 +55,7 @@ Before editing, read:
 ProtoDock canvas layout is user-owned state.
 
 - Never regenerate, normalize, replace, or reorder `canvas.nodes`, `canvas.edges`, or `canvas.notes` unless the user explicitly asks for canvas reset or re-layout.
+- Preserve optional `canvas.groups`; groups are product-manager-owned business partitions, not page-generation output.
 - Preserve node coordinates, edge sides, anchors, notes, and unknown fields.
 - When adding a page, append only the missing node or edge by `pageId` or node `id`.
 - Coordinates may be negative. Do not add positive-only clamps.
@@ -75,6 +76,9 @@ Treat a readable canvas as part of delivery quality, not as optional decoration.
 - Divide the canvas by top-level business module. Keep each module entry, page states, and detail or result pages in the same local region.
 - Prefer `module entry -> page state -> result/detail`. Never dump new pages at the bottom of the canvas or assign random coordinates.
 - Do not draw global Tab or sidebar navigation across modules. Draw only key task-flow actions. When several actions reach the same target, keep the primary path on canvas and document secondary paths in the page Markdown.
+- When `canvas.groups` exists, each group must have a unique `id`, readable `title`, a `rootNodeId` contained in `nodeIds`, and one or more existing node IDs. A node may belong to at most one group.
+- Old manifests without `canvas.groups` are valid and must not be migrated unless the user creates groups.
+- Group tabs are preview navigation only. They do not replace the group’s internal tree or business edges.
 
 ### Geometry and connections
 
@@ -88,10 +92,11 @@ Treat a readable canvas as part of delivery quality, not as optional decoration.
 - Normal build and export commands must not modify `canvas.nodes`, `canvas.edges`, or `canvas.notes`.
 - Only an explicit `--relayout`, `--reset-canvas`, or direct user request may update canvas layout. Back up the manifest first and modify only `canvas`; preserve `pages`, `project.id`, and unknown fields.
 - Layout automation must provide a preview before writing. Never silently re-layout during upload.
+- Group layout may update only member node coordinates after preview and confirmation; it must not move nodes in other groups.
 
 ### Upload gate
 
-Validate the final extracted ZIP and require: `pageCount === uniqueNodeCount`, zero duplicate or missing nodes, zero dangling or duplicate edges, zero node overlaps, valid edge endpoints, and all declared entry/doc files present.
+Validate the final extracted ZIP and require: `pageCount === uniqueNodeCount`, zero duplicate or missing nodes, zero dangling or duplicate edges, zero node overlaps, valid edge endpoints, valid group IDs/members/root nodes, and all declared entry/doc files present.
 
 Block upload for integrity failures. Report edge crossings, edges through unrelated nodes, and insufficient spacing as explicit layout warnings. “Every page previews” is not sufficient unless the canvas is also complete and readable.
 

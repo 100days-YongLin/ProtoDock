@@ -41,7 +41,7 @@ prototype-project/
 
 - `pages/**`、`docs/**`、`assets/**` 可以由 Agent 生成或更新。
 - `protodock.project.json` 中的 `project` 和 `pages` 可以由 Agent 按需更新。
-- `canvas.nodes`、`canvas.edges`、`canvas.notes` 默认视为用户在 ProtoDock 中编辑过的布局数据，Agent 不得整体重写。
+- `canvas.nodes`、`canvas.edges`、`canvas.notes`、`canvas.groups` 默认视为用户在 ProtoDock 中编辑过的布局数据，Agent 不得整体重写。
 - Agent 如需新增页面节点，只能按 `id` 或 `pageId` 增量追加缺失节点，并必须保留已有节点的 `x`、`y`、`fromSide`、`toSide`、锚点、说明文本以及未知字段。
 - 只有用户明确说“重排画布”“重建 flow”或“覆盖 canvas”时，Agent 才能重写 `canvas`。
 - 导出脚本默认必须 preserve canvas；只有显式参数如 `--reset-canvas` 才允许重排或替换整个 `canvas` 对象。
@@ -88,6 +88,22 @@ protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json
   }
 }
 ```
+
+`canvas.groups` 是可选字段，用于把一组页面节点组织成业务模块。旧项目不包含该字段时仍按原页面列表打开；新建组后 ProtoDock 会写入组 ID、组名、主入口、成员节点和折叠状态。
+
+```json
+"groups": [
+  {
+    "id": "group-life-record",
+    "title": "生活记录详情",
+    "rootNodeId": "node-life-daily",
+    "nodeIds": ["node-life-daily", "node-meal-detail", "node-nap-detail"],
+    "collapsed": false
+  }
+]
+```
+
+左侧“原型页面”按组显示树形层级。组支持折叠、聚焦、组内页面 Tab 和局部自动布局预览；应用局部布局前会先备份 manifest，并且只更新当前组节点坐标。
 
 ## 本地使用
 

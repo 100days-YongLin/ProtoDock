@@ -72,6 +72,7 @@ Agent 能说出 ZIP 根目录必须直接包含 `protodock.project.json`、`page
 - 这个项目是原型工作台，不是普通页面项目
 - 哪些文件可以生成或修改
 - 哪些画布状态必须保护
+- 页面组、组成员和主入口为什么不能被普通导出重建
 - 修改 `protodock.project.json` 前需要备份
 - 最终页面必须能被浏览器作为静态入口加载
 
@@ -125,6 +126,7 @@ Agent 默认不应该整体重写：
 - `canvas.nodes`
 - `canvas.edges`
 - `canvas.notes`
+- `canvas.groups`
 - 节点坐标
 - 锚点方向
 - 未知字段

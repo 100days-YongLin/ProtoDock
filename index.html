@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="./vendor/devices.css">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./canvas-groups.css">
 </head>
 <body>
   <main class="app">
@@ -98,9 +99,14 @@
         <section class="panel-section">
           <div class="panel-heading-row">
             <h2 class="panel-heading">原型页面</h2>
-            <button class="panel-icon-button" id="sortPagesButton" type="button" title="排序页面" aria-label="排序页面" aria-pressed="false" data-requires-project>
-              <i data-lucide="arrow-up-down"></i>
-            </button>
+            <div class="panel-heading-actions">
+              <button class="panel-icon-button" id="addGroupButton" type="button" title="新建页面组" aria-label="新建页面组" data-requires-project>
+                <i data-lucide="folder-plus"></i>
+              </button>
+              <button class="panel-icon-button" id="sortPagesButton" type="button" title="排序页面" aria-label="排序页面" aria-pressed="false" data-requires-project>
+                <i data-lucide="arrow-up-down"></i>
+              </button>
+            </div>
           </div>
           <ul class="doc-list page-list" id="pageList">
           </ul>
@@ -124,6 +130,7 @@
         </div>
 
         <div class="canvas-transform" id="canvasTransform">
+          <div class="group-mount" id="groupMount"></div>
           <svg class="edge-layer" id="edgeLayer" aria-hidden="true">
             <defs>
               <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -136,6 +143,13 @@
           <div class="edge-label-editor-mount" id="edgeLabelEditorMount"></div>
           <div id="nodeMount"></div>
           <div id="noteMount"></div>
+        </div>
+
+        <nav class="canvas-group-tabs" id="groupTabs" aria-label="组内页面" hidden></nav>
+        <div class="group-layout-review" id="groupLayoutReview" hidden>
+          <span id="groupLayoutReviewText">正在预览组内布局</span>
+          <button class="secondary compact" id="cancelGroupLayout" type="button">取消</button>
+          <button class="primary compact" id="applyGroupLayout" type="button">应用布局</button>
         </div>
 
         <div class="zoom-readout">
@@ -565,9 +579,49 @@
     </section>
   </div>
 
+  <div class="project-modal-backdrop" id="groupModal" hidden>
+    <section class="project-modal group-modal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="groupModalTitle">新建页面组</strong>
+          <span>一个组对应一个业务模块，组内保留页面树和关键流程。</span>
+        </div>
+        <button class="tool-button" id="closeGroupModal" title="关闭" aria-label="关闭">×</button>
+      </header>
+
+      <label class="group-name-field">
+        <span>组名称</span>
+        <input id="groupNameInput" type="text" maxlength="60" autocomplete="off" placeholder="例如：生活记录详情">
+      </label>
+
+      <section class="group-page-picker">
+        <header>
+          <strong>组内页面</strong>
+          <span id="groupPageCount">0 个页面</span>
+        </header>
+        <div id="groupPageOptions"></div>
+      </section>
+
+      <label class="group-root-field">
+        <span>主入口</span>
+        <select id="groupRootSelect"></select>
+      </label>
+
+      <div class="share-status" id="groupStatus" aria-live="polite">请选择至少一个页面</div>
+
+      <div class="action-row group-actions">
+        <button class="danger compact" id="deleteGroup" type="button" hidden>删除组</button>
+        <span></span>
+        <button class="secondary" id="cancelGroupModal" type="button">取消</button>
+        <button class="primary" id="saveGroup" type="button">保存组</button>
+      </div>
+    </section>
+  </div>
+
   <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
   <script src="./vendor/lucide.min.js"></script>
   <script src="./placement.js"></script>
+  <script src="./canvas-groups.js"></script>
   <script src="./zip.js"></script>
   <script src="./capture.js"></script>
   <script src="./capture-options.js"></script>
