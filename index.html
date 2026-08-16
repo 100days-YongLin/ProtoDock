@@ -104,14 +104,22 @@
               <button class="panel-icon-button" id="addGroupButton" type="button" title="新建页面组" aria-label="新建页面组" data-requires-project>
                 <i data-lucide="folder-plus"></i>
               </button>
-              <button class="panel-icon-button" id="sortPagesButton" type="button" title="排序页面" aria-label="排序页面" aria-pressed="false" data-requires-project>
-                <i data-lucide="arrow-up-down"></i>
-              </button>
+              <details class="panel-menu">
+                <summary class="panel-icon-button" title="更多页面操作" aria-label="更多页面操作">
+                  <i data-lucide="more-horizontal"></i>
+                </summary>
+                <div class="panel-menu-popover">
+                  <button id="sortPagesButton" type="button" aria-pressed="false" data-requires-project>
+                    <i data-lucide="arrow-up-down"></i>
+                    <span>调整页面顺序</span>
+                  </button>
+                </div>
+              </details>
             </div>
           </div>
           <label class="page-search" for="pageSearchInput">
             <i data-lucide="search"></i>
-            <input id="pageSearchInput" type="search" autocomplete="off" placeholder="搜索页面或路径" aria-label="搜索原型页面" disabled>
+            <input id="pageSearchInput" type="search" autocomplete="off" placeholder="搜索页面" aria-label="搜索原型页面" disabled>
             <button id="pageSearchClear" type="button" title="清除搜索" aria-label="清除搜索" hidden><i data-lucide="x"></i></button>
           </label>
           <ul class="doc-list page-list" id="pageList">

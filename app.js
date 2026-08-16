@@ -1513,6 +1513,7 @@ function renderPageListItem(node, index) {
         <strong>${index + 1}. ${escapeHtml(page.title || node.pageId)}</strong>
         <span>${escapeHtml(page.entry || '未设置入口')}</span>
       </span>
+      <i class="page-list-locate" data-lucide="locate-fixed" aria-hidden="true"></i>
     </li>
   `;
 }
@@ -1564,12 +1565,20 @@ function renderPageList() {
             <strong>${escapeHtml(group.title)}</strong>
             <span>${query && matchingMembers.length !== members.length ? `${matchingMembers.length} / ${members.length}` : members.length} 个页面</span>
           </span>
-          <button type="button" data-group-layout="${escapeHtml(group.id)}" title="预览组内布局" aria-label="预览组内布局" ${state.readOnly ? 'disabled' : ''}>
-            <i data-lucide="layout-template"></i>
-          </button>
-          <button type="button" data-group-edit="${escapeHtml(group.id)}" title="编辑页面组" aria-label="编辑页面组" ${state.readOnly ? 'disabled' : ''}>
-            <i data-lucide="settings-2"></i>
-          </button>
+          <details class="page-group-menu" name="page-group-menu">
+            <summary title="页面组操作" aria-label="页面组操作"><i data-lucide="more-horizontal"></i></summary>
+            <div class="page-group-menu-popover">
+              <button type="button" data-group-focus="${escapeHtml(group.id)}">
+                <i data-lucide="locate-fixed"></i><span>定位主入口</span>
+              </button>
+              <button type="button" data-group-layout="${escapeHtml(group.id)}" ${state.readOnly ? 'disabled' : ''}>
+                <i data-lucide="layout-template"></i><span>预览组内布局</span>
+              </button>
+              <button type="button" data-group-edit="${escapeHtml(group.id)}" ${state.readOnly ? 'disabled' : ''}>
+                <i data-lucide="settings-2"></i><span>编辑页面组</span>
+              </button>
+            </div>
+          </details>
         </div>
         <ul class="page-group-pages" ${isCollapsed ? 'hidden' : ''}>
           ${matchingMembers.map((node) => renderPageListItem(node, nodeIndex.get(node.id))).join('')}
@@ -3931,6 +3940,7 @@ function setPageSortMode(enabled) {
   state.draggingPageNodeId = null;
   els.sortPagesButton?.classList.toggle('active', state.pageSortMode);
   els.sortPagesButton?.setAttribute('aria-pressed', String(state.pageSortMode));
+  els.sortPagesButton?.closest('details')?.removeAttribute('open');
   renderPageList();
   setStatus(state.pageSortMode ? '拖拽左侧页面调整顺序' : '已退出页面排序');
 }
@@ -4222,11 +4232,22 @@ function bindGlobalEvents() {
     }
     const layout = event.target.closest('[data-group-layout]');
     if (layout) {
+      layout.closest('details')?.removeAttribute('open');
       previewGroupLayout(layout.dataset.groupLayout);
+      return;
+    }
+    const focus = event.target.closest('[data-group-focus]');
+    if (focus) {
+      focus.closest('details')?.removeAttribute('open');
+      const group = groupById(focus.dataset.groupFocus);
+      if (group) {
+        selectPageFromList(group.rootNodeId);
+      }
       return;
     }
     const edit = event.target.closest('[data-group-edit]');
     if (edit) {
+      edit.closest('details')?.removeAttribute('open');
       openGroupModal(edit.dataset.groupEdit);
       return;
     }
@@ -4247,6 +4268,14 @@ function bindGlobalEvents() {
       els.pageSearchInput.focus();
     }
     renderPageList();
+  });
+  document.addEventListener('click', (event) => {
+    const currentMenu = event.target.closest('.panel-menu, .page-group-menu');
+    document.querySelectorAll('.panel-menu[open], .page-group-menu[open]').forEach((menu) => {
+      if (menu !== currentMenu) {
+        menu.removeAttribute('open');
+      }
+    });
   });
 
   els.canvasShell.addEventListener('pointerdown', (event) => {
