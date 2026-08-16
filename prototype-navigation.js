@@ -196,8 +196,24 @@
   }
 
   function backFallbackForControl(manifest, control) {
-    const fallback = String(control?.getAttribute?.('data-protodock-back') || '').trim();
-    return pageExists(manifest, fallback) ? fallback : null;
+    const explicitFallback = String(control?.getAttribute?.('data-protodock-back') || '').trim();
+    if (pageExists(manifest, explicitFallback)) {
+      return explicitFallback;
+    }
+    const legacyAttributes = [
+      'data-protodock-page',
+      'data-protodock-target',
+      'data-page',
+      'data-page-id',
+      'data-target-page'
+    ];
+    for (const attribute of legacyAttributes) {
+      const legacyFallback = String(control?.getAttribute?.(attribute) || '').trim();
+      if (pageExists(manifest, legacyFallback)) {
+        return legacyFallback;
+      }
+    }
+    return null;
   }
 
   function isBackControl(control) {

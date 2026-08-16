@@ -108,10 +108,17 @@ const legacyBackControl = {
     return false;
   },
   getAttribute(name) {
-    return name === 'class' ? 'header-back-button' : (name === 'aria-label' ? '返回' : null);
+    if (name === 'class') {
+      return 'header-back-button';
+    }
+    if (name === 'aria-label') {
+      return '返回';
+    }
+    return name === 'data-protodock-page' ? 'home' : null;
   }
 };
 assert.equal(ProtoDockNavigation.isBackControl(legacyBackControl), true);
+assert.equal(ProtoDockNavigation.backFallbackForControl(manifest, legacyBackControl), 'home');
 
 const legacyControl = {
   tagName: 'BUTTON',
