@@ -202,7 +202,6 @@
   font-size: 11px;
 }
 
-.canvas-group-tabs,
 .group-layout-review {
   position: absolute;
   top: 16px;
@@ -211,50 +210,19 @@
   display: flex;
   max-width: min(720px, calc(100% - 360px));
   align-items: center;
-  gap: 4px;
-  overflow-x: auto;
+  gap: 8px;
+  overflow: visible;
   transform: translateX(-50%);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.94);
-  padding: 4px;
+  padding: 6px 8px 6px 12px;
   box-shadow: 0 8px 24px rgba(23, 32, 51, 0.1);
   backdrop-filter: saturate(180%) blur(20px);
 }
 
-.canvas-group-tabs[hidden],
 .group-layout-review[hidden] {
   display: none;
-}
-
-.canvas-group-tabs button {
-  flex: 0 0 auto;
-  height: 30px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  padding: 0 10px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.canvas-group-tabs > strong {
-  flex: 0 0 auto;
-  padding: 0 8px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.canvas-group-tabs button.active {
-  background: var(--text);
-  color: #fff;
-}
-
-.group-layout-review {
-  gap: 8px;
-  overflow: visible;
-  padding: 6px 8px 6px 12px;
 }
 
 .group-layout-review span {
@@ -360,7 +328,6 @@
 }
 
 @media (max-width: 900px) {
-  .canvas-group-tabs,
   .group-layout-review {
     top: 62px;
     max-width: calc(100% - 24px);

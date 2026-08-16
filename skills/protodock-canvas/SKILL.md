@@ -89,7 +89,7 @@ Treat a readable canvas as part of delivery quality, not as optional decoration.
 - Do not draw global Tab or sidebar navigation across modules. Draw only key task-flow actions. When several actions reach the same target, keep the primary path on canvas and document secondary paths in the page Markdown.
 - When `canvas.groups` exists, each group must have a unique `id`, readable `title`, a `rootNodeId` contained in `nodeIds`, and one or more existing node IDs. A node may belong to at most one group.
 - Old manifests without `canvas.groups` are valid and must not be migrated unless the user creates groups.
-- Group tabs are preview navigation only. They do not replace the group’s internal tree or business edges.
+- Page navigation belongs in the left page tree. Do not add group tabs or other duplicate navigation overlays on top of the Canvas.
 
 ### Legacy group migration
 

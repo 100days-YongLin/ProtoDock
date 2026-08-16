@@ -38,7 +38,6 @@ const els = {
   groupMount: document.getElementById('groupMount'),
   nodeMount: document.getElementById('nodeMount'),
   noteMount: document.getElementById('noteMount'),
-  groupTabs: document.getElementById('groupTabs'),
   groupLayoutReview: document.getElementById('groupLayoutReview'),
   groupLayoutReviewText: document.getElementById('groupLayoutReviewText'),
   cancelGroupLayout: document.getElementById('cancelGroupLayout'),
@@ -1604,28 +1603,6 @@ function renderGroupFrames(nodes = renderedCanvasNodes()) {
   }).join('');
 }
 
-function renderGroupTabs() {
-  if (!els.groupTabs || !state.manifest || state.groupLayoutPreview) {
-    if (els.groupTabs) {
-      els.groupTabs.hidden = true;
-    }
-    return;
-  }
-  const group = groupForNodeId(state.selectedNodeId);
-  if (!group) {
-    els.groupTabs.hidden = true;
-    els.groupTabs.innerHTML = '';
-    return;
-  }
-  const nodeById = new Map(state.manifest.canvas.nodes.map((node) => [node.id, node]));
-  els.groupTabs.innerHTML = `<strong>${escapeHtml(group.title)}</strong>${group.nodeIds.map((nodeId) => {
-    const node = nodeById.get(nodeId);
-    const page = node ? pageForNode(node) : null;
-    return node ? `<button class="${node.id === state.selectedNodeId ? 'active' : ''}" type="button" data-group-tab-node="${escapeHtml(node.id)}">${escapeHtml(page?.title || node.pageId)}</button>` : '';
-  }).join('')}`;
-  els.groupTabs.hidden = false;
-}
-
 function renderProjectActions() {
   const hasProject = !!state.manifest;
   const canEdit = canEditProject();
@@ -1859,7 +1836,6 @@ function renderCanvas() {
     els.nodeMount.innerHTML = '';
     els.noteMount.innerHTML = '';
     els.edgeLayer.innerHTML = markerDefs();
-    els.groupTabs.hidden = true;
     els.groupLayoutReview.hidden = true;
     renderEdgeLabelEditor();
     renderChrome();
@@ -1873,7 +1849,6 @@ function renderCanvas() {
   renderEdges();
   bindRenderedCanvas();
   renderChrome();
-  renderGroupTabs();
   renderGroupLayoutReview();
   updateInspector();
   updateZoom();
@@ -2187,7 +2162,6 @@ function selectNode(id) {
   document.querySelectorAll('.text-note').forEach((note) => note.classList.remove('selected'));
   renderEdges();
   renderPageList();
-  renderGroupTabs();
   updateInspector();
 }
 
@@ -3712,7 +3686,7 @@ async function applyGroupLayoutPreview() {
   markDirty('组内布局已应用，仅更新当前组节点');
 }
 
-function selectGroupTab(nodeId) {
+function selectPageFromList(nodeId) {
   selectNode(nodeId);
   centerNode(nodeId);
 }
@@ -4146,12 +4120,6 @@ function bindGlobalEvents() {
   els.groupPageOptions?.addEventListener('change', () => syncGroupRootOptions());
   els.cancelGroupLayout?.addEventListener('click', cancelGroupLayoutPreview);
   els.applyGroupLayout?.addEventListener('click', applyGroupLayoutPreview);
-  els.groupTabs?.addEventListener('click', (event) => {
-    const tab = event.target.closest('[data-group-tab-node]');
-    if (tab) {
-      selectGroupTab(tab.dataset.groupTabNode);
-    }
-  });
   buttons.zoomIn?.addEventListener('click', () => zoomFromCenter(0.1));
   buttons.zoomOut?.addEventListener('click', () => zoomFromCenter(-0.1));
   els.inspectorResizer?.addEventListener('pointerdown', (event) => {
@@ -4264,7 +4232,7 @@ function bindGlobalEvents() {
     }
     const item = event.target.closest('[data-page-node]');
     if (item && !state.pageSortMode) {
-      await selectGroupTab(item.dataset.pageNode);
+      selectPageFromList(item.dataset.pageNode);
     }
   });
   els.pageList?.addEventListener('pointerdown', beginPageSortDrag);
