@@ -114,6 +114,27 @@
     return matches.length === 1 ? matches[0][0] : null;
   }
 
+  function navigationForFrameLocation(manifest, currentPageId, href) {
+    let url;
+    try {
+      url = new URL(href, global.location?.href || 'http://localhost/');
+    } catch (error) {
+      return null;
+    }
+    if (url.protocol === 'about:') {
+      return null;
+    }
+    const pageId = pageIdForHref(manifest, currentPageId, url.href);
+    if (!pageId || pageId === currentPageId) {
+      return null;
+    }
+    return {
+      pageId,
+      url: url.href,
+      suffix: `${url.search}${url.hash}`
+    };
+  }
+
   function routeForLabel(routes, label) {
     const normalizedLabel = normalizeText(label);
     const normalizedAction = actionText(label);
@@ -187,6 +208,21 @@
       try {
         const documentForFrame = frame.contentDocument;
         if (!documentForFrame) {
+          return;
+        }
+        const current = frame.__protoDockNavigationOptions;
+        const redirected = navigationForFrameLocation(
+          current?.manifest,
+          current?.pageId,
+          documentForFrame.location?.href
+        );
+        if (redirected) {
+          global.setTimeout(() => {
+            const latest = frame.__protoDockNavigationOptions;
+            if (latest?.pageId === current?.pageId) {
+              latest.onNavigate(redirected.pageId, 'location', redirected);
+            }
+          }, 0);
           return;
         }
         if (documentForFrame.__protoDockNavigationState) {
@@ -287,6 +323,7 @@
     routesForPage,
     resolveRelativeEntry,
     pageIdForHref,
+    navigationForFrameLocation,
     routeForLabel,
     controlForEvent,
     routeForControl,

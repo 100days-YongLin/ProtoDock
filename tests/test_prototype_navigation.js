@@ -7,7 +7,8 @@ const manifest = {
   pages: {
     home: { entry: 'pages/home/index.html' },
     reader: { entry: 'pages/reader/index.html' },
-    character: { entry: 'pages/reader-character/index.html' }
+    character: { entry: 'pages/reader-character/index.html' },
+    record: { entry: 'pages/record/index.html' }
   },
   canvas: {
     nodes: [
@@ -31,6 +32,18 @@ assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', '../reader-ch
 assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', '/pages/reader-character/index'), 'character');
 assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', 'protodock:home'), 'home');
 assert.equal(ProtoDockNavigation.pageIdForHref(manifest, 'reader', 'protodock:missing'), null);
+assert.deepEqual(
+  ProtoDockNavigation.navigationForFrameLocation(
+    manifest,
+    'reader',
+    'http://localhost/pages/record/index.html?type=milk'
+  ),
+  {
+    pageId: 'record',
+    url: 'http://localhost/pages/record/index.html?type=milk',
+    suffix: '?type=milk'
+  }
+);
 assert.equal(ProtoDockNavigation.pageIdFromMessage(
   { source: 'frame-window', data: { type: 'protodock:navigate', pageId: 'reader' } },
   { contentWindow: 'frame-window' },
@@ -149,5 +162,36 @@ assert.equal(documentClickCapture, true);
 assert.equal(prevented, true);
 assert.equal(stopped, true);
 assert.equal(navigatedPageId, 'home');
+
+let recoveredNavigation = null;
+const redirectedFrame = {
+  dataset: {},
+  contentDocument: {
+    location: { href: 'http://localhost/pages/record/index.html?type=milk' }
+  },
+  contentWindow: {},
+  addEventListener() {}
+};
+global.setTimeout = (callback) => {
+  callback();
+  return 1;
+};
+ProtoDockNavigation.bindFrame(redirectedFrame, {
+  manifest,
+  pageId: 'reader',
+  onNavigate(pageId, source, navigation) {
+    recoveredNavigation = { pageId, source, navigation };
+  }
+});
+global.setTimeout = originalSetTimeout;
+assert.deepEqual(recoveredNavigation, {
+  pageId: 'record',
+  source: 'location',
+  navigation: {
+    pageId: 'record',
+    url: 'http://localhost/pages/record/index.html?type=milk',
+    suffix: '?type=milk'
+  }
+});
 
 console.log('prototype navigation tests passed');

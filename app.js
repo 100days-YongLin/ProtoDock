@@ -262,6 +262,7 @@ const state = {
   playbackIndex: 0,
   playbackActive: false,
   playbackJobId: null,
+  playbackLocationSuffix: '',
   edgeFrameId: null,
   minimapFrameId: null,
   isSettingEditorValue: false,
@@ -1106,13 +1107,41 @@ async function rewriteCssUrls(cssText, cssDir, nodeId) {
   return rewritten;
 }
 
-async function rewriteHtmlForLocalPreview(html, entryPath, nodeId) {
+function normalizedNavigationSuffix(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return '';
+  }
+  try {
+    const url = new URL(normalized, window.location.href);
+    return `${url.search}${url.hash}`;
+  } catch (error) {
+    return '';
+  }
+}
+
+async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {}) {
   const entryDir = dirname(entryPath);
   const documentForPreview = new DOMParser().parseFromString(html, 'text/html');
   const head = documentForPreview.head || documentForPreview.documentElement;
   const guardStyle = documentForPreview.createElement('style');
   guardStyle.textContent = 'html,body{margin:0;}a{cursor:default;}';
   head.prepend(guardStyle);
+  const locationSuffix = normalizedNavigationSuffix(options.locationSuffix);
+  if (locationSuffix) {
+    const locationScript = documentForPreview.createElement('script');
+    const injectedSearch = new URL(locationSuffix, window.location.href).search;
+    locationScript.textContent = `(() => {
+      const injectedSearch = ${JSON.stringify(injectedSearch)};
+      const NativeURLSearchParams = window.URLSearchParams;
+      window.URLSearchParams = class ProtoDockURLSearchParams extends NativeURLSearchParams {
+        constructor(value) {
+          super(value === window.location.search && !value ? injectedSearch : value);
+        }
+      };
+    })();`;
+    head.prepend(locationScript);
+  }
 
   const linkNodes = Array.from(documentForPreview.querySelectorAll('link[href]'));
   for (const link of linkNodes) {
@@ -1180,7 +1209,7 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId) {
   return `<!doctype html>\n${documentForPreview.documentElement.outerHTML}`;
 }
 
-async function buildPreviewIframe(node, className = 'prototype-frame') {
+async function buildPreviewIframe(node, className = 'prototype-frame', options = {}) {
   const page = pageForNode(node);
   const iframe = document.createElement('iframe');
   iframe.className = className;
@@ -1188,10 +1217,17 @@ async function buildPreviewIframe(node, className = 'prototype-frame') {
   iframe.loading = 'lazy';
 
   if (state.projectBaseUrl) {
-    iframe.src = new URL(page.entry, state.projectBaseUrl).toString();
+    const entryUrl = new URL(page.entry, state.projectBaseUrl);
+    const locationSuffix = normalizedNavigationSuffix(options.locationSuffix);
+    if (locationSuffix) {
+      const routedUrl = new URL(locationSuffix, entryUrl);
+      entryUrl.search = routedUrl.search;
+      entryUrl.hash = routedUrl.hash;
+    }
+    iframe.src = entryUrl.toString();
   } else {
     const html = await readTextFile(page.entry);
-    iframe.srcdoc = await rewriteHtmlForLocalPreview(html, page.entry, node.id);
+    iframe.srcdoc = await rewriteHtmlForLocalPreview(html, page.entry, node.id, options);
   }
 
   return iframe;
@@ -1318,7 +1354,9 @@ async function hydratePlaybackPreview(node) {
   mount.innerHTML = '<div class="preview-loading">加载中</div>';
 
   try {
-    const iframe = await buildPreviewIframe(node, 'playback-frame');
+    const iframe = await buildPreviewIframe(node, 'playback-frame', {
+      locationSuffix: state.playbackLocationSuffix
+    });
     window.ProtoDockNavigation?.bindFrame(iframe, {
       manifest: state.manifest,
       pageId: node.pageId,
@@ -3878,6 +3916,7 @@ function startPlayback() {
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.playbackActive = true;
   state.playbackIndex = 0;
+  state.playbackLocationSuffix = '';
   els.inspector?.classList.add('is-playback');
   if (els.playbackPanel) {
     els.playbackPanel.hidden = false;
@@ -3894,6 +3933,7 @@ function stopPlayback() {
   }
   state.playbackActive = false;
   state.playbackJobId = null;
+  state.playbackLocationSuffix = '';
   els.inspector?.classList.remove('is-playback');
   if (els.playbackPanel) {
     els.playbackPanel.hidden = true;
@@ -3952,10 +3992,11 @@ function stepPlayback(delta) {
     return;
   }
   state.playbackIndex = nextIndex;
+  state.playbackLocationSuffix = '';
   renderPlayback();
 }
 
-function navigatePlaybackToPage(pageId) {
+function navigatePlaybackToPage(pageId, source, navigation = null) {
   if (!state.playbackActive || !state.manifest) {
     return;
   }
@@ -3964,6 +4005,9 @@ function navigatePlaybackToPage(pageId) {
     return;
   }
   state.playbackIndex = index;
+  state.playbackLocationSuffix = source === 'location'
+    ? normalizedNavigationSuffix(navigation?.suffix || navigation?.url)
+    : '';
   renderPlayback();
   setStatus(`已进入 ${pageForNode(state.manifest.canvas.nodes[index]).title || pageId}`);
 }

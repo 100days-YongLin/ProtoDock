@@ -74,6 +74,7 @@
     index: 0,
     preset: devicePresets['iphone-portrait'],
     shellKey: '',
+    locationSuffix: '',
     mobileControlsCollapsed: true,
     controlsTimer: null
   };
@@ -106,6 +107,19 @@
       return value;
     }
     return new URL(value.replace(/^\/+/, ''), state.shareBaseUrl).toString();
+  }
+
+  function normalizedNavigationSuffix(value) {
+    const normalized = String(value || '').trim();
+    if (!normalized) {
+      return '';
+    }
+    try {
+      const url = new URL(normalized, window.location.href);
+      return `${url.search}${url.hash}`;
+    } catch (error) {
+      return '';
+    }
   }
 
   function escapeHtml(value) {
@@ -475,7 +489,13 @@
     const frame = frameElement();
     if (frame) {
       bindFrameInteractions(frame);
-      const nextSrc = projectFileUrl(page.entry);
+      const entryUrl = new URL(projectFileUrl(page.entry));
+      if (state.locationSuffix) {
+        const routedUrl = new URL(state.locationSuffix, entryUrl);
+        entryUrl.search = routedUrl.search;
+        entryUrl.hash = routedUrl.hash;
+      }
+      const nextSrc = entryUrl.toString();
       if (frame.getAttribute('src') !== nextSrc) {
         frame.src = nextSrc;
       }
@@ -486,19 +506,20 @@
     scheduleControlsAutoCollapse();
   }
 
-  function goToPage(index) {
+  function goToPage(index, navigation = null) {
     const nextIndex = Number(index);
     if (!Number.isFinite(nextIndex)) {
       return;
     }
     state.index = Math.min(Math.max(nextIndex, 0), state.pages.length - 1);
+    state.locationSuffix = normalizedNavigationSuffix(navigation?.suffix || navigation?.url);
     renderCurrentPage();
   }
 
-  function goToPageById(pageId) {
+  function goToPageById(pageId, source, navigation = null) {
     const index = state.pages.findIndex((page) => page.pageId === pageId);
     if (index >= 0) {
-      goToPage(index);
+      goToPage(index, source === 'location' ? navigation : null);
     }
   }
 
@@ -523,6 +544,7 @@
     state.pages = orderedPages(manifest);
     state.index = 0;
     state.shellKey = '';
+    state.locationSuffix = '';
     state.mobileControlsCollapsed = true;
     renderOptions();
     renderCurrentPage();
