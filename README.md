@@ -206,7 +206,7 @@ http://<server-ip>:6080/index.html
 
 首页的“打开项目”会提供三种来源：
 
-- `打开本地项目`：选择包含 `protodock.project.json` 的本地目录，可编辑并保存。
+- `打开本地项目`：点击选择或直接拖入包含 `protodock.project.json` 的项目文件夹，可编辑并保存。拖拽只接受一个文件夹，且清单必须位于文件夹根目录；浏览器不支持文件夹拖拽时，仍可点击选择目录。
 - `打开公开预览`：读取 `GET /api/shares`，列出当前服务上已经上传过的分享项目，点击后进入对应 `/s/<share-id>` 公开预览。
 - `从 GitHub 仓库打开`：填写 GitHub 仓库地址、分支和可选项目路径。服务端会下载指定分支中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 公开预览。分支为必填；项目路径留空时默认读取仓库根目录。浏览器会记住上一次成功打开时使用的这三项。
 

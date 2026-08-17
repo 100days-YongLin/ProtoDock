@@ -104,6 +104,7 @@ const els = {
   conflictModalTitle: document.getElementById('conflictModalTitle'),
   conflictModalDescription: document.getElementById('conflictModalDescription'),
   openProjectModal: document.getElementById('openProjectModal'),
+  openLocalProjectStatus: document.getElementById('openLocalProjectStatus'),
   githubOpenRepo: document.getElementById('githubOpenRepo'),
   githubOpenBranch: document.getElementById('githubOpenBranch'),
   githubOpenProjectPath: document.getElementById('githubOpenProjectPath'),
@@ -3400,6 +3401,37 @@ async function loadManifestText(text, options = {}) {
   startManifestWatcher();
 }
 
+function localProjectErrorMessage(error) {
+  if (error?.name === 'NotFoundError') {
+    return `项目根目录缺少 ${MANIFEST_FILE}`;
+  }
+  if (error?.name === 'NotAllowedError') {
+    return '需要授予项目文件夹读写权限';
+  }
+  return error?.message || `未找到 ${MANIFEST_FILE}`;
+}
+
+async function loadLocalProjectHandle(handle) {
+  if (!handle || handle.kind !== 'directory') {
+    throw new Error('请选择一个项目文件夹');
+  }
+  const hasPermission = await window.ProtoDockProjectDrop?.ensureReadWritePermission?.(handle);
+  if (hasPermission === false) {
+    const error = new Error('需要授予项目文件夹读写权限');
+    error.name = 'NotAllowedError';
+    throw error;
+  }
+  const manifestHandle = await handle.getFileHandle(MANIFEST_FILE);
+  const text = await (await manifestHandle.getFile()).text();
+  await loadManifestText(text, {
+    projectHandle: handle,
+    manifestHandle,
+    projectDirectoryName: handle.name,
+    readOnly: false
+  });
+  setStatus(`已打开 ${handle.name}`);
+}
+
 async function openProjectDirectory() {
   if (!window.showDirectoryPicker) {
     setStatus('当前浏览器不支持目录读写，请使用 Chrome / Edge');
@@ -3407,19 +3439,11 @@ async function openProjectDirectory() {
   }
   try {
     const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    const manifestHandle = await handle.getFileHandle(MANIFEST_FILE);
-    const text = await (await manifestHandle.getFile()).text();
-    await loadManifestText(text, {
-      projectHandle: handle,
-      manifestHandle,
-      projectDirectoryName: handle.name,
-      readOnly: false
-    });
-    setStatus(`已打开 ${handle.name}`);
+    await loadLocalProjectHandle(handle);
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.error(error);
-      setStatus(`打开失败：${error.message || '未找到 protodock.project.json'}`);
+      setStatus(`打开失败：${localProjectErrorMessage(error)}`);
     }
   }
 }
@@ -3480,6 +3504,10 @@ function openProjectMenuModal() {
   if (els.githubOpenStatus) {
     els.githubOpenStatus.textContent = '等待填写仓库地址和分支';
   }
+  if (els.openLocalProjectStatus) {
+    els.openLocalProjectStatus.textContent = `选择或拖入包含 ${MANIFEST_FILE} 的项目文件夹，可编辑并保存。`;
+  }
+  buttons.openLocalProjectFromMenu?.classList.remove('is-drag-over', 'is-loading', 'is-error');
   els.openProjectModal.hidden = false;
   buttons.openLocalProjectFromMenu?.focus();
 }
@@ -3487,6 +3515,33 @@ function openProjectMenuModal() {
 function closeProjectMenuModal() {
   if (els.openProjectModal) {
     els.openProjectModal.hidden = true;
+  }
+}
+
+async function openDroppedProjectDirectory(handle) {
+  try {
+    await loadLocalProjectHandle(handle);
+    closeProjectMenuModal();
+  } catch (error) {
+    throw new Error(localProjectErrorMessage(error));
+  }
+}
+
+function updateLocalProjectDropState(status, message = '') {
+  const target = buttons.openLocalProjectFromMenu;
+  if (!target || !els.openLocalProjectStatus) {
+    return;
+  }
+  target.classList.toggle('is-loading', status === 'loading');
+  target.classList.toggle('is-error', status === 'error');
+  if (status === 'dragging') {
+    els.openLocalProjectStatus.textContent = '松开即可打开这个项目文件夹';
+  } else if (status === 'loading') {
+    els.openLocalProjectStatus.textContent = '正在读取项目文件夹...';
+  } else if (status === 'error') {
+    els.openLocalProjectStatus.textContent = `打开失败：${message}`;
+  } else if (status === 'idle') {
+    els.openLocalProjectStatus.textContent = `选择或拖入包含 ${MANIFEST_FILE} 的项目文件夹，可编辑并保存。`;
   }
 }
 
@@ -4459,6 +4514,10 @@ function bindGlobalEvents() {
   buttons.openLocalProjectFromMenu?.addEventListener('click', openLocalProjectFromMenu);
   buttons.openPublicPreviewFromMenu?.addEventListener('click', openPublicPreviewFromMenu);
   buttons.openGithubProject?.addEventListener('click', openGithubProjectFromMenu);
+  window.ProtoDockProjectDrop?.bindDirectoryDropTarget?.(buttons.openLocalProjectFromMenu, {
+    onDirectory: openDroppedProjectDirectory,
+    onState: updateLocalProjectDropState
+  });
   buttons.newProject?.addEventListener('click', openNewProjectModal);
   buttons.startNewProject?.addEventListener('click', openNewProjectModal);
   buttons.saveProject?.addEventListener('click', saveProject);
@@ -4774,6 +4833,7 @@ window.ProtoDock = {
     };
   },
   openProjectDirectory,
+  openDroppedProjectDirectory,
   renameProject,
   saveProject,
   reloadProject,
