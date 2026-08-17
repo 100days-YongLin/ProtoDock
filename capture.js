@@ -162,6 +162,8 @@
       ...Array.from(documentRef.documentElement?.querySelectorAll?.('*') || [])
     ];
     const clonedElements = [clone, ...Array.from(clone.querySelectorAll?.('*') || [])];
+    const sourceIndexes = new Map(sourceElements.map((element, index) => [element, index]));
+    const expandedAncestors = new Set();
     sourceElements.forEach((source, index) => {
       const target = clonedElements[index];
       const scrollHeight = Number(source.scrollHeight || 0);
@@ -172,6 +174,21 @@
       target.style.setProperty('height', `${scrollHeight}px`, 'important');
       target.style.setProperty('max-height', 'none', 'important');
       target.style.setProperty('overflow-y', 'visible', 'important');
+
+      for (let ancestor = source.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        if (ancestor === documentRef.body || ancestor === documentRef.documentElement) {
+          break;
+        }
+        const ancestorIndex = sourceIndexes.get(ancestor);
+        const clonedAncestor = clonedElements[ancestorIndex];
+        if (!clonedAncestor?.style || expandedAncestors.has(clonedAncestor)) {
+          continue;
+        }
+        expandedAncestors.add(clonedAncestor);
+        clonedAncestor.style.setProperty('height', 'auto', 'important');
+        clonedAncestor.style.setProperty('max-height', 'none', 'important');
+        clonedAncestor.style.setProperty('overflow-y', 'visible', 'important');
+      }
     });
   }
 

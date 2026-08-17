@@ -69,16 +69,27 @@ function styleRecorder() {
   };
 }
 
-const sourceChild = element({ scrollHeight: 200, clientHeight: 200 });
-const sourceRoot = element({ scrollHeight: 1200, clientHeight: 830 });
-sourceRoot.querySelectorAll = () => [sourceChild];
-const cloneChild = { style: styleRecorder() };
+const sourceScroller = element({ scrollHeight: 1200, clientHeight: 700 });
+const sourceWrapper = element({ scrollHeight: 700, clientHeight: 700 });
+const sourceBody = element({ scrollHeight: 700, clientHeight: 700 });
+const sourceRoot = element({ scrollHeight: 830, clientHeight: 830 });
+sourceScroller.parentElement = sourceWrapper;
+sourceWrapper.parentElement = sourceBody;
+sourceBody.parentElement = sourceRoot;
+sourceRoot.querySelectorAll = () => [sourceBody, sourceWrapper, sourceScroller];
+const cloneBody = { style: styleRecorder() };
+const cloneWrapper = { style: styleRecorder() };
+const cloneScroller = { style: styleRecorder() };
 const cloneRoot = {
   style: styleRecorder(),
-  querySelectorAll: () => [cloneChild]
+  querySelectorAll: () => [cloneBody, cloneWrapper, cloneScroller]
 };
-ProtoDockCapture.expandScrollableClones({ documentElement: sourceRoot }, cloneRoot);
-assert.equal(cloneRoot.style.values.get('height'), '1200px');
-assert.equal(cloneChild.style.values.has('height'), false);
+ProtoDockCapture.expandScrollableClones({ documentElement: sourceRoot, body: sourceBody }, cloneRoot);
+assert.equal(cloneScroller.style.values.get('height'), '1200px');
+assert.equal(cloneScroller.style.values.get('overflow-y'), 'visible');
+assert.equal(cloneWrapper.style.values.get('height'), 'auto');
+assert.equal(cloneWrapper.style.values.get('overflow-y'), 'visible');
+assert.equal(cloneBody.style.values.has('height'), false);
+assert.equal(cloneRoot.style.values.has('height'), false);
 
 console.log('capture tests passed');
