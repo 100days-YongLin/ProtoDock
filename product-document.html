@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>完整产品文档 · ProtoDock</title>
+  <link rel="icon" type="image/png" href="./assets/protodock-icon.png">
+  <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
+  <link rel="stylesheet" href="./product-document.css">
+</head>
+<body>
+  <header class="document-header">
+    <div class="document-brand">
+      <img src="./assets/protodock-icon.png" alt="">
+      <strong>完整产品文档</strong>
+    </div>
+    <div class="document-project-name" id="documentProjectName">正在准备文档</div>
+    <div class="document-actions">
+      <span class="document-progress" id="documentProgress" aria-live="polite">等待项目数据</span>
+      <button class="icon-button" id="toggleOutline" type="button" title="查看目录" aria-label="查看目录" aria-expanded="false">
+        <i data-lucide="list"></i>
+      </button>
+      <button class="icon-button" id="printDocument" type="button" title="打印或导出 PDF" aria-label="打印或导出 PDF" disabled>
+        <i data-lucide="printer"></i>
+      </button>
+    </div>
+  </header>
+
+  <div class="document-layout">
+    <aside class="document-outline" id="documentOutline">
+      <div class="outline-heading">
+        <strong>目录</strong>
+        <span id="outlinePageCount">0 个页面</span>
+      </div>
+      <nav id="outlineNavigation" aria-label="产品文档目录"></nav>
+    </aside>
+
+    <main class="document-content" id="documentContent">
+      <section class="document-loading" id="documentLoading">
+        <img src="./assets/protodock-icon.png" alt="">
+        <strong>正在生成完整产品文档</strong>
+        <p>ProtoDock 会汇总每个页面的 PRD，并为原型生成截图。</p>
+        <div class="loading-track"><i id="loadingProgress"></i></div>
+      </section>
+
+      <section class="document-cover" id="documentCover" hidden>
+        <span class="cover-label">ProtoDock Product Requirement Document</span>
+        <h1 id="coverTitle"></h1>
+        <p id="coverDescription"></p>
+        <dl class="cover-meta">
+          <div><dt>页面</dt><dd id="coverPageCount"></dd></div>
+          <div><dt>业务分组</dt><dd id="coverGroupCount"></dd></div>
+          <div><dt>生成时间</dt><dd id="coverGeneratedAt"></dd></div>
+        </dl>
+      </section>
+
+      <div id="documentSections"></div>
+    </main>
+  </div>
+
+  <div class="image-preview" id="imagePreview" hidden>
+    <button class="image-preview-close" id="closeImagePreview" type="button" title="关闭大图" aria-label="关闭大图"><i data-lucide="x"></i></button>
+    <img id="previewImage" alt="">
+  </div>
+
+  <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
+  <script src="./vendor/lucide.min.js"></script>
+  <script src="./product-document-view.js"></script>
+</body>
+</html>

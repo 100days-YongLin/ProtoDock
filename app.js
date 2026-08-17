@@ -46,6 +46,7 @@ const els = {
   canvasMinimapSvg: document.getElementById('canvasMinimapSvg'),
   canvasMinimapFit: document.getElementById('canvasMinimapFit'),
   zoomValue: document.getElementById('zoomValue'),
+  openProductDocument: document.getElementById('openProductDocument'),
   productSelect: document.getElementById('productSelect'),
   currentProjectName: document.getElementById('currentProjectName'),
   pageList: document.getElementById('pageList'),
@@ -143,6 +144,7 @@ const buttons = {
   addNode: document.getElementById('addNode'),
   addText: document.getElementById('addText'),
   playFlow: document.getElementById('playFlow'),
+  openProductDocument: document.getElementById('openProductDocument'),
   zoomIn: document.getElementById('zoomIn'),
   zoomOut: document.getElementById('zoomOut'),
   closePlayback: document.getElementById('closePlayback'),
@@ -271,7 +273,8 @@ const state = {
   manifestWatchTimer: null,
   manifestCheckInFlight: false,
   manifestExternalDialogOpen: false,
-  ignoredExternalManifestHash: null
+  ignoredExternalManifestHash: null,
+  productDocumentGenerating: false
 };
 
 function escapeHtml(value) {
@@ -1115,6 +1118,78 @@ async function copySelectedPagePng() {
   }
 }
 
+async function openFullProductDocument() {
+  if (!state.manifest) {
+    setStatus('请先打开一个项目');
+    return;
+  }
+  if (state.productDocumentGenerating) {
+    return;
+  }
+  if (!window.ProtoDockProductDocument?.generate || !window.ProtoDockCapture?.capturePagePng) {
+    setStatus('完整产品文档模块未加载');
+    return;
+  }
+
+  state.productDocumentGenerating = true;
+  renderProjectActions();
+  setStatus('正在准备完整产品文档...');
+
+  try {
+    const preset = presetFor();
+    const safeArea = configuredSafeAreaInsets();
+    const result = await window.ProtoDockProductDocument.generate({
+      viewerUrl: appUrl('/product-document.html'),
+      manifest: state.manifest,
+      loadMarkdown(descriptor) {
+        return loadDocForPage(descriptor.id, state.manifest.pages[descriptor.id]);
+      },
+      async buildPage(descriptor) {
+        const page = state.manifest.pages[descriptor.id];
+        const node = state.manifest.canvas.nodes.find((item) => item.id === descriptor.nodeId);
+        const markdown = await loadDocForPage(descriptor.id, page);
+        let capture = null;
+
+        try {
+          if (!node) {
+            throw new Error('页面没有对应的画布节点');
+          }
+          capture = await createCaptureIframe(node);
+          const screenshot = await window.ProtoDockCapture.capturePagePng({
+            iframe: capture.iframe,
+            preset,
+            safeAreaEnabled: safeAreaEnabled(),
+            safeAreaTop: safeArea.top,
+            safeAreaBottom: safeArea.bottom,
+            includeFrame: true
+          });
+          return { markdown, screenshot, captureError: '' };
+        } finally {
+          if (capture) {
+            capture.iframe.remove();
+            revokePreviewUrls(capture.captureNodeId);
+          }
+        }
+      },
+      onPageError(descriptor, error) {
+        console.warn(`ProtoDock: product document capture failed for ${descriptor.id}`, error);
+      },
+      onProgress(current, total) {
+        setStatus(`正在生成完整产品文档 ${current}/${total}`);
+      }
+    });
+    setStatus(result.failed
+      ? `完整产品文档已生成，${result.failed} 张截图未生成`
+      : '完整产品文档已生成');
+  } catch (error) {
+    console.error(error);
+    setStatus(`完整产品文档生成失败：${error.message || '未知错误'}`);
+  } finally {
+    state.productDocumentGenerating = false;
+    renderProjectActions();
+  }
+}
+
 async function createBlobUrlFromFile(path, baseDir = '') {
   const resolvedPath = resolvePath(baseDir, path);
   const fileHandle = await getFileHandleByPath(state.projectHandle, resolvedPath);
@@ -1706,6 +1781,7 @@ function renderProjectActions() {
   document.querySelectorAll('[data-requires-project]').forEach((button) => {
     button.disabled = !hasProject;
   });
+  buttons.openProductDocument?.toggleAttribute('disabled', !hasProject || state.productDocumentGenerating);
   [
     buttons.saveProject,
     buttons.addNode,
@@ -4290,6 +4366,7 @@ function bindGlobalEvents() {
   buttons.addText?.addEventListener('click', () => setToolMode('text'));
   buttons.addNode?.addEventListener('click', addNode);
   buttons.playFlow?.addEventListener('click', startPlayback);
+  buttons.openProductDocument?.addEventListener('click', openFullProductDocument);
   buttons.closePlayback?.addEventListener('click', stopPlayback);
   buttons.playbackPrev?.addEventListener('click', () => stepPlayback(-1));
   buttons.playbackNext?.addEventListener('click', () => stepPlayback(1));
@@ -4596,6 +4673,7 @@ window.ProtoDock = {
   checkExternalManifestChange,
   createShareArchive,
   copySelectedPagePng,
+  openFullProductDocument,
   loadSharedProject,
   zoomByWheel(deltaY = -360, clientX, clientY) {
     const rect = els.canvasShell.getBoundingClientRect();

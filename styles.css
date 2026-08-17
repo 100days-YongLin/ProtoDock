@@ -268,6 +268,41 @@ select {
   opacity: 0.45;
 }
 
+.product-document-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.product-document-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.product-document-button:hover:not(:disabled),
+.product-document-button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.14);
+  outline: none;
+}
+
+.product-document-button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
 .status {
   display: none;
   align-items: center;
@@ -2919,6 +2954,16 @@ select {
 }
 
 @media (max-width: 1180px) {
+  .docs-entry,
+  .product-document-button span {
+    display: none;
+  }
+
+  .product-document-button {
+    width: 30px;
+    padding: 0;
+  }
+
   .workspace {
     --inspector-width: 292px;
     grid-template-columns: 232px minmax(0, 1fr) 8px var(--inspector-width);
