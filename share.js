@@ -54,6 +54,18 @@
     }
   }
 
+  function validationStatus(successMessage, warnings) {
+    if (!warnings.length) {
+      return successMessage;
+    }
+    const preview = warnings.slice(0, 3).map((warning) => (
+      String(warning || '').replace(/\s+/g, ' ').trim().slice(0, 120)
+    ));
+    const remaining = warnings.length - preview.length;
+    const suffix = remaining > 0 ? `；另有 ${remaining} 项，请运行交付校验器查看完整结果` : '';
+    return `${successMessage}；校验警告 ${warnings.length} 项：${preview.join('；')}${suffix}`;
+  }
+
   function isValidShareId(value) {
     return /^[a-zA-Z0-9_-]{6,80}$/.test(value || '');
   }
@@ -537,7 +549,10 @@
       }
       const successMessage = payload.action === 'updated' ? '公开预览已更新，原链接继续有效' : '分享链接已生成';
       const warnings = Array.isArray(payload.warnings) ? payload.warnings : [];
-      setStatus(warnings.length ? `${successMessage}；布局警告：${warnings.join('；')}` : successMessage);
+      if (warnings.length) {
+        console.warn('ProtoDock upload validation warnings:', warnings);
+      }
+      setStatus(validationStatus(successMessage, warnings));
       if (payload.action === 'updated') {
         await loadShareTargets({ preferredId: payload.id });
       }

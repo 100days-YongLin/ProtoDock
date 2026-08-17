@@ -3,7 +3,7 @@ title: 协作概览
 description: 先理解产品经理、AI Agent 和 ProtoDock 的分工。
 ---
 
-ProtoDock 是产品经理和 AI Agent 之间的原型协作工作台。AI Agent 负责生成页面、页面说明和素材，ProtoDock 负责把这些结果组织成可预览、可连线、可评审、可分享的产品原型。
+ProtoDock 是产品经理和 AI Agent 之间的原型协作工作台。AI Agent 负责生成页面、产品文档和素材，ProtoDock 负责把这些结果组织成可预览、可连线、可评审、可分享的产品原型。
 
 <Note>
   ProtoDock 不生成页面。ProtoDock 展示、组织、连接和保存页面。
@@ -14,7 +14,7 @@ ProtoDock 是产品经理和 AI Agent 之间的原型协作工作台。AI Agent 
 | 角色 | 负责什么 |
 | --- | --- |
 | 产品经理 | 提需求、看结果、调整流程、补充说明、分享评审 |
-| AI Agent | 根据需求生成页面、文档、素材，并按 manifest 注册页面 |
+| AI Agent | 根据需求生成页面、产品文档、素材，并按 manifest 注册页面 |
 | ProtoDock | 读取页面入口，把页面放进设备壳，维护画布和流程 |
 
 画布是产品经理的工作区，不是 Agent 的临时生成结果。`canvas.nodes`、`canvas.edges` 和 `canvas.notes` 记录的是用户在 ProtoDock 里整理出来的流程关系，Agent 默认必须保护它们。
@@ -53,6 +53,7 @@ ProtoDock 读取静态页面入口
 ## 接下来阅读
 
 - [接入 AI 工具](/ai-agent-tools)：把 Codex、Claude Code 或其他 Agent 接入项目目录。
+- [产品文档规范](/product-documentation)：用“前提 / 操作 / 预期”写可执行、可验收的 PRD。
 - [Skill 安装与文件契约](/ai-agent-skills)：安装 Skill，并理解项目契约和静态页面交付要求。
 - [提示词模板](/ai-agent-prompts)：复制常用提示词，让 Agent 新增或修改页面。
 - [Agent 写入边界](/agent-boundaries)：明确哪些文件能改，哪些画布状态必须保护。

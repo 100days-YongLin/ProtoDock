@@ -26,7 +26,7 @@ description: 让 Codex、Claude Code 或其他 Agent 读取项目目录并产出
 当你希望 Agent 新增页面时，让它同时完成三件事：
 
 1. 在 `pages/<page-id>/index.html` 生成静态页面
-2. 在 `docs/<page-id>.md` 补充页面目标、状态和验收说明
+2. 在 `docs/<page-id>.md` 补充完整产品文档，并使用“前提 / 操作 / 预期”描述验收场景
 3. 在 `protodock.project.json` 的 `pages` 中注册页面
 
 如果需要让新页面出现在画布上，Agent 只能增量追加缺失节点，不能整体重写 `canvas`。
@@ -57,3 +57,7 @@ pages/<page-id>/index.html
 - 让 Agent 先说明会修改哪些文件，再开始写入。
 - 页面迭代完成后，回到 ProtoDock 查看 iframe 预览和画布关系。
 - 如果 ProtoDock 提示 manifest 被外部修改，先阅读 [冲突处理](/conflict-handling) 再决定读取或覆盖。
+- 最终页面必须能被浏览器作为静态入口加载。
+- 产品文档不能只列页面模块或源码位置；应覆盖场景、规则、状态、异常、数据影响和可判断的验收结果。
+
+这样 Codex、Claude Code 或其他 Agent 即使使用不同的实现方式，也能把结果交付成 ProtoDock 可以读取的项目结构。产品文档的标准章节和示例见 [产品文档规范](/product-documentation)。业务条件不明确时，Agent 应先向产品负责人确认，不能根据界面自行补写规则。

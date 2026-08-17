@@ -52,6 +52,42 @@ Before editing, read:
 - React, Vue, Svelte, and other framework pages must be built into static artifacts before delivery.
 - “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
 
+## Product Documentation Contract
+
+Treat every `docs/<page-id>.md` as a product alignment artifact for product, design, engineering, and Agents. It must explain user intent, deterministic behavior, business rules, states, and observable acceptance results. It is not an export report or source-code inventory.
+
+Every new or modified page document must contain these sections:
+
+```text
+页面定位
+使用场景
+前置条件
+页面内容
+交互规则
+业务规则
+状态与异常
+数据影响
+产品验收
+非本期范围
+```
+
+Write acceptance scenarios with Chinese labels rather than English Given/When/Then:
+
+```md
+### 验收场景 1：主流程
+
+- 前提：用户、账户、数据和业务所处状态。
+- 操作：用户执行的明确操作。
+- 预期：可观察、可判断的页面、状态、数据或提示结果。
+```
+
+- Start with the user problem and outcome, not a list of visible controls.
+- State entry, action, feedback, destination, return behavior, data changes, and failure handling without ambiguity.
+- Cover loading, empty, success, failure, permission, duplicate-action, and recovery states when relevant.
+- Keep source paths, component names, `initialScreen`, framework details, static-export checks, and device-shell stability out of the PRD body. ProtoDock already exposes source metadata in the page-information view.
+- Do not invent unknown permissions, account rules, prices, limits, synchronization scope, or exception behavior. Ask the product owner before completing the document or implementation.
+- Product-document validation warnings include missing sections, missing `前提 / 操作 / 预期`, unfinished `请填写` placeholders, and technical-only headings. Existing projects remain compatible by default; use `--warnings-as-errors` when documentation compliance is a release gate.
+
 ## Interactive Preview Contract
 
 ProtoDock runs page entries in iframes in the right-side player and the public Share preview. A page’s own JavaScript must remain executable in both surfaces.

@@ -38,7 +38,8 @@
         "pages": [
           "docs",
           "quickstart",
-          "project-structure"
+          "project-structure",
+          "product-documentation"
         ]
       },
       {

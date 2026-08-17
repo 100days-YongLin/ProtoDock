@@ -25,7 +25,7 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 from urllib.parse import quote, unquote, urlparse
 
-from protodock_validation import validate_cross_page_navigation
+from protodock_validation import validate_cross_page_navigation, validate_product_documents
 
 
 ROOT = Path(__file__).resolve().parent
@@ -69,6 +69,7 @@ DOCS_ASSET_ROOTS = {"_next", "favicons", "images", "logo"}
 DOCS_PAGE_ROOTS = {
     "quickstart",
     "project-structure",
+    "product-documentation",
     "ai-agent-workflow",
     "ai-agent-tools",
     "ai-agent-skills",
@@ -504,6 +505,7 @@ def validate_project_manifest_files(
 
     canvas_validation = validate_canvas_layout(manifest)
     navigation_validation = validate_cross_page_navigation(project_dir, manifest)
+    product_doc_validation = validate_product_documents(project_dir, manifest)
     canvas_issues = canvas_validation["issues"]
     navigation_issues = navigation_validation["issues"]
     if issues or canvas_issues or navigation_issues:
@@ -532,7 +534,12 @@ def validate_project_manifest_files(
             "stats": navigation_validation["stats"],
             "routes": navigation_validation["routes"],
         },
-        "warnings": canvas_validation["warnings"] + navigation_validation["warnings"],
+        "productDocs": product_doc_validation["stats"],
+        "warnings": (
+            canvas_validation["warnings"]
+            + navigation_validation["warnings"]
+            + product_doc_validation["warnings"]
+        ),
     }
 
 
@@ -1531,6 +1538,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             "action": "updated" if is_update else "created",
             "canvasValidation": validation["canvas"],
             "navigationValidation": validation["navigation"]["stats"],
+            "productDocValidation": validation["productDocs"],
             "warnings": validation["warnings"],
         })
 

@@ -39,6 +39,21 @@ HISTORY_BACK_PATTERN = re.compile(
 )
 BACK_LABELS = {"返回", "后退", "上一页", "返回上一页", "back", "goback"}
 BACK_ACTIONS = {"back", "go-back", "navigate-back", "return"}
+PRODUCT_DOC_SECTIONS = (
+    ("页面定位", {"页面定位", "功能定位", "功能与页面定位"}),
+    ("使用场景", {"使用场景", "用户场景"}),
+    ("前置条件", {"前置条件"}),
+    ("页面内容", {"页面内容", "页面结构", "功能内容"}),
+    ("交互规则", {"交互规则", "主流程", "交互流程"}),
+    ("业务规则", {"业务规则"}),
+    ("状态与异常", {"状态与异常", "异常与空状态", "异常与边界", "异常处理"}),
+    ("数据影响", {"数据影响", "数据规则"}),
+    ("产品验收", {"产品验收", "产品验收标准", "验收标准"}),
+    ("非本期范围", {"非本期范围", "非目标", "本期不包含"}),
+)
+TECHNICAL_DOC_HEADINGS = {"源码", "源码位置", "原型入口", "react来源", "技术实现", "实现说明"}
+MARKDOWN_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
+CHINESE_ACCEPTANCE_LABELS = ("前提", "操作", "预期")
 
 
 def normalize_text(value: str) -> str:
@@ -53,6 +68,112 @@ def action_text(value: str) -> str:
         previous = normalized
         normalized = ACTION_PREFIX.sub("", normalized)
     return normalized
+
+
+def markdown_heading_key(value: str) -> str:
+    return normalize_text(re.sub(r"[`*_~]", "", value))
+
+
+def markdown_section(source: str, aliases: set[str]) -> str:
+    alias_keys = {markdown_heading_key(alias) for alias in aliases}
+    headings = list(MARKDOWN_HEADING_PATTERN.finditer(source))
+    for index, heading in enumerate(headings):
+        if markdown_heading_key(heading.group(1)) not in alias_keys:
+            continue
+        level = len(heading.group(0)) - len(heading.group(0).lstrip("#"))
+        end = len(source)
+        for following in headings[index + 1:]:
+            following_level = len(following.group(0)) - len(following.group(0).lstrip("#"))
+            if following_level <= level:
+                end = following.start()
+                break
+        return source[heading.end():end]
+    return ""
+
+
+def validate_product_documents(project_dir: Path, manifest: dict) -> dict:
+    project_root = project_dir.resolve()
+    pages = manifest.get("pages", {}) if isinstance(manifest, dict) else {}
+    warnings = []
+    scanned_count = 0
+    compliant_count = 0
+    acceptance_count = 0
+    missing_section_count = 0
+
+    for page_id, page in pages.items():
+        if not isinstance(page, dict):
+            continue
+        doc = str(page.get("doc") or "").strip()
+        doc_path = (project_root / doc).resolve()
+        if not doc or not doc_path.is_file() or project_root not in doc_path.parents:
+            continue
+        try:
+            source = doc_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            warnings.append(f"{page_id} · {doc} 不是 UTF-8，未执行产品文档质量检查")
+            continue
+
+        scanned_count += 1
+        page_warnings = []
+        headings = {
+            markdown_heading_key(match.group(1))
+            for match in MARKDOWN_HEADING_PATTERN.finditer(source)
+        }
+        missing_sections = [
+            canonical
+            for canonical, aliases in PRODUCT_DOC_SECTIONS
+            if not headings.intersection(markdown_heading_key(alias) for alias in aliases)
+        ]
+        if missing_sections:
+            missing_section_count += len(missing_sections)
+            page_warnings.append(
+                f"缺少产品文档章节：{'、'.join(missing_sections)}"
+            )
+
+        acceptance_aliases = next(
+            aliases for canonical, aliases in PRODUCT_DOC_SECTIONS if canonical == "产品验收"
+        )
+        acceptance = markdown_section(source, acceptance_aliases)
+        missing_labels = [
+            label
+            for label in CHINESE_ACCEPTANCE_LABELS
+            if not re.search(rf"(?:^|\n)\s*[-*]\s*{label}\s*[：:]", acceptance)
+        ]
+        if acceptance and not missing_labels:
+            acceptance_count += 1
+        elif acceptance:
+            page_warnings.append(
+                f"产品验收缺少中文场景字段：{'、'.join(missing_labels)}；请使用“前提 / 操作 / 预期”"
+            )
+
+        placeholder_count = source.count("<!-- 请填写")
+        if placeholder_count:
+            page_warnings.append(f"仍有 {placeholder_count} 处“请填写”占位内容")
+
+        technical_headings = sorted(
+            heading for heading in headings if heading in TECHNICAL_DOC_HEADINGS
+        )
+        if technical_headings:
+            page_warnings.append(
+                f"PRD 主体包含技术章节：{'、'.join(technical_headings)}；源码路径应放在 ProtoDock 页面信息中"
+            )
+
+        if page_warnings:
+            warnings.extend(f"{page_id} · {doc}：{warning}" for warning in page_warnings)
+        else:
+            compliant_count += 1
+
+    return {
+        "issues": [],
+        "warnings": list(dict.fromkeys(warnings)),
+        "stats": {
+            "scannedDocumentCount": scanned_count,
+            "compliantDocumentCount": compliant_count,
+            "acceptanceFormatCount": acceptance_count,
+            "missingProductDocSectionCount": missing_section_count,
+            "productDocWarningCount": len(list(dict.fromkeys(warnings))),
+        },
+    }
 
 
 def clean_relative_path(value: str) -> str:

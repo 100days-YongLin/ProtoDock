@@ -44,6 +44,27 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 26. If a query parameter represents a state already registered as a manifest page, link directly to that state `pageId` instead of routing through a generic page plus query parameters.
 27. Run `scripts/protodock-validate <final-upload.zip>` after packaging. A non-zero exit code blocks delivery; source-directory checks and prose reviews do not satisfy this gate.
 28. Back controls must use `data-protodock-back[="<fallbackPageId>"]`, `ProtoDockPreview.back()`, or the `protodock:back` message. Do not use iframe `history.back()` or ship an unbound back icon; test enter-detail-and-return in both player and Share.
+29. Every new or modified `docs/<page-id>.md` must follow the Product Documentation Contract below. Acceptance scenarios use the Chinese labels `前提 / 操作 / 预期`; source paths and implementation details belong in manifest metadata, not the PRD body.
+
+## Product Documentation Contract
+
+Page documents are product alignment artifacts for product, design, engineering, and Agents. They must explain user intent and deterministic behavior rather than repeat the visible UI or export metadata.
+
+Required sections are: `页面定位`, `使用场景`, `前置条件`, `页面内容`, `交互规则`, `业务规则`, `状态与异常`, `数据影响`, `产品验收`, and `非本期范围`.
+
+Write each acceptance scenario in this Chinese format:
+
+```md
+### 验收场景 1：主流程
+
+- 前提：用户和系统已经处于什么状态。
+- 操作：用户执行什么明确操作。
+- 预期：系统产生什么可观察、可判断的结果。
+```
+
+Do not use vague results such as “works correctly” or “displays normally”. Do not put component names, `initialScreen`, React sources, static-export checks, device-shell stability, or source paths in the PRD body. If permissions, money, account state, synchronization scope, or exception behavior is unknown, ask the product owner instead of inventing a rule.
+
+The validator reports missing sections, non-Chinese acceptance fields, unfinished placeholders, and technical-only headings as product-document warnings. Existing projects remain upload-compatible by default; release pipelines should use `--warnings-as-errors` when product-document compliance is mandatory.
 
 ## React / Vue Recommended Build
 

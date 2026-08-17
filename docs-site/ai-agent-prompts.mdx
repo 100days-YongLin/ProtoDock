@@ -21,6 +21,8 @@ description: 复制这些提示词，让 Agent 按 ProtoDock 契约新增、修�
 要求：
 - 页面放到 pages/user-detail/index.html
 - 页面文档放到 docs/user-detail.md
+- 产品文档包含页面定位、使用场景、前置条件、页面内容、交互规则、业务规则、状态与异常、数据影响、产品验收和非本期范围
+- 产品验收使用“前提 / 操作 / 预期”，每个预期必须可观察、可判断
 - 在 protodock.project.json 的 pages 中注册页面
 - 如需新增 canvas node，只能增量追加
 - 禁止重写 canvas.nodes、canvas.edges、canvas.notes
@@ -38,6 +40,8 @@ description: 复制这些提示词，让 Agent 按 ProtoDock 契约新增、修�
 要求：
 - 先阅读 README.md、DESIGN_AGENT_CONTRACT.md 和当前 protodock.project.json
 - 保留页面静态可预览能力
+- 按产品文档规范同步更新页面场景、规则、状态、异常、数据影响和验收场景
+- 不要把源码路径、组件名或技术验收写进 PRD 主体
 - 只在必要时更新 protodock.project.json 的 pages.user-detail 字段
 - 不要重排画布
 - 不要覆盖 canvas.nodes、canvas.edges、canvas.notes
@@ -53,7 +57,9 @@ description: 复制这些提示词，让 Agent 按 ProtoDock 契约新增、修�
 - protodock.project.json 是否符合 schema
 - 每个 pages.<pageId>.entry 是否存在
 - 页面入口是否是浏览器可加载的静态文件
-- docs/<page-id>.md 是否存在并说明页面目标
+- docs/<page-id>.md 是否包含完整产品文档章节
+- 产品验收是否使用“前提 / 操作 / 预期”，且没有“功能正常”等模糊结果
+- 文档是否仍有“请填写”占位内容或源码、组件、静态导出等技术章节
 - canvas.nodes、canvas.edges、canvas.notes 是否被无意重写
 - 修改 manifest 前是否创建了备份
 
@@ -70,4 +76,5 @@ description: 复制这些提示词，让 Agent 按 ProtoDock 契约新增、修�
 - 只更新这次需求涉及的页面、文档和素材
 - 如果发现需要新增页面，先说明计划，再注册到 protodock.project.json
 - 如果检测到 manifest 和本地状态有冲突，先停下来说明，不要直接覆盖
+- 如果业务规则、权限、金额、同步范围或异常处理不明确，先询问产品负责人，不要自行补写
 ```
