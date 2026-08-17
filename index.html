@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="./vendor/devices.css">
-  <link rel="stylesheet" href="./styles.css?v=6">
+  <link rel="stylesheet" href="./styles.css?v=8">
   <link rel="stylesheet" href="./canvas-groups.css">
   <link rel="stylesheet" href="./canvas-minimap.css">
 </head>
@@ -47,13 +47,9 @@
         <span id="currentProjectName">未打开项目</span>
         <i data-lucide="pencil"></i>
       </button>
-      <button class="share-button" id="openShareModal" type="button" title="分享项目包" aria-label="分享项目包">
-        <i data-lucide="share-2"></i>
-        <span>分享</span>
-      </button>
-      <button class="share-button" id="openGithubModal" type="button" title="推送到 GitHub" aria-label="推送到 GitHub">
-        <i data-lucide="git-branch"></i>
-        <span>GitHub</span>
+      <button class="share-button" id="openShareModal" type="button" title="发布公开预览" aria-label="发布公开预览">
+        <i data-lucide="send"></i>
+        <span>发布</span>
       </button>
       <div class="status">
         <span class="dot"></span>
@@ -503,41 +499,63 @@
   </div>
 
   <div class="project-modal-backdrop" id="shareModal" hidden>
-    <section class="project-modal share-modal" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+    <section class="project-modal share-modal publish-modal" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
       <header class="modal-head">
         <div>
-          <strong id="shareModalTitle">分享原型项目</strong>
-          <span>上传包含 protodock.project.json、pages、docs 和 assets 的 zip，生成或更新只读预览链接。</span>
+          <strong id="shareModalTitle">发布原型项目</strong>
+          <span>公开预览与 GitHub 使用同一分支标识；再次发布同一分支会更新原链接。</span>
         </div>
         <button class="tool-button" id="closeShareModal" title="关闭" aria-label="关闭">×</button>
       </header>
 
-      <div class="share-mode-switch" role="tablist" aria-label="分享方式">
-        <button class="share-mode-button is-active" type="button" data-share-mode="create" aria-pressed="true">
-          <i data-lucide="plus"></i>
-          <span>
-            <strong>新建</strong>
-            <small>生成新的链接</small>
-          </span>
-        </button>
-        <button class="share-mode-button" type="button" data-share-mode="update" aria-pressed="false">
-          <i data-lucide="refresh-cw"></i>
-          <span>
-            <strong>更新</strong>
-            <small>沿用已有链接</small>
-          </span>
-        </button>
+      <div class="github-form-grid publish-identity-grid">
+        <label>
+          <span>产品名</span>
+          <input id="publishProductName" type="text" autocomplete="off" placeholder="pictale">
+        </label>
+        <label>
+          <span>版本号</span>
+          <input id="publishVersion" type="text" autocomplete="off" placeholder="v1">
+        </label>
       </div>
 
-      <div class="share-update-panel" id="shareUpdatePanel" hidden>
-        <div class="share-update-head">
-          <strong>选择要更新的公开预览</strong>
-          <button class="tool-button" id="refreshShareTargets" type="button" title="刷新列表" aria-label="刷新列表">
-            <i data-lucide="refresh-cw"></i>
-          </button>
+      <div class="github-branch-preview publish-route-preview">
+        <div>
+          <span>统一发布路径</span>
+          <strong id="publishBranchPreview">-</strong>
         </div>
-        <div class="share-target-list" id="shareTargetList"></div>
+        <a id="publishUrlPreview" href="#" target="_blank" rel="noreferrer">填写产品名和版本号后生成</a>
       </div>
+
+      <section class="github-config-panel publish-github-panel">
+        <div>
+          <strong>同步到 GitHub</strong>
+          <span id="githubRepoText">正在读取服务器配置...</span>
+        </div>
+        <label class="publish-sync-control" for="publishSyncGithub">
+          <input id="publishSyncGithub" type="checkbox">
+          <i aria-hidden="true"></i>
+          <span>同步</span>
+        </label>
+        <button class="tool-button" id="refreshGithubConfig" type="button" title="刷新 GitHub 配置" aria-label="刷新 GitHub 配置">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+      </section>
+
+      <label class="github-message-field" id="publishCommitField">
+        <span>提交说明</span>
+        <textarea id="publishCommitMessage" rows="3" placeholder="说明本次发布的主要变化"></textarea>
+      </label>
+
+      <details class="github-key-panel publish-github-settings">
+        <summary>GitHub 连接配置</summary>
+        <div>
+          <strong id="githubCredentialTitle">Deploy Key 公钥</strong>
+          <span id="githubCredentialHelp">把公钥添加到固定仓库的 Deploy Keys，并开启写权限。</span>
+        </div>
+        <pre id="githubPublicKey">正在读取认证配置...</pre>
+        <button class="secondary" id="copyGithubDeployKey" type="button">复制公钥</button>
+      </details>
 
       <div class="share-auto-panel" id="shareAutoPanel" hidden>
         <i data-lucide="archive"></i>
@@ -554,7 +572,7 @@
         <input id="shareFileInput" type="file" accept=".zip,application/zip" hidden>
       </div>
 
-      <div class="share-status" id="shareStatus" aria-live="polite">等待上传项目压缩包</div>
+      <div class="share-status" id="shareStatus" aria-live="polite">填写发布信息后即可生成公开预览</div>
 
       <div class="share-progress" id="shareProgress" hidden>
         <div class="share-progress-track" aria-hidden="true">
@@ -564,82 +582,15 @@
       </div>
 
       <div class="share-result" id="shareResult" hidden>
-        <span>分享链接</span>
+        <span>发布结果</span>
         <a id="shareUrl" href="#" target="_blank" rel="noreferrer"></a>
+        <a id="githubBranchUrl" href="#" target="_blank" rel="noreferrer" hidden></a>
+        <a id="githubCommitUrl" href="#" target="_blank" rel="noreferrer" hidden></a>
       </div>
 
       <div class="action-row">
         <button class="secondary" id="chooseShareFile" type="button">选择 zip</button>
-        <button class="primary" id="uploadShareFile" type="button" disabled>上传并生成链接</button>
-      </div>
-    </section>
-  </div>
-
-  <div class="project-modal-backdrop" id="githubModal" hidden>
-    <section class="project-modal github-modal" role="dialog" aria-modal="true" aria-labelledby="githubModalTitle">
-      <header class="modal-head">
-        <div>
-          <strong id="githubModalTitle">推送到 GitHub</strong>
-          <span>将当前原型项目推送到公司内部固定仓库，分支名由产品名和版本号组合。</span>
-        </div>
-        <button class="tool-button" id="closeGithubModal" title="关闭" aria-label="关闭">×</button>
-      </header>
-
-      <div class="github-config-panel">
-        <div>
-          <strong>固定仓库</strong>
-          <span id="githubRepoText">正在读取服务器配置...</span>
-        </div>
-        <button class="secondary compact" id="refreshGithubConfig" type="button">刷新</button>
-      </div>
-
-      <div class="github-key-panel">
-        <div>
-          <strong id="githubCredentialTitle">Deploy Key 公钥</strong>
-          <span id="githubCredentialHelp">把这段公钥添加到固定 GitHub 私有仓库的 Deploy Keys，并勾选写权限。</span>
-        </div>
-        <pre id="githubPublicKey">正在生成公钥...</pre>
-        <button class="secondary" id="copyGithubDeployKey" type="button">复制公钥</button>
-      </div>
-
-      <div class="github-form-grid">
-        <label>
-          <span>产品名</span>
-          <input id="githubProductName" type="text" autocomplete="off" placeholder="pictale">
-        </label>
-        <label>
-          <span>版本号</span>
-          <input id="githubVersion" type="text" autocomplete="off" placeholder="v1">
-        </label>
-      </div>
-
-      <label class="github-message-field">
-        <span>Commit message</span>
-        <textarea id="githubCommitMessage" rows="3" placeholder="update prototype flow"></textarea>
-      </label>
-
-      <div class="github-branch-preview">
-        <span>目标分支</span>
-        <strong id="githubBranchPreview">-</strong>
-      </div>
-
-      <div class="share-status" id="githubStatus" aria-live="polite">等待填写推送信息</div>
-
-      <div class="share-progress" id="githubProgress" hidden>
-        <div class="share-progress-track" aria-hidden="true">
-          <i id="githubProgressBar"></i>
-        </div>
-        <span id="githubProgressText">0%</span>
-      </div>
-
-      <div class="share-result github-result" id="githubResult" hidden>
-        <span>推送结果</span>
-        <a id="githubBranchUrl" href="#" target="_blank" rel="noreferrer"></a>
-        <a id="githubCommitUrl" href="#" target="_blank" rel="noreferrer"></a>
-      </div>
-
-      <div class="action-row">
-        <button class="primary" id="pushGithubProject" type="button" disabled>推送到 GitHub</button>
+        <button class="primary" id="uploadShareFile" type="button" disabled>发布项目</button>
       </div>
     </section>
   </div>
@@ -693,15 +644,15 @@
   <script src="./zip.js"></script>
   <script src="./capture.js?v=5"></script>
   <script src="./capture-options.js"></script>
-  <script src="./github-preferences.js"></script>
+  <script src="./github-preferences.js?v=2"></script>
+  <script src="./share-reference.js?v=2"></script>
   <script src="./project-drop.js?v=1"></script>
   <script src="./project-changelog.js?v=1"></script>
   <script src="./project-changelog-dialog.js?v=1"></script>
   <script src="./product-document-cache.js?v=3"></script>
   <script src="./product-document.js?v=5"></script>
-  <script src="./app.js?v=6"></script>
+  <script src="./app.js?v=7"></script>
   <script src="./project-name.js"></script>
-  <script src="./share.js"></script>
-  <script src="./github.js"></script>
+  <script src="./share.js?v=3"></script>
 </body>
 </html>

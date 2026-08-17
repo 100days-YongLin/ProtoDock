@@ -3307,26 +3307,17 @@ function showStartScreen(message = '选择工作目录开始') {
   setStatus(message);
 }
 
-function isValidShareId(value) {
-  return /^[a-zA-Z0-9_-]{6,80}$/.test(value || '');
-}
-
 function shareIdFromLocation() {
-  const params = new URLSearchParams(window.location.search);
-  const queryShareId = params.get('share');
-  if (isValidShareId(queryShareId)) {
-    return queryShareId;
-  }
-  const pathParts = window.location.pathname.split('/').filter(Boolean);
-  if (pathParts[0] === 's' && isValidShareId(pathParts[1])) {
-    return pathParts[1];
-  }
-  return null;
+  return window.ProtoDockShareReference?.fromLocation?.() || null;
 }
 
 async function loadSharedProject(shareId) {
   try {
-    const baseUrl = new URL(appUrl(`/shares/${encodeURIComponent(shareId)}/`));
+    const basePath = window.ProtoDockShareReference?.assetBasePath?.(shareId);
+    if (!basePath) {
+      throw new Error('分享项目编号无效');
+    }
+    const baseUrl = new URL(appUrl(basePath));
     const manifestUrl = new URL(MANIFEST_FILE, baseUrl);
     const response = await fetch(manifestUrl, { cache: 'no-store' });
     if (!response.ok) {
@@ -3618,7 +3609,7 @@ function renderPublicPreviewList(items = []) {
 }
 
 function shareUrlForItem(item) {
-  const path = item.path || (item.id ? `/s/${encodeURIComponent(item.id)}` : item.url || '');
+  const path = item.path || (item.id ? window.ProtoDockShareReference?.sharePath?.(item.id) : item.url || '');
   if (!path) {
     return '';
   }
@@ -4800,9 +4791,13 @@ function bindGlobalEvents() {
 window.ProtoDock = {
   getState() {
     const safeArea = state.manifest ? configuredSafeAreaInsets() : { top: null, bottom: null };
+    const changeLog = Array.isArray(state.manifest?.changelog) ? state.manifest.changelog : [];
+    const currentChange = changeLog[changeLog.length - 1] || null;
     return {
       projectId: state.manifest?.project?.id || null,
       projectName: state.manifest?.project?.name || null,
+      currentVersion: currentChange?.version || window.ProtoDockChangeLog?.inferredVersion?.(state.manifest) || null,
+      currentChangeDescription: currentChange?.description || null,
       shareId: state.shareId,
       selectedNodeId: state.selectedNodeId,
       selectedEdgeId: state.selectedEdgeId,

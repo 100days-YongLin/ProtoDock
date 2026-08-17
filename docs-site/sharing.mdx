@@ -1,45 +1,57 @@
 ---
-title: 分享预览
-description: 上传项目 zip，生成只读预览链接。
+title: 统一发布
+description: 一次生成稳定公开预览，并可同步到同名 GitHub 分支。
 ---
 
-部署内置 Python 服务后，可以把 `.zip` 项目包上传到后端，生成 `/s/<share-id>` 公开预览链接。
+部署内置 Python 服务后，点击右上角 **发布**，可以把同一份 ProtoDock 项目同时发布为公开预览和 GitHub 分支。
 
 ```bash
 PROTODOCK_PORT=6080 python3 server.py
 ```
 
-## 上传
+## 发布标识
 
-右上角 **分享** 按钮支持拖入项目 zip。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，不能再套项目名、版本号或交付目录。
+填写 `产品标识` 和 `版本` 后，ProtoDock 会使用同一标识生成 Git 分支和分享路径。
 
-ProtoDock 上传包应与完整交付包分开生成。服务端会在导入前一次性检查 manifest 中全部 `entry`、`doc` 和 Canvas 完整性；缺失文件、非根目录相对路径、缺失或重复节点、悬空或重复连线、节点重叠会显示具体问题并停止导入。
+```text
+产品标识：pictale
+版本：v1
+Git 分支：pictale/v1
+公开链接：/s/pictale/v1
+```
 
-项目使用 `canvas.groups` 时，还会检查组 ID、组成员和主入口。重复组 ID、同一节点属于多个组、主入口不在组内或组引用不存在节点都会阻止上传；没有 groups 的旧项目保持兼容。
+再次发布 `pictale/v1` 会更新原有内容，公开链接保持不变。旧版随机 ID 链接 `/s/<share-id>` 继续兼容，但新发布不再要求用户区分“新建分享”和“更新分享”。
 
-连线交叉、连线穿过无关节点和节点间距不足属于布局质量警告。它们不会触发自动重排，上传完成后会在界面中明确提示。
+## 项目包
 
-建议使用 `<project>-<version>-protodock-upload.zip` 与 `<project>-<version>-full-release.zip` 区分两类产物，完整交付包不要用于 ProtoDock 上传。
+打开本地项目后，ProtoDock 会自动打包当前目录；没有目录权限时，也可以拖入或选择项目 ZIP。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，不能再套项目名、版本号或交付目录。
 
-服务端只解压：
+ProtoDock 上传包应与完整交付包分开生成。建议使用 `<project>-<version>-protodock-upload.zip` 与 `<project>-<version>-full-release.zip` 区分两类产物，完整交付包不要用于 ProtoDock 发布。
 
-- `protodock.project.json`
-- `pages/**`
-- `docs/**`
-- `assets/**`
+服务端会在写入前一次性检查 manifest 中全部 `entry`、`doc`、Canvas、跨页导航、返回桥接和变更历史。缺失文件、错误的归档根目录、重复节点、悬空连线、节点重叠或无效页面目标会显示具体问题并停止发布。
 
-## 预览
+## GitHub 同步
 
-`/s/<share-id>` 默认进入独立预览页，适合发给产品、设计或测试同学在手机上直接查看原型。
+服务端配置固定 GitHub 仓库后，发布弹窗中的 **同步到 GitHub** 默认开启，也可以按次关闭。Commit message 仅在同步开启时必填。
 
-公开预览沿用完整产品文档的阅读结构：左侧目录按业务分组快速定位页面，中间每个页面并排展示真实 iframe 原型与完整 PRD。原型中的按钮、Tab 和返回操作会联动定位到目标页面章节；iframe 按滚动位置延迟加载，避免一次打开大量页面。上传包包含可执行 JavaScript 时，浏览者可以直接点击、输入、滚动和触发页面状态；使用 `data-protodock-page`、`protodock:` 链接或 `protodock:navigate` 消息的控件还可以在分享页内切换到目标 manifest 页面。
+公开版本和 GitHub 推送使用同一份已校验项目包，并写入同一个 `产品标识/版本`。如果 GitHub 推送失败，服务端会恢复发布前的公开版本，避免分享链接与仓库分支内容不一致。
 
-如果页面看起来正常但按钮没有反应，应先检查上传入口是否只是静态 DOM。框架项目必须上传构建后的 HTML/CSS/JS，不能只导出 React/Vue 组件渲染后的 HTML。
+GitHub 凭据位于折叠的 **GitHub 连接配置** 中。Deploy Key 私钥、GitHub App 私钥和工作目录只保存在服务端，不会进入项目包或公开预览。
 
-分享项目会从 `shares/<share-id>/` 读取，不会写回上传者本地文件。需要查看画布节点、连线和右侧文档时，可以打开 `/s/<share-id>/canvas`，这个入口仍然是只读画布，不允许浏览者编辑 canvas、docs 或页面信息。
+## 预览与下载
 
-首页的 **打开项目** 支持从公开预览列表打开已有分享项目，也支持从 GitHub 仓库下载指定分支生成只读预览。GitHub 打开需要填写仓库地址和分支；项目路径留空时默认读取仓库根目录。
+`/s/<product>/<version>` 默认进入产品文档式预览页：左侧目录按业务分组快速定位页面，中间并排展示真实 iframe 原型与完整 PRD。原型中的按钮、Tab 和返回操作会联动定位到目标页面章节。
 
-## 下载
+需要查看画布节点、连线和右侧文档时，打开 `/s/<product>/<version>/canvas`。这个入口是只读画布，不允许浏览者编辑 Canvas、文档或页面信息。
 
-进入 `/s/<share-id>` 后，顶部下载按钮可以下载该只读项目对应的 zip 包。
+公开预览顶部提供下载按钮，对应接口为 `/api/shares/<product>/<version>/download`。
+
+## 高速上传
+
+预览域名上传较慢时，可以给浏览器配置单独的直连上传 origin：
+
+```bash
+export PROTODOCK_UPLOAD_ORIGIN=http://100.113.173.18:6080
+```
+
+浏览器仍使用当前域名生成公开链接，但项目包优先上传到高速 origin 的 `/api/publish`；连接失败时自动回退当前域名。环境变量只填写 origin，不要附带接口路径。

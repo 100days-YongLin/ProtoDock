@@ -2410,11 +2410,22 @@ select {
 }
 
 .share-modal {
-  max-width: 520px;
+  max-width: 620px;
 }
 
-.github-modal {
-  max-width: 560px;
+.publish-modal .action-row {
+  position: sticky;
+  z-index: 2;
+  bottom: -24px;
+  margin: 0 -24px -24px;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.96);
+  padding: 12px 24px 24px;
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+.publish-modal .action-row .primary {
+  flex: 1;
 }
 
 .public-preview-modal {
@@ -2565,148 +2576,6 @@ select {
   text-align: center;
 }
 
-.share-mode-switch {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.share-mode-button {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  color: var(--text);
-  cursor: pointer;
-  padding: 10px 12px;
-  text-align: left;
-}
-
-.share-mode-button:hover,
-.share-mode-button:focus-visible {
-  border-color: var(--primary-focus);
-  outline: none;
-}
-
-.share-mode-button.is-active {
-  border-color: var(--primary-focus);
-  background: rgba(0, 113, 227, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.18);
-}
-
-.share-mode-button svg {
-  width: 18px;
-  height: 18px;
-  color: var(--primary);
-}
-
-.share-mode-button span,
-.share-mode-button strong,
-.share-mode-button small {
-  display: block;
-  min-width: 0;
-}
-
-.share-mode-button strong {
-  font-size: 13px;
-  font-weight: 760;
-}
-
-.share-mode-button small {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.share-update-panel {
-  display: grid;
-  gap: 8px;
-}
-
-.share-update-panel[hidden] {
-  display: none;
-}
-
-.share-update-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.share-update-head strong {
-  font-size: 13px;
-  font-weight: 760;
-}
-
-.share-target-list {
-  display: grid;
-  gap: 8px;
-  max-height: min(260px, 34vh);
-  overflow: auto;
-}
-
-.share-target-item {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  color: var(--text);
-  cursor: pointer;
-  padding: 10px 12px;
-  text-align: left;
-}
-
-.share-target-item:hover,
-.share-target-item:focus-visible,
-.share-target-item.is-selected {
-  border-color: var(--primary-focus);
-  background: rgba(0, 113, 227, 0.06);
-  outline: none;
-}
-
-.share-target-item.is-selected {
-  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.18);
-}
-
-.share-target-item strong,
-.share-target-item span {
-  display: block;
-  overflow: hidden;
-  min-width: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.share-target-item strong {
-  font-size: 13px;
-  font-weight: 720;
-}
-
-.share-target-item span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.share-target-empty {
-  border: 1px dashed var(--line);
-  border-radius: 14px;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 14px;
-  text-align: center;
-}
-
 .share-auto-panel {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -2766,6 +2635,62 @@ select {
   align-items: center;
 }
 
+.publish-github-panel {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.publish-sync-control {
+  display: inline-grid;
+  grid-template-columns: 34px auto;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.publish-sync-control input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.publish-sync-control i {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: #c9ced6;
+  transition: background 0.18s ease;
+}
+
+.publish-sync-control i::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.24);
+  content: "";
+  transition: transform 0.18s ease;
+}
+
+.publish-sync-control input:checked + i {
+  background: var(--primary);
+}
+
+.publish-sync-control input:checked + i::after {
+  transform: translateX(14px);
+}
+
+.publish-sync-control:has(input:disabled) {
+  cursor: default;
+  opacity: 0.52;
+}
+
 .github-config-panel div,
 .github-key-panel div {
   display: grid;
@@ -2811,6 +2736,22 @@ select {
   word-break: break-all;
 }
 
+.publish-github-settings {
+  gap: 10px;
+  background: #f8fafc;
+}
+
+.publish-github-settings summary {
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.publish-github-settings[open] summary {
+  margin-bottom: 2px;
+}
+
 .github-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2850,6 +2791,10 @@ select {
   resize: vertical;
 }
 
+.github-message-field.is-disabled {
+  opacity: 0.56;
+}
+
 .github-open-panel input:focus,
 .github-form-grid input:focus,
 .github-message-field textarea:focus {
@@ -2869,6 +2814,25 @@ select {
   font-size: 12px;
 }
 
+.publish-route-preview {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+}
+
+.publish-route-preview > div {
+  display: grid;
+  gap: 3px;
+}
+
+.publish-route-preview a {
+  overflow-wrap: anywhere;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  text-decoration: none;
+}
+
 .github-result {
   gap: 4px;
 }
@@ -2877,13 +2841,13 @@ select {
   display: grid;
   justify-items: center;
   gap: 8px;
-  min-height: 154px;
+  min-height: 118px;
   border: 1px dashed #b8bec8;
   border-radius: 16px;
   background: #f8fafc;
   color: var(--muted);
   cursor: pointer;
-  padding: 24px;
+  padding: 18px;
   text-align: center;
 }
 
@@ -3047,6 +3011,15 @@ select {
   .open-project-grid,
   .github-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .publish-route-preview,
+  .publish-github-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .publish-route-preview a {
+    text-align: left;
   }
 
   .brand-title strong {

@@ -226,7 +226,7 @@ class UploadPackageTests(unittest.TestCase):
     def test_builds_upload_url_from_valid_origin(self):
         self.assertEqual(
             server.configured_upload_url("http://100.113.173.18:6080/"),
-            "http://100.113.173.18:6080/api/shares",
+            "http://100.113.173.18:6080/api/publish",
         )
 
     def test_rejects_invalid_upload_origin(self):

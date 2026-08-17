@@ -78,7 +78,8 @@
       : {};
     targets[key] = {
       productName: cleanText(value.productName, 64),
-      version: cleanText(value.version, 64)
+      version: cleanText(value.version, 64),
+      syncGithub: value.syncGithub !== false
     };
     preferences.pushTargets = targets;
     return writePreferences(preferences);

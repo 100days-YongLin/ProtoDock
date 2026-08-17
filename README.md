@@ -133,7 +133,7 @@ http://localhost:4175/index.html
 
 打开项目后，可以点击顶部显示的当前项目名称进行重命名。点击“保存名称”后需要填写版本号和变更内容，再把名称与本次记录一并写回 `protodock.project.json`；公开预览等只读项目不允许重命名。
 
-只要项目存在未保存修改，顶部保存按钮都会要求记录本次版本和变更内容。记录追加到 `changelog` 末尾，最后一条作为当前版本显示在完整产品文档中。旧项目没有 `changelog` 时仍可打开，第一次保存后自动建立历史。存在未保存修改时，分享和 GitHub 推送会要求先完成保存，避免发布内容没有对应版本记录。
+只要项目存在未保存修改，顶部保存按钮都会要求记录本次版本和变更内容。记录追加到 `changelog` 末尾，最后一条作为当前版本显示在完整产品文档中。旧项目没有 `changelog` 时仍可打开，第一次保存后自动建立历史。存在未保存修改时，统一发布会要求先完成保存，避免发布内容没有对应版本记录。
 
 选中页面后，右侧标题区的“复制页面 PNG”按钮会把当前页面首屏写入剪贴板。复制按钮右侧可以切换“带设备框”和“无设备框”：带框模式会合成项目设备壳，无框模式按项目真实视口输出纯页面截图并保留安全区。浏览器不支持图片剪贴板写入时，会自动下载 PNG。
 
@@ -141,7 +141,7 @@ http://localhost:4175/index.html
 
 二级页面的返回键使用 `data-protodock-back`，ProtoDock 会回到用户实际访问的上一页并恢复 query/hash；可用 `data-protodock-back="home"` 指定没有访问历史时的兜底页。这个属性只表达语义，不会代替页面实现点击逻辑。独立静态页面必须自带桥接脚本：优先调用 `window.ProtoDockPreview.back(fallbackPageId)`，不可用时向父窗口发送 `{ type: 'protodock:back', fallbackPageId }`。可从 Skill 的 `templates/protodock-back-bridge.js` 复制标准实现到项目 `assets/`。只声明属性、依赖宿主自动拦截，或使用 iframe 的 `history.back()` 都会被上传校验器拦截。
 
-公开分享上传和 GitHub 推送共用后端 ZIP 解压校验，提交包每次都会自动检查入口、文档、Canvas、跨页目标和返回协议；任一错误都会在写入分享目录或推送仓库前阻止操作。`scripts/protodock-validate` 用于 Agent 在交付前对同一份最终 ZIP 提前执行相同门禁。
+统一发布会对同一份 ZIP 执行一次后端解压校验，自动检查入口、文档、Canvas、跨页目标和返回协议；任一错误都会在写入公开版本或推送仓库前阻止操作。`scripts/protodock-validate` 用于 Agent 在交付前对同一份最终 ZIP 提前执行相同门禁。
 
 `docs/<page-id>.md` 是给产品、设计、研发和 Agent 对齐的产品文档，不是源码导出说明。新建页面会生成“页面定位、使用场景、前置条件、页面内容、交互规则、业务规则、状态与异常、数据影响、产品验收、非本期范围”模板；验收场景统一写成“前提 / 操作 / 预期”。源码目录和入口在页面信息二级视图查看，不应占用 PRD 主体。
 
@@ -161,7 +161,7 @@ http://localhost:4175/index.html
 
 脚本会运行 `mint validate` 和 `mint export`，并把导出包解压到 `docs-dist/`。`docs-dist/` 是生成产物，不进入 git；当目录存在时，内置 Python 服务会把 `/docs`、Mintlify 页面路由和 `_next` 资源指向这份导出结果。
 
-## 分享预览服务
+## 统一发布服务
 
 如果需要让同事通过 URL 只读预览项目，可以启动内置 Python 服务：
 
@@ -175,7 +175,7 @@ PROTODOCK_PORT=6080 python3 server.py
 http://<server-ip>:6080/index.html
 ```
 
-右上角“分享”按钮会上传项目包到后端。打开本地项目目录后，ProtoDock 会优先在浏览器内自动打包当前项目，不需要手动压缩；如果没有本地目录权限，也可以手动选择 `.zip` 项目包。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，禁止额外套项目名、版本号或交付目录。ProtoDock 专用上传包必须与完整交付包分开生成。
+右上角“发布”按钮会把公开预览与可选的 GitHub 推送合并为一次操作。打开本地项目目录后，ProtoDock 会优先在浏览器内自动打包当前项目，不需要手动压缩；如果没有本地目录权限，也可以手动选择 `.zip` 项目包。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，禁止额外套项目名、版本号或交付目录。ProtoDock 专用上传包必须与完整交付包分开生成。
 
 服务端会在导入前按 manifest 一次性校验所有 `pages.*.entry` 和 `pages.*.doc`。路径不是 ZIP 根目录相对路径、文件缺失，或清单被放在外层目录时，上传会直接失败并返回具体路径，不会等进入画布后再逐页报 `NotFoundError`。
 
@@ -185,36 +185,33 @@ http://<server-ip>:6080/index.html
 ./scripts/protodock-validate /path/to/project-v1.1-protodock-upload.zip
 ```
 
-校验器会检查 ZIP 根目录、manifest 文件路径、Canvas 节点/连线/分组、节点重叠、跨页导航和变更历史，并输出跨页路由表。`changelog` 缺失会作为旧项目兼容警告；字段存在但版本、时间或变更内容不完整时会阻止上传。发现缺失文件、重复节点、悬空连线、旧 `data-page`、`window.location`、根路径 `/pages/...` 或无效目标时同样返回非零退出码。`--json` 可供 Agent 和 CI 读取，`--warnings-as-errors` 可让连线交叉、穿过节点及间距不足也阻止发布。分享上传和 GitHub 导入会在服务端再次执行同一套核心校验。
+校验器会检查 ZIP 根目录、manifest 文件路径、Canvas 节点/连线/分组、节点重叠、跨页导航和变更历史，并输出跨页路由表。`changelog` 缺失会作为旧项目兼容警告；字段存在但版本、时间或变更内容不完整时会阻止上传。发现缺失文件、重复节点、悬空连线、旧 `data-page`、`window.location`、根路径 `/pages/...` 或无效目标时同样返回非零退出码。`--json` 可供 Agent 和 CI 读取，`--warnings-as-errors` 可让连线交叉、穿过节点及间距不足也阻止发布。统一发布和 GitHub 导入会在服务端再次执行同一套核心校验。
 
 建议分别命名为 `<project>-<version>-protodock-upload.zip` 和 `<project>-<version>-full-release.zip`，不要向用户推荐后者用于 ProtoDock 上传。
 
-自动打包只读取当前项目目录中的 `pages/**`、`docs/**` 和 `assets/**`，并把已保存的 manifest 状态写入包内的 `protodock.project.json`。如果画布或右侧文档仍有未保存修改，ProtoDock 会先要求保存并填写变更记录，不允许绕过版本历史直接分享或推送。
+自动打包只读取当前项目目录中的 `pages/**`、`docs/**` 和 `assets/**`，并把已保存的 manifest 状态写入包内的 `protodock.project.json`。如果画布或右侧文档仍有未保存修改，ProtoDock 会先要求保存并填写变更记录，不允许绕过版本历史直接发布。
 
 打开项目后，顶部的“完整产品文档”会在新标签页生成项目级 PRD 阅读视图。封面读取 `changelog` 展示日期、时间、版本号和变更内容，并高亮末条当前版本。正文按 `canvas.groups` 汇总业务模块；旧项目没有分组时自动按画布页面顺序展示。每个页面包含带设备框的完整长截图和对应 `docs/<page-id>.md` 正文，长截图会自动展开页面及内层滚动区域直至内容底部；支持目录定位、点击后滚动查看原尺寸大图，以及打印或导出 PDF。A4 横版打印使用独立纸面版式：压缩封面留白，让变更历史尽量留在封面页，把业务模块标题与模块第一页连续排版，并将页面正文重排为左侧原型图、右侧双栏 PRD。文档顶部的“返回流程图”会优先回到原 Canvas 标签；浏览器无法关闭文档标签时则在当前标签打开来源流程图。首次打开会并行生成截图并复用相同图片、字体和样式资源；截图完成后写入浏览器持久缓存，再次打开时直接读取。页面目录、公共素材、设备规格、安全区或截图模式变化后，对应缓存会自动失效。单页截图失败不会阻断其他 PRD 内容。
 
 完整产品文档是运行时汇总视图，不会生成或覆盖新的总 Markdown 文件，也不会把截图写回项目目录。页面级 `docs/*.md` 仍然是产品文档的唯一来源；本地编辑器中尚未保存的文档内容也会进入本次阅读视图。
 
-分享弹窗支持两种模式：
+发布时填写 `产品标识` 和 `版本`，两者共同形成唯一发布标识。例如产品标识 `pictale`、版本 `v1` 会得到 Git 分支 `pictale/v1` 和公开链接 `/s/pictale/v1`。再次发布同一标识会原位更新同一条公开链接，不需要区分“新建”和“更新”。GitHub 已配置时“同步到 GitHub”默认开启，也可以在发布前关闭。
 
-- `新建`：生成新的 `/s/<share-id>` 公开预览链接。
-- `更新`：从已有公开预览列表中选择一个项目，用新上传的 zip 替换对应 `shares/<share-id>/` 内容，原分享链接保持不变。
+公开链接默认进入产品文档式预览页：左侧目录按业务分组提供快速切页，中间每个页面都并排展示可交互原型与完整 PRD。原型中的按钮、Tab 和返回操作会联动定位到对应页面章节；原型 iframe 按滚动位置延迟加载，避免一次打开大量页面。右上角支持按 A4 横版打印或导出 PDF；打印前会生成并缓存每个页面的 2 倍高分辨率完整原型截图，打印时保持原图宽高比缩放、替换 iframe，并隐藏工具栏和目录。项目内容从 `shares/<product>/<version>/` 读取，不会写回上传者本地文件。
 
-分享链接默认进入产品文档式预览页：左侧目录按业务分组提供快速切页，中间每个页面都并排展示可交互原型与完整 PRD。原型中的按钮、Tab 和返回操作会联动定位到对应页面章节；原型 iframe 按滚动位置延迟加载，避免一次打开大量页面。右上角支持按 A4 横版打印或导出 PDF；打印前会生成并缓存每个页面的 2 倍高分辨率完整原型截图，打印时保持原图宽高比缩放、替换 iframe，并隐藏工具栏和目录。项目内容从 `shares/<share-id>/` 读取，不会写回上传者本地文件。
-
-如果需要查看画布节点、连线和右侧文档，可以打开 `/s/<share-id>/canvas`。这个入口仍然是只读画布，不允许浏览者编辑 canvas、docs 或页面信息。
+如果需要查看画布节点、连线和右侧文档，可以打开 `/s/<product>/<version>/canvas`。这个入口仍然是只读画布，不允许浏览者编辑 canvas、docs 或页面信息。历史随机 ID 链接 `/s/<share-id>` 仍然兼容，但新发布统一使用产品与版本路径。
 
 首页的“打开项目”会提供三种来源：
 
 - `打开本地项目`：点击选择或直接拖入包含 `protodock.project.json` 的项目文件夹，可编辑并保存。拖拽只接受一个文件夹，且清单必须位于文件夹根目录；浏览器不支持文件夹拖拽时，仍可点击选择目录。
-- `打开公开预览`：读取 `GET /api/shares`，列出当前服务上已经上传过的分享项目，点击后进入对应 `/s/<share-id>` 公开预览。
+- `打开公开预览`：读取 `GET /api/shares`，列出当前服务上已经发布过的项目，点击后进入对应公开预览。
 - `从 GitHub 仓库打开`：填写 GitHub 仓库地址、分支和可选项目路径。服务端会下载指定分支中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 公开预览。分支为必填；项目路径留空时默认读取仓库根目录。浏览器会记住上一次成功打开时使用的这三项。
 
-进入 `/s/<share-id>` 后，顶部会提供“打开画布”和“下载项目包”两个操作；下载会拿到该只读项目对应的 zip 包。
+进入公开链接后，顶部会提供“打开画布”和“下载项目包”两个操作；下载会拿到该只读项目对应的 zip 包。
 
 默认使用 `6080` 是为了避开 Chrome 会拦截的保留端口，例如 `6000` 和 `6666`。
 
-如果服务通过 FRP 或反向代理暴露，分享列表和上传结果会按当前访问地址生成链接。也就是说，从哪个域名或端口打开 ProtoDock，公开预览列表里就显示对应入口的 `/s/<share-id>`。
+如果服务通过 FRP 或反向代理暴露，发布结果会按当前访问地址生成链接。也就是说，从哪个域名或端口打开 ProtoDock，公开预览列表里就显示对应入口的 `/s/<product>/<version>`。
 
 如果主访问入口适合预览但上传链路较慢，可以单独配置高速上传入口：
 
@@ -222,9 +219,9 @@ http://<server-ip>:6080/index.html
 export PROTODOCK_UPLOAD_ORIGIN=http://100.113.173.18:6080
 ```
 
-浏览器仍从当前访问地址生成分享链接，但 ZIP 会优先发送到高速入口；高速入口不可达时自动回退当前地址。高速入口只填写 origin，不要包含 `/api/shares` 路径。
+浏览器仍从当前访问地址生成分享链接，但 ZIP 会优先发送到高速入口的 `/api/publish`；高速入口不可达时自动回退当前地址。高速入口只填写 origin，不要包含接口路径。
 
-## GitHub 推送
+## GitHub 同步
 
 内置 Python 服务也可以把当前本地项目推送到公司内部固定私有 GitHub 仓库。这个能力复用浏览器端自动打包：只读取 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，不会把服务端密钥写入项目包。
 
@@ -237,7 +234,7 @@ export PROTODOCK_GITHUB_AUTHOR_EMAIL=protodock@example.com
 PROTODOCK_PORT=6080 python3 server.py
 ```
 
-第一次打开右上角“GitHub”弹窗时，服务端会在 `.secrets/github-deploy-key` 自动生成 deploy key。把弹窗中的公钥复制到固定私有仓库的 `Settings -> Deploy keys`，并勾选写权限。私钥只保存在服务端 `.secrets/`，该目录必须留在 `.gitignore` 中。
+第一次展开“发布”弹窗中的“GitHub 连接配置”时，服务端会在 `.secrets/github-deploy-key` 自动生成 deploy key。把其中的公钥复制到固定私有仓库的 `Settings -> Deploy keys`，并勾选写权限。私钥只保存在服务端 `.secrets/`，该目录必须留在 `.gitignore` 中。
 
 如果组织策略禁用了 Deploy Keys，推荐改用 GitHub App installation token。先在 GitHub 组织里创建 GitHub App，授予目标仓库 `Contents: Read and write` 权限并安装到固定仓库，然后把 GitHub App 下载的 `.pem` 私钥放到服务端 `.secrets/` 目录。启动服务时配置：
 
@@ -262,15 +259,17 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 
 这个代理只会用于 GitHub App API、从 GitHub 打开项目、推送到 GitHub 这些出站操作；不会影响用户访问 ProtoDock 后端、公开预览链接或静态资源。当前实现面向 HTTPS GitHub 仓库和 GitHub App 模式；如果使用 Deploy Key 的 SSH 推送，仍需要在 SSH 层单独配置代理。
 
-推送时用户填写：
+发布时用户填写：
 
 - `产品名`：例如 `pictale`
 - `版本号`：例如 `v1` 或 `report-h5`
 - `Commit message`：本次提交说明
 
-后端会组合分支名为 `产品名/版本号`，例如 `pictale/v1`。每次推送都会覆盖该分支中的受控内容，再执行 commit 和 `git push --force-with-lease`。产品名和版本号只允许英文、数字、点、中横线和下划线，避免生成非法 Git 分支名。
+后端会组合分支名为 `产品名/版本号`，例如 `pictale/v1`，同时把公开链接固定为 `/s/pictale/v1`。每次发布都会更新该公开版本；开启 GitHub 同步时还会覆盖同名分支中的受控内容，再执行 commit 和 `git push --force-with-lease`。产品名和版本号只允许英文、数字、点、中横线和下划线，避免生成非法 Git 分支或 URL 路径。
 
-推送成功后，浏览器会按 `project.id` 记住该项目使用的产品名和版本号；下次打开 GitHub 弹窗时自动恢复。Commit message 不会复用，避免误用上一次提交说明。
+公开版本和 GitHub 推送是一个事务：ZIP 校验只执行一次；GitHub 推送失败时，服务端会恢复发布前的公开版本，避免链接内容与仓库分支不一致。
+
+发布成功后，浏览器会按 `project.id` 记住该项目使用的产品名、版本号和 GitHub 同步开关；下次打开发布弹窗时自动恢复。Commit message 不会复用，避免误用上一次提交说明。
 
 ## 冲突处理
 

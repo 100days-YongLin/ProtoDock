@@ -100,17 +100,8 @@
     activeObserver: null
   };
 
-  function isValidShareId(value) {
-    return /^[a-zA-Z0-9_-]{6,80}$/.test(value || '');
-  }
-
   function shareIdFromLocation() {
-    const queryShareId = new URLSearchParams(window.location.search).get('share');
-    if (isValidShareId(queryShareId)) {
-      return queryShareId;
-    }
-    const parts = window.location.pathname.split('/').filter(Boolean);
-    return parts[0] === 's' && isValidShareId(parts[1]) ? parts[1] : '';
+    return window.ProtoDockShareReference?.fromLocation?.() || '';
   }
 
   function escapeHtml(value) {
@@ -856,9 +847,9 @@
       renderError('分享链接缺少有效的项目编号。');
       return;
     }
-    state.shareBaseUrl = new URL(`/shares/${encodeURIComponent(state.shareId)}/`, window.location.origin).toString();
-    els.canvasLink.href = `/s/${encodeURIComponent(state.shareId)}/canvas`;
-    els.downloadLink.href = `/api/shares/${encodeURIComponent(state.shareId)}/download`;
+    state.shareBaseUrl = new URL(window.ProtoDockShareReference.assetBasePath(state.shareId), window.location.origin).toString();
+    els.canvasLink.href = window.ProtoDockShareReference.sharePath(state.shareId, '/canvas');
+    els.downloadLink.href = window.ProtoDockShareReference.downloadPath(state.shareId);
     try {
       const response = await fetch(projectFileUrl(MANIFEST_FILE), { cache: 'no-store' });
       if (!response.ok) {

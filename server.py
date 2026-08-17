@@ -95,6 +95,45 @@ def is_valid_share_id(value: str) -> bool:
     return 6 <= len(value) <= 80 and all(char.isalnum() or char in "_-" for char in value)
 
 
+def is_valid_share_branch_component(value: str) -> bool:
+    text = str(value or "")
+    return (
+        1 <= len(text) <= 64
+        and bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", text))
+        and not text.endswith(".")
+        and not text.endswith(".lock")
+        and ".." not in text
+        and text.lower() not in {"canvas", "download"}
+    )
+
+
+def normalize_share_reference(value: str) -> str:
+    parts = [unquote(part).strip() for part in str(value or "").strip("/").split("/") if part]
+    if len(parts) == 1 and is_valid_share_id(parts[0]):
+        return parts[0]
+    if len(parts) == 2 and all(is_valid_share_branch_component(part) for part in parts):
+        return "/".join(parts)
+    return ""
+
+
+def share_reference_path(reference: str, suffix: str = "") -> str:
+    normalized = normalize_share_reference(reference)
+    if not normalized:
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+    encoded = "/".join(quote(part, safe="") for part in normalized.split("/"))
+    return f"/s/{encoded}{suffix}"
+
+
+def share_directory_path(reference: str) -> Path:
+    normalized = normalize_share_reference(reference)
+    if not normalized:
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+    directory = (SHARES_DIR / Path(*normalized.split("/"))).resolve()
+    if os.path.commonpath([SHARES_DIR.resolve(), directory]) != str(SHARES_DIR.resolve()):
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+    return directory
+
+
 def clean_zip_name(name: str) -> PurePosixPath | None:
     normalized = name.replace("\\", "/")
     if normalized.startswith("/") or ":" in normalized.split("/", 1)[0]:
@@ -630,11 +669,12 @@ def parse_multipart_upload(headers, body: bytes) -> tuple[str, bytes, dict[str, 
 
 
 def replace_share_directory(final_dir: Path, temp_dir: Path, share_id: str) -> None:
+    final_dir.parent.mkdir(parents=True, exist_ok=True)
     if not final_dir.exists():
         temp_dir.rename(final_dir)
         return
 
-    backup_dir = SHARES_DIR / f".replace-{share_id}-{secrets.token_urlsafe(6)}"
+    backup_dir = SHARES_DIR / f".replace-{secrets.token_urlsafe(10)}"
     final_dir.rename(backup_dir)
     try:
         temp_dir.rename(final_dir)
@@ -647,9 +687,17 @@ def replace_share_directory(final_dir: Path, temp_dir: Path, share_id: str) -> N
             shutil.rmtree(backup_dir, ignore_errors=True)
 
 
+def share_reference_for_directory(directory: Path) -> str:
+    try:
+        relative = directory.resolve().relative_to(SHARES_DIR.resolve())
+    except ValueError:
+        return ""
+    return normalize_share_reference(relative.as_posix())
+
+
 def share_item_from_directory(directory: Path, url_for=None) -> dict | None:
-    share_id = directory.name
-    if not is_valid_share_id(share_id):
+    share_id = share_reference_for_directory(directory)
+    if not share_id:
         return None
     manifest_path = directory / MANIFEST_FILE
     if not manifest_path.is_file():
@@ -664,9 +712,10 @@ def share_item_from_directory(directory: Path, url_for=None) -> dict | None:
         project = {}
     name = str(project.get("name") or share_id)
     updated_at = manifest_path.stat().st_mtime
-    path = f"/s/{share_id}"
+    path = share_reference_path(share_id)
     return {
         "id": share_id,
+        "branch": share_id if "/" in share_id else "",
         "name": name,
         "path": path,
         "url": (url_for or absolute_public_url)(path),
@@ -675,9 +724,7 @@ def share_item_from_directory(directory: Path, url_for=None) -> dict | None:
 
 
 def share_directory_for(share_id: str) -> Path:
-    if not is_valid_share_id(share_id):
-        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
-    directory = SHARES_DIR / share_id
+    directory = share_directory_path(share_id)
     if not (directory / MANIFEST_FILE).is_file():
         raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
     return directory
@@ -696,12 +743,13 @@ def project_name_for_directory(directory: Path, fallback: str) -> str:
 
 
 def download_filename_for_share(directory: Path, share_id: str) -> str:
-    raw_name = project_name_for_directory(directory, f"protodock-{share_id}")
+    safe_reference = share_id.replace("/", "-")
+    raw_name = project_name_for_directory(directory, f"protodock-{safe_reference}")
     safe_name = "".join(
         char if char.isalnum() or char in {" ", "-", "_", "."} else "-"
         for char in raw_name
     ).strip(" .-_")
-    return f"{safe_name or 'protodock-project'}-{share_id}.zip"
+    return f"{safe_name or 'protodock-project'}-{safe_reference}.zip"
 
 
 def iter_share_files(directory: Path):
@@ -723,7 +771,8 @@ def iter_share_files(directory: Path):
 def build_share_archive(share_id: str) -> tuple[Path, str]:
     directory = share_directory_for(share_id)
     download_name = download_filename_for_share(directory, share_id)
-    handle = tempfile.NamedTemporaryFile(prefix=f"protodock-{share_id}-", suffix=".zip", delete=False)
+    safe_reference = share_id.replace("/", "-")
+    handle = tempfile.NamedTemporaryFile(prefix=f"protodock-{safe_reference}-", suffix=".zip", delete=False)
     archive_path = Path(handle.name)
     handle.close()
     total_size = 0
@@ -751,6 +800,8 @@ def safe_branch_component(value: str, label: str) -> str:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}只能包含英文、数字、点、中横线和下划线")
     if text.endswith(".") or text.endswith(".lock") or ".." in text:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}不能作为 Git 分支名")
+    if text.lower() in {"canvas", "download"}:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}不能使用系统保留名称 {text}")
     return text
 
 
@@ -1306,6 +1357,55 @@ def push_project_to_github(project_dir: Path, product_name: str, version: str, c
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
+def boolean_form_value(value: str) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def publish_project_snapshot(
+    project_dir: Path,
+    product_name: str,
+    version: str,
+    commit_message: str,
+    sync_github: bool,
+) -> dict:
+    branch = github_branch_name(product_name, version)
+    final_dir = share_directory_path(branch)
+    existed = final_dir.exists()
+    backup_dir = SHARES_DIR / f".publish-{secrets.token_urlsafe(10)}"
+    final_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    if existed:
+        final_dir.rename(backup_dir)
+    try:
+        project_dir.rename(final_dir)
+    except Exception:
+        if backup_dir.exists() and not final_dir.exists():
+            backup_dir.rename(final_dir)
+        raise
+
+    github_result = None
+    try:
+        if sync_github:
+            github_result = push_project_to_github(final_dir, product_name, version, commit_message)
+    except Exception:
+        shutil.rmtree(final_dir, ignore_errors=True)
+        if backup_dir.exists():
+            backup_dir.rename(final_dir)
+        raise
+    else:
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir, ignore_errors=True)
+
+    path = share_reference_path(branch)
+    return {
+        "id": branch,
+        "branch": branch,
+        "path": path,
+        "action": "updated" if existed else "created",
+        "github": github_result,
+    }
+
+
 def request_path_to_file(root: Path, request_path: str) -> Path:
     decoded = unquote(request_path).replace("\\", "/")
     normalized = posixpath.normpath(decoded.lstrip("/"))
@@ -1379,7 +1479,7 @@ def configured_upload_url(origin: str = UPLOAD_ORIGIN) -> str:
         return ""
     if parsed.path not in {"", "/"}:
         return ""
-    return f"{parsed.scheme}://{parsed.netloc}/api/shares"
+    return f"{parsed.scheme}://{parsed.netloc}/api/publish"
 
 
 class ProtoDockHandler(BaseHTTPRequestHandler):
@@ -1398,7 +1498,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def send_upload_cors_headers(self) -> None:
-        if urlparse(self.path).path != "/api/shares":
+        if urlparse(self.path).path not in {"/api/shares", "/api/publish"}:
             return
         origin = self.headers.get("Origin", "").strip()
         self.send_header("Access-Control-Allow-Origin", origin or "*")
@@ -1461,7 +1561,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_OPTIONS(self) -> None:
-        if urlparse(self.path).path != "/api/shares":
+        if urlparse(self.path).path not in {"/api/shares", "/api/publish"}:
             self.send_response(HTTPStatus.NO_CONTENT)
             self.end_headers()
             return
@@ -1472,6 +1572,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             parsed = urlparse(self.path)
+            if parsed.path == "/api/publish":
+                self.handle_publish()
+                return
             if parsed.path == "/api/shares":
                 self.handle_share_upload()
                 return
@@ -1505,6 +1608,39 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         if not isinstance(payload, dict):
             raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请求 JSON 必须是对象")
         return payload
+
+    def handle_publish(self) -> None:
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length <= 0:
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "上传内容为空")
+        if length > MAX_UPLOAD_BYTES:
+            raise ProtoDockError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "zip 上传体积过大")
+        body = self.rfile.read(length)
+        filename, archive, fields = parse_multipart_upload(self.headers, body)
+        if not filename.lower().endswith(".zip"):
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请上传 .zip 文件")
+
+        SHARES_DIR.mkdir(parents=True, exist_ok=True)
+        temp_dir = Path(tempfile.mkdtemp(prefix=".publish-upload-", dir=SHARES_DIR))
+        try:
+            validation = safe_extract_project_zip(archive, temp_dir)
+            result = publish_project_snapshot(
+                temp_dir,
+                fields.get("productName", ""),
+                fields.get("version", ""),
+                fields.get("commitMessage", ""),
+                boolean_form_value(fields.get("syncGithub", "")),
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        result["url"] = self.absolute_url(result["path"])
+        result["canvasValidation"] = validation["canvas"]
+        result["navigationValidation"] = validation["navigation"]["stats"]
+        result["productDocValidation"] = validation["productDocs"]
+        result["warnings"] = validation["warnings"]
+        status = HTTPStatus.OK if result["action"] == "updated" else HTTPStatus.CREATED
+        self.send_json(status, result)
 
     def handle_share_upload(self) -> None:
         length = int(self.headers.get("Content-Length", "0") or "0")
@@ -1590,9 +1726,10 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
     def handle_share_list(self) -> None:
         SHARES_DIR.mkdir(parents=True, exist_ok=True)
         items = []
-        for directory in SHARES_DIR.iterdir():
-            if not directory.is_dir():
-                continue
+        manifests = list(SHARES_DIR.glob(f"*/{MANIFEST_FILE}"))
+        manifests.extend(SHARES_DIR.glob(f"*/*/{MANIFEST_FILE}"))
+        for manifest_path in manifests:
+            directory = manifest_path.parent
             item = share_item_from_directory(directory, self.absolute_url)
             if item:
                 items.append(item)
@@ -1600,10 +1737,13 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         self.send_json(HTTPStatus.OK, {"items": items})
 
     def handle_share_download(self, path: str) -> None:
-        parts = [part for part in path.split("/") if part]
-        if len(parts) != 4 or parts[0] != "api" or parts[1] != "shares" or parts[3] != "download":
+        parts = [unquote(part) for part in path.split("/") if part]
+        if len(parts) not in {4, 5} or parts[:2] != ["api", "shares"] or parts[-1] != "download":
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
-        archive_path, download_name = build_share_archive(parts[2])
+        share_id = normalize_share_reference("/".join(parts[2:-1]))
+        if not share_id:
+            raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
+        archive_path, download_name = build_share_archive(share_id)
         try:
             self.serve_file(archive_path, content_type="application/zip", download_name=download_name)
         finally:
@@ -1619,14 +1759,17 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         return absolute_public_url(path, self.headers, self.server.server_address)
 
     def serve_share_index(self, path: str) -> None:
-        parts = [part for part in path.split("/") if part]
-        if len(parts) < 2 or parts[0] != "s" or not is_valid_share_id(parts[1]):
+        parts = [unquote(part) for part in path.split("/") if part]
+        if len(parts) < 2 or parts[0] != "s":
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享链接不存在")
-        is_canvas_route = len(parts) == 3 and parts[2] == "canvas"
-        if len(parts) > 2 and not is_canvas_route:
+        route_parts = parts[1:]
+        is_canvas_route = route_parts[-1:] == ["canvas"]
+        if is_canvas_route:
+            route_parts = route_parts[:-1]
+        share_id = normalize_share_reference("/".join(route_parts))
+        if not share_id or len(route_parts) not in {1, 2}:
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享链接不存在")
-        if not (SHARES_DIR / parts[1] / MANIFEST_FILE).is_file():
-            raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+        share_directory_for(share_id)
         index_path = ROOT / ("index.html" if is_canvas_route else "preview.html")
         html = index_path.read_text(encoding="utf-8")
         if is_canvas_route and "<base " not in html:
@@ -1641,12 +1784,29 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
 
     def serve_share_asset(self, path: str) -> None:
         parts = [part for part in unquote(path).split("/") if part]
-        if len(parts) < 3 or parts[0] != "shares" or not is_valid_share_id(parts[1]):
+        if len(parts) < 3 or parts[0] != "shares":
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
-        relative = PurePosixPath(*parts[2:])
+        tail = parts[1:]
+        directory = None
+        relative_parts = []
+        for reference_length in (2, 1):
+            if len(tail) <= reference_length:
+                continue
+            reference = normalize_share_reference("/".join(tail[:reference_length]))
+            if not reference:
+                continue
+            try:
+                directory = share_directory_for(reference)
+                relative_parts = tail[reference_length:]
+                break
+            except ProtoDockError:
+                continue
+        if directory is None:
+            raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
+        relative = PurePosixPath(*relative_parts)
         if not allowed_project_path(relative):
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
-        file_path = safe_target_path(SHARES_DIR / parts[1], relative)
+        file_path = safe_target_path(directory, relative)
         self.serve_file(file_path)
 
     def serve_static_asset(self, path: str) -> None:
