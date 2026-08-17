@@ -66,7 +66,8 @@ const fakeController = {
     concurrency: 2,
     openViewer: () => fakeController,
     loadMarkdown: async (page) => `# ${page.title}`,
-    buildPage: async (page) => {
+    buildPage: async (page, context) => {
+      assert.equal(context.markdown, `# ${page.title}`);
       activeBuilds += 1;
       maxActiveBuilds = Math.max(maxActiveBuilds, activeBuilds);
       await new Promise((resolve) => setTimeout(resolve, 5));
@@ -89,7 +90,11 @@ const fakeController = {
   assert.deepEqual(result, { total: 4, failed: 1, cached: 1 });
   assert.equal(maxActiveBuilds, 2);
   assert.equal(sentMessages[0].action, 'start');
-  assert.equal(sentMessages.filter((message) => message.action === 'page').length, 4);
+  const pageMessages = sentMessages.filter((message) => message.action === 'page');
+  assert.equal(pageMessages.length, 8);
+  assert.equal(pageMessages.filter((message) => message.payload.capturePending).length, 4);
+  assert.equal(pageMessages.filter((message) => !message.payload.capturePending).length, 4);
+  assert.equal(pageMessages.find((message) => message.payload.capturePending).payload.markdown.startsWith('# '), true);
   assert.equal(sentMessages.at(-1).action, 'complete');
   assert.equal(disposed, true);
   console.log('product document view tests passed');

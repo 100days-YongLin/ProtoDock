@@ -1068,6 +1068,43 @@ async function createCaptureIframe(node) {
   }
 }
 
+function loadedCanvasPreviewIframe(nodeId) {
+  const mount = document.querySelector(`[data-preview-node="${CSS.escape(nodeId)}"]`);
+  const iframe = mount?.querySelector('iframe');
+  if (!iframe) {
+    return null;
+  }
+  try {
+    const doc = iframe.contentDocument;
+    if (!doc?.documentElement || doc.readyState !== 'complete' || doc.location?.href === 'about:blank') {
+      return null;
+    }
+    return iframe;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function acquireCaptureIframe(node) {
+  const existingIframe = loadedCanvasPreviewIframe(node.id);
+  if (existingIframe) {
+    if (existingIframe.contentDocument?.fonts?.ready) {
+      await existingIframe.contentDocument.fonts.ready.catch(() => {});
+    }
+    await waitForPreviewImages(existingIframe.contentDocument);
+    return { iframe: existingIframe, captureNodeId: null, reused: true };
+  }
+  return createCaptureIframe(node);
+}
+
+function releaseCaptureIframe(capture) {
+  if (!capture?.captureNodeId) {
+    return;
+  }
+  capture.iframe.remove();
+  revokePreviewUrls(capture.captureNodeId);
+}
+
 async function copySelectedPagePng() {
   const node = activeNode();
   const page = activePage();
@@ -1169,13 +1206,11 @@ async function openFullProductDocument() {
       loadMarkdown(descriptor) {
         return loadDocForPage(descriptor.id, state.manifest.pages[descriptor.id]);
       },
-      async buildPage(descriptor) {
+      async buildPage(descriptor, context = {}) {
         const page = state.manifest.pages[descriptor.id];
         const node = state.manifest.canvas.nodes.find((item) => item.id === descriptor.nodeId);
-        const [markdown, cacheKey] = await Promise.all([
-          loadDocForPage(descriptor.id, page),
-          revisionSession.keyForPage(descriptor, captureProfile)
-        ]);
+        const markdown = context.markdown || '';
+        const cacheKey = await revisionSession.keyForPage(descriptor, captureProfile);
         const cachedScreenshot = await screenshotCache.get(cacheKey);
         if (cachedScreenshot) {
           return {
@@ -1191,7 +1226,7 @@ async function openFullProductDocument() {
           if (!node) {
             throw new Error('页面没有对应的画布节点');
           }
-          capture = await createCaptureIframe(node);
+          capture = await acquireCaptureIframe(node);
           const screenshot = await window.ProtoDockCapture.capturePagePng({
             iframe: capture.iframe,
             preset,
@@ -1204,10 +1239,7 @@ async function openFullProductDocument() {
           await screenshotCache.set(cacheKey, screenshot);
           return { markdown, screenshot, captureError: '', cacheHit: false };
         } finally {
-          if (capture) {
-            capture.iframe.remove();
-            revokePreviewUrls(capture.captureNodeId);
-          }
+          releaseCaptureIframe(capture);
         }
       },
       onPageError(descriptor, error) {

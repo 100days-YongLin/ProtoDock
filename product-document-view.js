@@ -156,8 +156,21 @@
     }
     const shot = article.querySelector('.prototype-shot');
     const markdownMount = article.querySelector('.product-markdown');
+
+    if (!article.dataset.markdownReady) {
+      markdownMount.innerHTML = '';
+      renderMarkdown(markdownMount, payload.markdown);
+      article.dataset.markdownReady = 'true';
+      article.classList.add('is-markdown-ready');
+    }
+
+    if (payload.capturePending) {
+      const outlineLink = els.outlineNavigation.querySelector(`[data-outline-page="${CSS.escape(payload.id)}"]`);
+      outlineLink?.classList.add('is-ready');
+      return;
+    }
+
     shot.innerHTML = '';
-    markdownMount.innerHTML = '';
 
     if (payload.screenshot instanceof Blob) {
       const url = URL.createObjectURL(payload.screenshot);
@@ -176,7 +189,6 @@
       shot.innerHTML = `<div class="shot-error"><strong>截图暂不可用</strong><span>${escapeHtml(payload.captureError || '无法生成此页面截图')}</span></div>`;
     }
 
-    renderMarkdown(markdownMount, payload.markdown);
     article.classList.remove('is-loading');
     const outlineLink = els.outlineNavigation.querySelector(`[data-outline-page="${CSS.escape(payload.id)}"]`);
     outlineLink?.classList.add('is-ready');

@@ -238,13 +238,21 @@
           throw new Error('完整产品文档页面已关闭');
         }
         const descriptor = pages[index];
+        let markdown = '';
         let pagePayload;
         try {
-          pagePayload = await options.buildPage(descriptor);
+          markdown = await options.loadMarkdown(descriptor);
+          controller.send('page', {
+            ...descriptor,
+            markdown,
+            screenshot: null,
+            capturePending: true
+          });
+          pagePayload = await options.buildPage(descriptor, { markdown });
         } catch (error) {
           failedCaptureCount += 1;
           pagePayload = {
-            markdown: await options.loadMarkdown(descriptor),
+            markdown: markdown || `# ${descriptor.title}\n\n产品文档或截图读取失败。`,
             screenshot: null,
             captureError: error.message || '无法生成截图'
           };
@@ -256,7 +264,12 @@
         if (pagePayload.cacheHit) {
           cachedCaptureCount += 1;
         }
-        controller.send('page', { ...descriptor, ...pagePayload });
+        controller.send('page', {
+          ...descriptor,
+          markdown,
+          ...pagePayload,
+          capturePending: false
+        });
         completedCount += 1;
         const progress = {
           current: completedCount,
