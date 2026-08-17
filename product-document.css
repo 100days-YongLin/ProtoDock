@@ -911,9 +911,55 @@ button {
     box-shadow: none;
   }
 
-  .document-cover,
-  .product-group-header {
+  .document-cover {
+    min-height: 0;
+    padding: 8mm 0 6mm;
     break-after: page;
+  }
+
+  .cover-label {
+    font-size: 8pt;
+  }
+
+  .document-cover h1 {
+    max-width: none;
+    margin: 7mm 0 3mm;
+    font-size: 34pt;
+    line-height: 1.08;
+  }
+
+  .document-cover > p {
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  .cover-meta {
+    max-width: none;
+    margin-top: 8mm;
+  }
+
+  .cover-meta div {
+    padding: 3mm 5mm 0 0;
+  }
+
+  .cover-changelog {
+    max-width: none;
+    margin-top: 8mm;
+  }
+
+  .cover-changelog > header {
+    margin-bottom: 3mm;
+    break-after: avoid;
+  }
+
+  .cover-changelog h2 {
+    margin-top: 1mm;
+    font-size: 18pt;
+  }
+
+  .cover-changelog > header > strong {
+    padding: 2mm 3mm;
+    font-size: 9pt;
   }
 
   .cover-changelog ol {
@@ -922,7 +968,39 @@ button {
   }
 
   .cover-changelog li {
+    grid-template-columns: 44mm minmax(0, 1fr) auto;
+    gap: 5mm;
+    padding: 3mm;
     break-inside: avoid;
+  }
+
+  .product-group {
+    break-before: page;
+  }
+
+  .product-group-header {
+    min-height: 0;
+    margin-bottom: 4mm;
+    padding: 0 0 3mm;
+    background: #fff;
+    break-after: avoid;
+  }
+
+  .product-group-header span {
+    font-size: 7pt;
+  }
+
+  .product-group-header h2 {
+    margin-top: 1mm;
+    font-size: 16pt;
+  }
+
+  .product-group-header > strong {
+    font-size: 8pt;
+  }
+
+  .product-group > .product-page:first-of-type {
+    break-before: auto;
   }
 
   .product-page {
@@ -932,17 +1010,20 @@ button {
   }
 
   .product-page-header {
-    margin-bottom: 7mm;
+    margin-bottom: 5mm;
   }
 
   .product-page-body {
-    display: flow-root;
+    display: grid;
+    grid-template-columns: 62mm minmax(0, 1fr);
+    align-items: start;
+    gap: 8mm;
   }
 
   .prototype-shot {
-    float: left;
-    width: 68mm;
-    margin: 0 9mm 4mm 0;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -954,5 +1035,58 @@ button {
     max-height: 126mm;
     margin: 0 auto;
     object-fit: contain;
+  }
+
+  .product-markdown .toastui-editor-contents {
+    column-count: 2;
+    column-gap: 7mm;
+    color: #27272a;
+    font-size: 8.5pt;
+    line-height: 1.32;
+  }
+
+  .product-markdown .toastui-editor-contents h2 {
+    margin: 2.5mm 0 1mm;
+    font-size: 11.5pt;
+    line-height: 1.2;
+    break-after: avoid;
+  }
+
+  .product-markdown .toastui-editor-contents h2:first-child {
+    margin-top: 0;
+  }
+
+  .product-markdown .toastui-editor-contents h3 {
+    margin: 1.8mm 0 0.8mm;
+    font-size: 9.5pt;
+    line-height: 1.25;
+    break-after: avoid;
+  }
+
+  .product-markdown .toastui-editor-contents p,
+  .product-markdown .toastui-editor-contents ul,
+  .product-markdown .toastui-editor-contents ol,
+  .product-markdown .toastui-editor-contents blockquote,
+  .product-markdown .toastui-editor-contents table {
+    margin-top: 0;
+    margin-bottom: 1.2mm;
+  }
+
+  .product-markdown .toastui-editor-contents li {
+    margin-top: 0;
+    margin-bottom: 0.3mm;
+  }
+
+  .product-markdown .toastui-editor-contents blockquote,
+  .product-markdown .toastui-editor-contents table {
+    break-inside: avoid;
+  }
+
+  .product-group > .product-page:first-of-type .prototype-shot {
+    width: 58mm;
+  }
+
+  .product-group > .product-page:first-of-type .prototype-shot img {
+    max-height: 112mm;
   }
 }

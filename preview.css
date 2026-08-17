@@ -214,32 +214,32 @@
 }
 
 @media print {
+  .share-document .document-content {
+    width: 100%;
+  }
+
   .share-document .product-page-header {
     break-after: avoid;
   }
 
-  .share-document .product-markdown .toastui-editor-contents {
-    font-size: 10pt;
-    line-height: 1.55;
-  }
-
-  .share-document .product-markdown .toastui-editor-contents h2 {
-    margin: 7mm 0 2.5mm;
-    font-size: 15pt;
-  }
-
-  .share-document .product-markdown .toastui-editor-contents h3 {
-    margin: 5mm 0 2mm;
-    font-size: 12pt;
+  .share-document .product-page-body {
+    display: grid;
+    grid-template-columns: 62mm minmax(0, 1fr);
+    align-items: start;
+    gap: 8mm;
   }
 
   .prototype-live {
-    float: left;
-    width: 68mm;
+    float: none;
+    width: 100%;
     min-height: 0;
-    margin: 0 9mm 4mm 0;
+    margin: 0;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .share-document .product-group > .product-page:first-of-type .prototype-live {
+    width: 58mm;
   }
 
   .prototype-live-stage,
@@ -257,6 +257,10 @@
     margin: 0 auto;
     object-fit: contain;
     object-position: top center;
+  }
+
+  .share-document .product-group > .product-page:first-of-type .prototype-print-shot {
+    max-height: 112mm;
   }
 
   .prototype-print-error {
