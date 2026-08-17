@@ -32,7 +32,7 @@ ProtoDock 上传包应与完整交付包分开生成。服务端会在导入前�
 
 `/s/<share-id>` 默认进入独立预览页，适合发给产品、设计或测试同学在手机上直接查看原型。
 
-公开预览运行与右侧播放器相同的真实 iframe：手机端铺满可用区域，电脑端保留项目设备壳。上传包包含可执行 JavaScript 时，浏览者可以直接点击、输入、滚动和触发页面状态；使用 `data-protodock-page`、`protodock:` 链接或 `protodock:navigate` 消息的控件还可以在分享页内切换到目标 manifest 页面。
+公开预览沿用完整产品文档的阅读结构：左侧目录按业务分组快速定位页面，中间每个页面并排展示真实 iframe 原型与完整 PRD。原型中的按钮、Tab 和返回操作会联动定位到目标页面章节；iframe 按滚动位置延迟加载，避免一次打开大量页面。上传包包含可执行 JavaScript 时，浏览者可以直接点击、输入、滚动和触发页面状态；使用 `data-protodock-page`、`protodock:` 链接或 `protodock:navigate` 消息的控件还可以在分享页内切换到目标 manifest 页面。
 
 如果页面看起来正常但按钮没有反应，应先检查上传入口是否只是静态 DOM。框架项目必须上传构建后的 HTML/CSS/JS，不能只导出 React/Vue 组件渲染后的 HTML。
 

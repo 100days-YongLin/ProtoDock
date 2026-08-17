@@ -6,50 +6,69 @@
   <title>ProtoDock 公开预览</title>
   <link rel="icon" type="image/png" href="/assets/protodock-icon.png">
   <link rel="apple-touch-icon" href="/assets/protodock-icon.png">
+  <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="/vendor/devices.css">
-  <link rel="stylesheet" href="/preview.css">
+  <link rel="stylesheet" href="/product-document.css?v=3">
+  <link rel="stylesheet" href="/preview.css?v=4">
 </head>
-<body>
-  <main class="preview-app">
-    <header class="preview-topbar">
-      <div class="preview-brand">
-        <img src="/assets/protodock-icon.png" alt="">
-        <div>
-          <strong id="projectTitle">ProtoDock 公开预览</strong>
-          <span id="pageTitle">正在加载</span>
-        </div>
+<body class="share-document">
+  <header class="document-header">
+    <div class="document-brand">
+      <a class="document-back-button" id="canvasLink" href="#" title="查看流程图">
+        <i data-lucide="network"></i>
+        <span>流程图</span>
+      </a>
+      <img src="/assets/protodock-icon.png" alt="">
+      <strong>产品文档</strong>
+    </div>
+    <div class="document-project-name" id="documentProjectName">正在准备文档</div>
+    <div class="document-actions">
+      <span class="document-progress" id="documentProgress" aria-live="polite">等待项目数据</span>
+      <button class="icon-button" id="toggleOutline" type="button" title="查看目录" aria-label="查看目录" aria-expanded="false">
+        <i data-lucide="list"></i>
+      </button>
+      <a class="icon-button" id="downloadLink" href="#" title="下载项目包" aria-label="下载项目包">
+        <i data-lucide="download"></i>
+      </a>
+    </div>
+  </header>
+
+  <div class="document-layout">
+    <aside class="document-outline" id="documentOutline">
+      <div class="outline-heading">
+        <strong>原型页面</strong>
+        <span id="outlinePageCount">0 个页面</span>
       </div>
-      <nav class="preview-actions" aria-label="预览操作">
-        <a class="icon-action" id="canvasLink" href="#" title="打开画布" aria-label="打开画布">
-          <i data-lucide="network"></i>
-        </a>
-        <a class="icon-action" id="downloadLink" href="#" title="下载项目包" aria-label="下载项目包">
-          <i data-lucide="download"></i>
-        </a>
-      </nav>
-    </header>
+      <nav id="outlineNavigation" aria-label="产品文档目录"></nav>
+    </aside>
 
-    <section class="preview-stage" id="previewStage">
-      <div class="preview-shell is-plain" id="previewShell"></div>
-    </section>
+    <main class="document-content" id="documentContent">
+      <section class="document-loading" id="documentLoading">
+        <img src="/assets/protodock-icon.png" alt="">
+        <strong>正在读取产品文档</strong>
+        <p>页面文档和可操作原型加载完成后即可直接查看。</p>
+        <div class="loading-track"><i id="loadingProgress"></i></div>
+      </section>
 
-    <footer class="preview-controls is-collapsed" id="previewControls" aria-expanded="false" title="展开切页控制">
-      <button class="control-button" id="prevPage" type="button" title="上一页" aria-label="上一页">
-        <i data-lucide="chevron-left"></i>
-      </button>
-      <label class="page-picker" for="pageSelect">
-        <span>页面</span>
-        <select id="pageSelect"></select>
-      </label>
-      <span class="page-counter" id="pageCounter">0 / 0</span>
-      <button class="control-button" id="nextPage" type="button" title="下一页" aria-label="下一页">
-        <i data-lucide="chevron-right"></i>
-      </button>
-    </footer>
-  </main>
+      <section class="document-cover" id="documentCover" hidden>
+        <span class="cover-label">ProtoDock Product Requirement Document</span>
+        <h1 id="coverTitle"></h1>
+        <p id="coverDescription"></p>
+        <dl class="cover-meta">
+          <div><dt>页面</dt><dd id="coverPageCount"></dd></div>
+          <div><dt>业务分组</dt><dd id="coverGroupCount"></dd></div>
+          <div><dt>更新方式</dt><dd>实时读取公开项目</dd></div>
+        </dl>
+      </section>
 
+      <div id="documentSections"></div>
+    </main>
+  </div>
+
+  <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
   <script src="/vendor/lucide.min.js"></script>
-  <script src="/prototype-navigation.js"></script>
-  <script src="/preview.js"></script>
+  <script src="/product-document.js?v=3"></script>
+  <script src="/prototype-navigation.js?v=3"></script>
+  <script src="/preview.js?v=18"></script>
 </body>
 </html>
