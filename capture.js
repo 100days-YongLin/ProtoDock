@@ -372,7 +372,7 @@
   }
 
   function createCanvas(width, height) {
-    const ratio = Math.min(2, Math.max(1, Math.floor(2200 / Math.max(width, height))));
+    const ratio = 2;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);

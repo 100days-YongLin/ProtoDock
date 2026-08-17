@@ -948,6 +948,11 @@ button {
   }
 
   .prototype-shot img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
     max-height: 126mm;
+    margin: 0 auto;
+    object-fit: contain;
   }
 }

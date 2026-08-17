@@ -1194,7 +1194,7 @@ async function openFullProductDocument() {
       safeAreaBottom: safeArea.bottom,
       includeFrame: true,
       fullPage: true,
-      rendererVersion: 4
+      rendererVersion: 5
     };
     const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
       projectId: state.manifest.project?.id || '',

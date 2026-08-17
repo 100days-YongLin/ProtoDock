@@ -429,7 +429,7 @@
       safeAreaBottom: safeArea.bottom,
       includeFrame: true,
       fullPage: true,
-      rendererVersion: 5
+      rendererVersion: 6
     };
     const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
       projectId: state.manifest.project?.id || '',
