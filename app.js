@@ -10,6 +10,7 @@ const MAX_SAFE_AREA_INSET = 240;
 const MANIFEST_WATCH_DIRTY_INTERVAL_MS = 6000;
 const CAPTURE_PREVIEW_READY_TIMEOUT_MS = 20000;
 const CAPTURE_IMAGE_SETTLE_TIMEOUT_MS = 5000;
+const PRODUCT_DOCUMENT_CAPTURE_CONCURRENCY = 3;
 const SHARE_ARCHIVE_ROOT_DIRS = ['pages', 'docs', 'assets'];
 
 function appBaseUrl() {
@@ -1126,7 +1127,9 @@ async function openFullProductDocument() {
   if (state.productDocumentGenerating) {
     return;
   }
-  if (!window.ProtoDockProductDocument?.generate || !window.ProtoDockCapture?.capturePagePng) {
+  if (!window.ProtoDockProductDocument?.generate
+    || !window.ProtoDockCapture?.capturePagePng
+    || !window.ProtoDockProductDocumentCache?.createProjectRevisionSession) {
     setStatus('完整产品文档模块未加载');
     return;
   }
@@ -1138,16 +1141,50 @@ async function openFullProductDocument() {
   try {
     const preset = presetFor();
     const safeArea = configuredSafeAreaInsets();
+    const captureProfile = {
+      preset: state.manifest.project?.devicePreset || 'iphone-portrait',
+      width: preset.width,
+      height: preset.height,
+      frameWidth: preset.frameWidth || preset.width,
+      frameHeight: preset.frameHeight || preset.height,
+      safeAreaEnabled: safeAreaEnabled(),
+      safeAreaTop: safeArea.top,
+      safeAreaBottom: safeArea.bottom,
+      includeFrame: true
+    };
+    const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
+      projectId: state.manifest.project?.id || '',
+      projectDirectoryName: state.projectDirectoryName,
+      projectHandle: state.projectHandle,
+      projectBaseUrl: state.projectBaseUrl,
+      shareId: state.shareId,
+      manifestHash: state.manifestHash
+    });
+    const screenshotCache = window.ProtoDockProductDocumentCache.screenshotCache;
+    const captureAssetCache = new Map();
     const result = await window.ProtoDockProductDocument.generate({
       viewerUrl: appUrl('/product-document.html'),
       manifest: state.manifest,
+      concurrency: PRODUCT_DOCUMENT_CAPTURE_CONCURRENCY,
       loadMarkdown(descriptor) {
         return loadDocForPage(descriptor.id, state.manifest.pages[descriptor.id]);
       },
       async buildPage(descriptor) {
         const page = state.manifest.pages[descriptor.id];
         const node = state.manifest.canvas.nodes.find((item) => item.id === descriptor.nodeId);
-        const markdown = await loadDocForPage(descriptor.id, page);
+        const [markdown, cacheKey] = await Promise.all([
+          loadDocForPage(descriptor.id, page),
+          revisionSession.keyForPage(descriptor, captureProfile)
+        ]);
+        const cachedScreenshot = await screenshotCache.get(cacheKey);
+        if (cachedScreenshot) {
+          return {
+            markdown,
+            screenshot: cachedScreenshot,
+            captureError: '',
+            cacheHit: true
+          };
+        }
         let capture = null;
 
         try {
@@ -1161,9 +1198,11 @@ async function openFullProductDocument() {
             safeAreaEnabled: safeAreaEnabled(),
             safeAreaTop: safeArea.top,
             safeAreaBottom: safeArea.bottom,
-            includeFrame: true
+            includeFrame: true,
+            assetCache: captureAssetCache
           });
-          return { markdown, screenshot, captureError: '' };
+          await screenshotCache.set(cacheKey, screenshot);
+          return { markdown, screenshot, captureError: '', cacheHit: false };
         } finally {
           if (capture) {
             capture.iframe.remove();
@@ -1174,13 +1213,18 @@ async function openFullProductDocument() {
       onPageError(descriptor, error) {
         console.warn(`ProtoDock: product document capture failed for ${descriptor.id}`, error);
       },
-      onProgress(current, total) {
-        setStatus(`正在生成完整产品文档 ${current}/${total}`);
+      onProgress(current, total, progress) {
+        const cacheLabel = progress.cached ? `，缓存 ${progress.cached}` : '';
+        setStatus(`正在生成完整产品文档 ${current}/${total}${cacheLabel}`);
       }
     });
-    setStatus(result.failed
-      ? `完整产品文档已生成，${result.failed} 张截图未生成`
-      : '完整产品文档已生成');
+    if (result.failed) {
+      setStatus(`完整产品文档已生成，${result.failed} 张截图未生成`);
+    } else if (result.cached) {
+      setStatus(`完整产品文档已生成，复用 ${result.cached} 张缓存截图`);
+    } else {
+      setStatus('完整产品文档已生成并缓存截图');
+    }
   } catch (error) {
     console.error(error);
     setStatus(`完整产品文档生成失败：${error.message || '未知错误'}`);

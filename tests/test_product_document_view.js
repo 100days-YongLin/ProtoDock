@@ -58,20 +58,36 @@ const fakeController = {
 };
 
 (async () => {
+  let activeBuilds = 0;
+  let maxActiveBuilds = 0;
   const result = await ProtoDockProductDocument.generate({
     viewerUrl: 'http://localhost/product-document.html',
     manifest,
+    concurrency: 2,
     openViewer: () => fakeController,
     loadMarkdown: async (page) => `# ${page.title}`,
     buildPage: async (page) => {
-      if (page.id === 'milk') {
-        throw new Error('capture failed');
+      activeBuilds += 1;
+      maxActiveBuilds = Math.max(maxActiveBuilds, activeBuilds);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      try {
+        if (page.id === 'milk') {
+          throw new Error('capture failed');
+        }
+        return {
+          markdown: `# ${page.title}`,
+          screenshot: { type: 'png' },
+          captureError: '',
+          cacheHit: page.id === 'home'
+        };
+      } finally {
+        activeBuilds -= 1;
       }
-      return { markdown: `# ${page.title}`, screenshot: { type: 'png' }, captureError: '' };
     }
   });
 
-  assert.deepEqual(result, { total: 4, failed: 1 });
+  assert.deepEqual(result, { total: 4, failed: 1, cached: 1 });
+  assert.equal(maxActiveBuilds, 2);
   assert.equal(sentMessages[0].action, 'start');
   assert.equal(sentMessages.filter((message) => message.action === 'page').length, 4);
   assert.equal(sentMessages.at(-1).action, 'complete');

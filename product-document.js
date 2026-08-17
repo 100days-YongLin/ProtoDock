@@ -212,6 +212,9 @@
     const pages = sections.flatMap((section) => section.pages);
     const controller = (options.openViewer || openViewer)(options.viewerUrl);
     let failedCaptureCount = 0;
+    let cachedCaptureCount = 0;
+    let completedCount = 0;
+    let nextPageIndex = 0;
 
     try {
       await controller.ready;
@@ -225,7 +228,12 @@
         sections
       });
 
-      for (let index = 0; index < pages.length; index += 1) {
+      async function buildNextPage() {
+        const index = nextPageIndex;
+        nextPageIndex += 1;
+        if (index >= pages.length) {
+          return;
+        }
         if (controller.isClosed()) {
           throw new Error('完整产品文档页面已关闭');
         }
@@ -245,12 +253,33 @@
         if (!pagePayload.screenshot) {
           failedCaptureCount += pagePayload.captureError ? 0 : 1;
         }
+        if (pagePayload.cacheHit) {
+          cachedCaptureCount += 1;
+        }
         controller.send('page', { ...descriptor, ...pagePayload });
-        controller.send('progress', { current: index + 1, total: pages.length });
-        options.onProgress?.(index + 1, pages.length);
+        completedCount += 1;
+        const progress = {
+          current: completedCount,
+          total: pages.length,
+          cached: cachedCaptureCount
+        };
+        controller.send('progress', progress);
+        options.onProgress?.(completedCount, pages.length, progress);
+        await buildNextPage();
       }
 
-      const result = { total: pages.length, failed: failedCaptureCount };
+      const requestedConcurrency = Number(options.concurrency || 1);
+      const workerCount = Math.min(
+        pages.length,
+        Math.max(1, Number.isFinite(requestedConcurrency) ? Math.floor(requestedConcurrency) : 1)
+      );
+      await Promise.all(Array.from({ length: workerCount }, () => buildNextPage()));
+
+      const result = {
+        total: pages.length,
+        failed: failedCaptureCount,
+        cached: cachedCaptureCount
+      };
       controller.send('complete', result);
       return result;
     } catch (error) {

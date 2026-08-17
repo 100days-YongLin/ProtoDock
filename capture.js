@@ -36,21 +36,22 @@
     }
     const url = absolutizeUrl(value, baseUrl);
     if (cache.has(url)) {
-      return cache.get(url);
+      return Promise.resolve(cache.get(url));
     }
-    try {
+    const pending = (async () => {
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`资源读取失败：${url}`);
       }
-      const dataUrl = await blobToDataUrl(await response.blob());
-      cache.set(url, dataUrl);
-      return dataUrl;
-    } catch (error) {
+      return blobToDataUrl(await response.blob());
+    })().catch((error) => {
       console.warn('ProtoDock: capture asset inline failed', url, error);
-      cache.set(url, url);
       return url;
-    }
+    });
+    cache.set(url, pending);
+    const result = await pending;
+    cache.set(url, result);
+    return result;
   }
 
   async function inlineCssUrls(cssText, baseUrl, cache) {
@@ -121,8 +122,7 @@
     }
   }
 
-  async function prepareHtmlForSvg(documentRef, width, height) {
-    const assetCache = new Map();
+  async function prepareHtmlForSvg(documentRef, width, height, assetCache = new Map()) {
     const clone = documentRef.documentElement.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
     clone.querySelectorAll('script').forEach((script) => script.remove());
@@ -163,7 +163,7 @@
     });
   }
 
-  async function iframeToImage(iframe, width, height) {
+  async function iframeToImage(iframe, width, height, assetCache) {
     const documentRef = iframe.contentDocument;
     if (!documentRef?.documentElement) {
       throw new Error('无法读取页面预览');
@@ -171,7 +171,7 @@
     if (documentRef.fonts?.ready) {
       await documentRef.fonts.ready.catch(() => {});
     }
-    const html = await prepareHtmlForSvg(documentRef, width, height);
+    const html = await prepareHtmlForSvg(documentRef, width, height, assetCache);
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
         <foreignObject x="0" y="0" width="${width}" height="${height}">
@@ -327,7 +327,7 @@
     const screenWidth = Number(preset.width || 390);
     const screenHeight = Number(preset.height || 830);
     const contentHeight = Math.max(1, screenHeight - safeTop - safeBottom);
-    const pageImage = await iframeToImage(options.iframe, screenWidth, contentHeight);
+    const pageImage = await iframeToImage(options.iframe, screenWidth, contentHeight, options.assetCache);
 
     if (options.includeFrame === false) {
       const { canvas, ctx } = createCanvas(screenWidth, screenHeight);

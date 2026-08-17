@@ -185,14 +185,24 @@
   function renderProgress(payload) {
     const total = Number(payload.total || 0);
     const current = Number(payload.current || 0);
+    const cached = Number(payload.cached || 0);
     const percent = total ? Math.round((current / total) * 100) : 0;
-    els.progress.textContent = `正在生成 ${current} / ${total}`;
+    els.progress.textContent = cached
+      ? `正在生成 ${current} / ${total} · 已复用 ${cached} 张`
+      : `正在生成 ${current} / ${total}`;
     els.loadingProgress.style.width = `${percent}%`;
   }
 
   function renderComplete(payload) {
     const failed = Number(payload.failed || 0);
-    els.progress.textContent = failed ? `已完成，${failed} 张截图未生成` : '文档已生成';
+    const cached = Number(payload.cached || 0);
+    if (failed) {
+      els.progress.textContent = `已完成，${failed} 张截图未生成`;
+    } else if (cached) {
+      els.progress.textContent = `文档已生成 · 已复用 ${cached} 张缓存截图`;
+    } else {
+      els.progress.textContent = '文档已生成 · 截图已缓存';
+    }
     els.loadingProgress.style.width = '100%';
     els.print.disabled = false;
     document.body.classList.add('is-complete');
