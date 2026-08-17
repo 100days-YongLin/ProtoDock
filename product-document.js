@@ -8,6 +8,15 @@
     return `${prefix}-${random}`;
   }
 
+  function buildViewerUrl(viewerUrl, sessionId, sourceUrl) {
+    const url = new URL(viewerUrl, sourceUrl || global.location?.href || undefined);
+    url.searchParams.set('session', sessionId);
+    if (sourceUrl) {
+      url.searchParams.set('return', sourceUrl);
+    }
+    return url;
+  }
+
   function pageDescriptor(manifest, node, group) {
     const page = manifest.pages?.[node.pageId];
     if (!page) {
@@ -104,25 +113,13 @@
 
   function openViewer(viewerUrl) {
     const sessionId = uniqueId('prd');
-    const url = new URL(viewerUrl, global.location?.href || undefined);
-    url.searchParams.set('session', sessionId);
+    const sourceUrl = global.location?.href || '';
+    const url = buildViewerUrl(viewerUrl, sessionId, sourceUrl);
     const channel = typeof global.BroadcastChannel === 'function'
       ? new global.BroadcastChannel(`protodock-prd-${sessionId}`)
       : null;
-    let viewerWindow = null;
-    if (channel && global.document) {
-      const link = global.document.createElement('a');
-      link.href = url.toString();
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.hidden = true;
-      global.document.body.append(link);
-      link.click();
-      link.remove();
-    } else {
-      viewerWindow = global.open(url.toString(), '_blank');
-    }
-    if (!channel && !viewerWindow) {
+    const viewerWindow = global.open(url.toString(), '_blank');
+    if (!viewerWindow) {
       channel?.close();
       throw new Error('浏览器阻止了新窗口，请允许 ProtoDock 打开新标签页');
     }
@@ -307,6 +304,7 @@
     READY_EVENT,
     MESSAGE_EVENT,
     buildDocumentOutline,
+    buildViewerUrl,
     openViewer,
     generate
   };

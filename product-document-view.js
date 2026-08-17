@@ -1,7 +1,8 @@
 (function initProductDocumentView() {
   const READY_EVENT = 'protodock:product-document-ready';
   const MESSAGE_EVENT = 'protodock:product-document-message';
-  const sessionId = new URLSearchParams(window.location.search).get('session') || '';
+  const searchParams = new URLSearchParams(window.location.search);
+  const sessionId = searchParams.get('session') || '';
   const channel = sessionId && typeof window.BroadcastChannel === 'function'
     ? new window.BroadcastChannel(`protodock-prd-${sessionId}`)
     : null;
@@ -12,6 +13,7 @@
 
   const els = {
     projectName: document.getElementById('documentProjectName'),
+    returnToCanvas: document.getElementById('returnToCanvas'),
     progress: document.getElementById('documentProgress'),
     print: document.getElementById('printDocument'),
     toggleOutline: document.getElementById('toggleOutline'),
@@ -58,6 +60,38 @@
     } else if (window.opener) {
       window.opener.postMessage(message, '*');
     }
+  }
+
+  function canvasReturnUrl() {
+    const fallback = new URL('./index.html', window.location.href);
+    const value = searchParams.get('return');
+    if (!value) {
+      return fallback.toString();
+    }
+    try {
+      const target = new URL(value, window.location.href);
+      if (target.origin !== window.location.origin || target.pathname.endsWith('/product-document.html')) {
+        return fallback.toString();
+      }
+      return target.toString();
+    } catch (error) {
+      return fallback.toString();
+    }
+  }
+
+  function returnToCanvas() {
+    const returnUrl = canvasReturnUrl();
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.focus();
+        window.close();
+        window.setTimeout(() => window.location.replace(returnUrl), 150);
+        return;
+      } catch (error) {
+        // Fall through to same-tab navigation when opener access is unavailable.
+      }
+    }
+    window.location.replace(returnUrl);
   }
 
   function renderMarkdown(mount, markdown) {
@@ -252,6 +286,7 @@
   channel?.addEventListener('message', handleMessage);
 
   els.print.addEventListener('click', () => window.print());
+  els.returnToCanvas.addEventListener('click', returnToCanvas);
   els.toggleOutline.addEventListener('click', () => {
     const open = document.body.classList.toggle('is-outline-open');
     els.toggleOutline.setAttribute('aria-expanded', String(open));

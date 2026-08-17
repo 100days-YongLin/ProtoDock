@@ -43,6 +43,16 @@ assert.deepEqual(
 
 assert.deepEqual(ProtoDockProductDocument.buildDocumentOutline(null), []);
 
+const viewerUrl = ProtoDockProductDocument.buildViewerUrl(
+  '/product-document.html',
+  'prd-test',
+  'http://localhost:6080/index.html?share=demo#canvas'
+);
+assert.equal(viewerUrl.origin, 'http://localhost:6080');
+assert.equal(viewerUrl.pathname, '/product-document.html');
+assert.equal(viewerUrl.searchParams.get('session'), 'prd-test');
+assert.equal(viewerUrl.searchParams.get('return'), 'http://localhost:6080/index.html?share=demo#canvas');
+
 const sentMessages = [];
 let disposed = false;
 const fakeController = {

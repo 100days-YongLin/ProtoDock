@@ -71,6 +71,37 @@ button {
   white-space: nowrap;
 }
 
+.document-back-button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 0 8px 0 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.document-back-button:hover,
+.document-back-button:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  outline: none;
+}
+
+.document-back-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.document-back-button span {
+  font-size: 12px;
+  font-weight: 680;
+}
+
 .document-project-name {
   overflow: hidden;
   min-width: 0;
@@ -600,7 +631,7 @@ button {
 
 @media (max-width: 720px) {
   .document-header {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: 0 10px;
   }
 
@@ -611,10 +642,6 @@ button {
 
   .document-project-name {
     text-align: left;
-  }
-
-  .document-brand {
-    display: none;
   }
 
   #toggleOutline {
@@ -706,6 +733,19 @@ button {
   .shot-placeholder,
   .shot-error {
     min-height: 280px;
+  }
+}
+
+@media (max-width: 420px) {
+  .document-back-button {
+    width: 34px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .document-back-button span,
+  .document-brand img {
+    display: none;
   }
 }
 
