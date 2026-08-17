@@ -2935,6 +2935,28 @@ select {
   padding: 10px 12px;
 }
 
+.share-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.share-result-head .secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.share-result-head .secondary svg {
+  width: 14px;
+  height: 14px;
+}
+
 .share-result[hidden] {
   display: none;
 }

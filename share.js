@@ -29,6 +29,7 @@
     progressBar: document.getElementById('shareProgressBar'),
     progressText: document.getElementById('shareProgressText'),
     result: document.getElementById('shareResult'),
+    copySummary: document.getElementById('copyPublishSummary'),
     shareUrl: document.getElementById('shareUrl'),
     branchUrl: document.getElementById('githubBranchUrl'),
     commitUrl: document.getElementById('githubCommitUrl'),
@@ -41,6 +42,7 @@
   let githubConfig = null;
   let formProjectId;
   let syncPreferenceApplied = false;
+  let latestPublishSummary = '';
   let uploadEndpointPromise = null;
   const activeShareReference = window.ProtoDockShareReference?.fromLocation?.() || '';
 
@@ -274,9 +276,9 @@
       }
     }
     if (els.commitMessage) {
-      els.commitMessage.disabled = !syncGithubEnabled() || isPublishing;
+      els.commitMessage.disabled = isPublishing;
     }
-    els.commitField?.classList.toggle('is-disabled', !syncGithubEnabled());
+    els.commitField?.classList.toggle('is-disabled', isPublishing);
     if (els.publish) {
       els.publish.disabled = !canPublish();
       const source = uploadSource() === 'auto' ? '打包并发布' : '上传并发布';
@@ -453,6 +455,52 @@
     if (els.result) {
       els.result.hidden = false;
     }
+    const state = protoDockState();
+    latestPublishSummary = window.ProtoDockPublishSummary?.build?.({
+      projectName: state.projectName || els.product?.value,
+      version: els.version?.value,
+      updateContent: els.commitMessage?.value || state.currentChangeDescription,
+      shareUrl,
+      branchUrl: github?.branchUrl || ''
+    }) || '';
+    if (els.copySummary) {
+      els.copySummary.disabled = !latestPublishSummary;
+    }
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch (error) {
+        // Fall through for HTTP and browsers that expose but deny Clipboard API writes.
+      }
+    }
+    const field = document.createElement('textarea');
+    field.value = text;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.select();
+    const copied = document.execCommand('copy');
+    field.remove();
+    if (!copied) {
+      throw new Error('浏览器不支持复制');
+    }
+  }
+
+  async function copyPublishSummary() {
+    if (!latestPublishSummary) {
+      return;
+    }
+    try {
+      await copyText(latestPublishSummary);
+      setStatus('更新文案已复制，可以直接发送');
+    } catch (error) {
+      setStatus('当前浏览器不能自动复制，请手动复制发布链接');
+    }
   }
 
   function selectFile(file) {
@@ -466,6 +514,7 @@
     if (els.result) {
       els.result.hidden = true;
     }
+    latestPublishSummary = '';
     resetProgress();
     updateState();
     setStatus(selectedFile ? '已选择项目包，可以发布' : '请选择 .zip 项目压缩包');
@@ -479,7 +528,7 @@
       return;
     }
     if (syncGithubEnabled() && !String(els.commitMessage?.value || '').trim()) {
-      setStatus('同步到 GitHub 时必须填写提交说明');
+      setStatus('同步到 GitHub 时必须填写更新内容');
       return;
     }
 
@@ -489,6 +538,7 @@
     if (els.result) {
       els.result.hidden = true;
     }
+    latestPublishSummary = '';
     setProgress(0);
     setStatus(source === 'auto' ? '准备打包当前项目...' : '准备上传项目包...');
 
@@ -588,6 +638,7 @@
     if (els.result) {
       els.result.hidden = true;
     }
+    latestPublishSummary = '';
     preparePublishTarget();
     fillDefaults();
     resetProgress();
@@ -616,6 +667,7 @@
   });
   els.refreshGithub?.addEventListener('click', loadGithubConfig);
   els.copyKey?.addEventListener('click', copyDeployKey);
+  els.copySummary?.addEventListener('click', copyPublishSummary);
   els.close?.addEventListener('click', closeModal);
   els.choose?.addEventListener('click', () => els.input?.click());
   els.input?.addEventListener('change', () => selectFile(els.input.files?.[0] || null));
