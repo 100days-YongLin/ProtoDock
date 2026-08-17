@@ -213,6 +213,20 @@ button {
   font-weight: 750;
 }
 
+.outline-subgroup {
+  margin: 3px 0 9px;
+}
+
+.outline-subgroup-title {
+  overflow: hidden;
+  color: #34373d;
+  padding: 7px 8px 3px 14px;
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .outline-group a[data-outline-page] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 6px;
@@ -224,6 +238,10 @@ button {
   padding: 6px 8px 6px 14px;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.outline-subgroup a[data-outline-page] {
+  padding-left: 25px;
 }
 
 .outline-group a[data-outline-page]:hover,

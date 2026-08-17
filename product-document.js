@@ -111,6 +111,67 @@
     return sections;
   }
 
+  function buildOutlineHierarchy(section) {
+    const pages = Array.isArray(section?.pages) ? section.pages : [];
+    const splitTitle = (value) => {
+      const parts = [];
+      let current = '';
+      let depth = 0;
+      for (const character of String(value || '')) {
+        if (character === '(' || character === '（') {
+          depth += 1;
+        } else if (character === ')' || character === '）') {
+          depth = Math.max(0, depth - 1);
+        }
+        if (character === '/' && depth === 0) {
+          if (current.trim()) {
+            parts.push(current.trim());
+          }
+          current = '';
+        } else {
+          current += character;
+        }
+      }
+      if (current.trim()) {
+        parts.push(current.trim());
+      }
+      return parts;
+    };
+    const prefixes = Array.from(new Set(pages.flatMap((page) => {
+      const parts = splitTitle(page.title);
+      return parts.length > 1 ? [parts[0]] : [];
+    })));
+    const entries = [];
+    const subgroupByTitle = new Map();
+
+    pages.forEach((page) => {
+      const title = String(page.title || page.id || '').trim();
+      const parts = splitTitle(title);
+      let subgroupTitle = parts.length > 1 ? parts[0] : '';
+      if (!subgroupTitle) {
+        subgroupTitle = prefixes.find((prefix) => (
+          title === prefix || new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[（(]`).test(title)
+        )) || '';
+      }
+      if (!subgroupTitle) {
+        entries.push({ type: 'page', page, label: title });
+        return;
+      }
+      let subgroup = subgroupByTitle.get(subgroupTitle);
+      if (!subgroup) {
+        subgroup = { type: 'subgroup', title: subgroupTitle, pages: [] };
+        subgroupByTitle.set(subgroupTitle, subgroup);
+        entries.push(subgroup);
+      }
+      const suffix = parts.length > 1 ? parts.slice(1).join(' / ') : title.slice(subgroupTitle.length).trim();
+      subgroup.pages.push({
+        page,
+        label: parts.length > 1 ? suffix : `概览${suffix}`
+      });
+    });
+    return entries;
+  }
+
   function openViewer(viewerUrl) {
     const sessionId = uniqueId('prd');
     const sourceUrl = global.location?.href || '';
@@ -304,6 +365,7 @@
     READY_EVENT,
     MESSAGE_EVENT,
     buildDocumentOutline,
+    buildOutlineHierarchy,
     buildViewerUrl,
     openViewer,
     generate

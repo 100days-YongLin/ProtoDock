@@ -43,6 +43,24 @@ assert.deepEqual(
 
 assert.deepEqual(ProtoDockProductDocument.buildDocumentOutline(null), []);
 
+const hierarchy = ProtoDockProductDocument.buildOutlineHierarchy({
+  pages: [
+    { id: 'home', title: '每日推送/首页' },
+    { id: 'default', title: '每日推送 / 默认' },
+    { id: 'report', title: '成长报告（日/周报）' },
+    { id: 'daily', title: '成长报告 / 日报详情' },
+    { id: 'other', title: '独立页面' }
+  ]
+});
+assert.equal(hierarchy.length, 3);
+assert.equal(hierarchy[0].type, 'subgroup');
+assert.equal(hierarchy[0].title, '每日推送');
+assert.deepEqual(hierarchy[0].pages.map((item) => item.label), ['首页', '默认']);
+assert.equal(hierarchy[1].title, '成长报告');
+assert.deepEqual(hierarchy[1].pages.map((item) => item.label), ['概览（日/周报）', '日报详情']);
+assert.equal(hierarchy[2].type, 'page');
+assert.equal(hierarchy[2].label, '独立页面');
+
 const viewerUrl = ProtoDockProductDocument.buildViewerUrl(
   '/product-document.html',
   'prd-test',

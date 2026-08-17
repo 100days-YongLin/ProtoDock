@@ -108,6 +108,22 @@
     mount.append(fallback);
   }
 
+  function renderOutlineEntries(section) {
+    const entries = window.ProtoDockProductDocument?.buildOutlineHierarchy?.(section)
+      || (section.pages || []).map((page) => ({ type: 'page', page, label: page.title }));
+    return entries.map((entry) => {
+      if (entry.type === 'subgroup') {
+        return `
+          <div class="outline-subgroup">
+            <div class="outline-subgroup-title">${escapeHtml(entry.title)}</div>
+            ${entry.pages.map(({ page, label }) => `<a href="#${escapeHtml(domId('page', page.id))}" data-outline-page="${escapeHtml(page.id)}"><span>${escapeHtml(label)}</span><i></i></a>`).join('')}
+          </div>
+        `;
+      }
+      return `<a href="#${escapeHtml(domId('page', entry.page.id))}" data-outline-page="${escapeHtml(entry.page.id)}"><span>${escapeHtml(entry.label)}</span><i></i></a>`;
+    }).join('');
+  }
+
   function showImage(url, title) {
     els.previewImage.src = url;
     els.previewImage.alt = title;
@@ -145,7 +161,7 @@
     els.outlineNavigation.innerHTML = sections.map((section) => `
       <section class="outline-group">
         <a class="outline-group-link" href="#${escapeHtml(domId('group', section.id))}">${escapeHtml(section.title)}</a>
-        ${(section.pages || []).map((page) => `<a href="#${escapeHtml(domId('page', page.id))}" data-outline-page="${escapeHtml(page.id)}"><span>${escapeHtml(page.title)}</span><i></i></a>`).join('')}
+        ${renderOutlineEntries(section)}
       </section>
     `).join('');
 
