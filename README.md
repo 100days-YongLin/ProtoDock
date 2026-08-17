@@ -129,7 +129,7 @@ http://localhost:4175/index.html
 
 顶部“播放原型”打开的右侧预览与公开 Share 页面都运行真实 iframe。页面自身的点击、输入、滚动、弹窗和 JavaScript 状态会原样执行；跨 manifest 页面必须显式使用 `data-protodock-page="<pageId>"`、`href="protodock:<pageId>"` 或 `protodock:navigate` 消息。旧静态页面仍有兼容恢复能力，但它不代表新交付通过验收；最终 ZIP 必须扫描控件和脚本，阻止根路径 `/pages/...`、目标未注册、目标节点不唯一或仅靠 `window.location` 跳转的页面。
 
-二级页面的返回键使用 `data-protodock-back`，ProtoDock 会回到用户实际访问的上一页并恢复 query/hash；可用 `data-protodock-back="home"` 指定没有访问历史时的兜底页。脚本也可以调用 `window.ProtoDockPreview?.back('home')` 或发送 `{ type: 'protodock:back', fallbackPageId: 'home' }`。iframe 自己的 `history.back()` 不等于 ProtoDock 页面历史，未绑定的返回图标和这类浏览器历史调用会被上传校验器拦截。
+二级页面的返回键使用 `data-protodock-back`，ProtoDock 会回到用户实际访问的上一页并恢复 query/hash；可用 `data-protodock-back="home"` 指定没有访问历史时的兜底页。这个属性只表达语义，不会代替页面实现点击逻辑。独立静态页面必须自带桥接脚本：优先调用 `window.ProtoDockPreview.back(fallbackPageId)`，不可用时向父窗口发送 `{ type: 'protodock:back', fallbackPageId }`。可从 Skill 的 `templates/protodock-back-bridge.js` 复制标准实现到项目 `assets/`。只声明属性、依赖宿主自动拦截，或使用 iframe 的 `history.back()` 都会被上传校验器拦截。
 
 公开分享上传和 GitHub 推送共用后端 ZIP 解压校验，提交包每次都会自动检查入口、文档、Canvas、跨页目标和返回协议；任一错误都会在写入分享目录或推送仓库前阻止操作。`scripts/protodock-validate` 用于 Agent 在交付前对同一份最终 ZIP 提前执行相同门禁。
 
@@ -293,6 +293,6 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 ./scripts/install-protodock-skill.sh both project /path/to/prototype-project
 ```
 
-更新已安装的旧版 Skill 时，拉取最新版仓库后重新执行同一条安装命令即可；脚本会先备份旧规则。更新 Skill 本身不会修改任何旧原型文件。
+更新已安装的旧版 Skill 时，拉取最新版仓库后重新执行同一条安装命令即可；脚本会先备份旧规则，并同步安装校验器和 `templates/protodock-back-bridge.js`。更新 Skill 本身不会修改任何旧原型文件，旧页面的返回桥接仍需由 Agent 显式升级。
 
 Codex 使用 `~/.agents/skills` 或项目内 `.agents/skills`；Claude Code 使用 `~/.claude/skills` 或项目内 `.claude/skills`。完整说明见使用文档的“Skill 安装与文件契约”。

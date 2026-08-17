@@ -22,7 +22,7 @@ ProtoDock 已把可分发版本放在仓库的 `skills/protodock-canvas/SKILL.md
 ./scripts/install-protodock-skill.sh claude
 ```
 
-脚本会在覆盖旧版本前创建时间戳备份。安装完成后，重新打开 Agent 或新建会话，让工具重新扫描 Skill。
+脚本会在覆盖旧版本前创建时间戳备份，并同时安装校验器与 `templates/protodock-back-bridge.js` 返回桥接模板。安装完成后，重新打开 Agent 或新建会话，让工具重新扫描 Skill。
 
 ## 更新已有 Skill
 
@@ -39,7 +39,7 @@ git pull
 ./scripts/install-protodock-skill.sh both project /path/to/old-prototype-project
 ```
 
-更新 Skill 会替换 Agent 规则文件、安装校验命令并备份旧规则，不会修改该原型的页面或 `protodock.project.json`。之后是否加入页面组，仍由下面的分组迁移流程决定。
+更新 Skill 会替换 Agent 规则文件、安装校验命令和返回桥接模板，并备份旧规则；不会自动修改该原型的页面或 `protodock.project.json`。旧页面若只有 `data-protodock-back`，需要由 Agent 显式把桥接模板复制到项目并写入页面脚本引用。之后是否加入页面组，仍由下面的分组迁移流程决定。
 
 ## 安装到项目
 
@@ -75,14 +75,14 @@ Copy-Item "skills/protodock-canvas/SKILL.md" "$HOME/.agents/skills/protodock-can
 
 Claude Code 只需把目标中的 `.agents` 改为 `.claude`。
 
-手动只复制 `SKILL.md` 时只能安装规则，校验器仍需从 ProtoDock 仓库运行。需要 Agent 在任意项目中都能直接找到校验命令时，请优先使用一键安装脚本。
+手动只复制 `SKILL.md` 时只能安装规则，校验器仍需从 ProtoDock 仓库运行，返回桥接模板也要另外复制到 Skill 的 `templates/protodock-back-bridge.js`。需要 Agent 在任意项目中都能直接找到校验命令和模板时，请优先使用一键安装脚本。
 
 ## 验证安装
 
 - Codex：新建任务后说“使用 `protodock-canvas` Skill 检查这个项目的上传包”。
 - Claude Code：进入项目后输入 `/protodock-canvas`，或直接要求它使用该 Skill 检查项目。
 
-Agent 能说出 ZIP 根目录必须直接包含 `protodock.project.json`、`pages/` 和 `docs/`，并能运行 Skill 目录中的 `scripts/protodock-validate`，即说明加载的是新版规则与校验器。
+Agent 能说出 ZIP 根目录必须直接包含 `protodock.project.json`、`pages/` 和 `docs/`，能运行 Skill 目录中的 `scripts/protodock-validate`，并能找到 `templates/protodock-back-bridge.js`，即说明加载的是新版规则、校验器与返回桥接模板。
 
 ## 用 Skill 升级旧版原型
 
@@ -170,10 +170,13 @@ Agent 必须扫描最终 ZIP 中每个页面的控件和脚本，并输出“来
 - 目标页面未注册、入口或文档缺失、目标节点重复
 - 用查询参数切换一个已经单独注册为 manifest 页面的业务状态
 - 返回键只使用 `history.back()`、`history.go(-1)`，或只有图标而没有 ProtoDock 返回协议
+- 只声明 `data-protodock-back`，没有页面自带的 click 监听、`ProtoDockPreview.back()` 调用和 `protodock:back` 消息兜底
 
 ProtoDock 会尽量恢复旧原型的脚本跳转，方便历史文件继续预览；这只是兼容能力，不能替代 Agent 的交付校验。页面状态已经有独立 `pageId` 时，应直接指向该页面，例如“饮奶”应指向饮奶历史状态页，而不是通用 `record?type=milk`。
 
-二级页返回应声明 `data-protodock-back`，需要支持直接进入二级页时可写成 `data-protodock-back="home"`。Agent 必须在播放器和 Share 中实际执行“进入二级页 → 返回”，确认回到真实来源页，而不是只检查按钮可点击。
+二级页返回应声明 `data-protodock-back`，需要支持直接进入二级页时可写成 `data-protodock-back="home"`。属性不是点击实现：Agent 应从 Skill 的 `templates/protodock-back-bridge.js` 复制标准桥接到项目，或提供等价实现。校验器会同时检查控件选择、click 绑定、`ProtoDockPreview.back()` 和 postMessage 兜底，不能只依赖宿主自动拦截。
+
+Agent 必须在 Player 和 Share 中真实点击按钮完成两条验收：从来源页进入二级页后返回实际来源并恢复 query/hash；直接打开二级页时返回声明的 fallback。只检查 DOM、属性或直接调用函数都不算完成。
 
 ## 运行交付校验器
 

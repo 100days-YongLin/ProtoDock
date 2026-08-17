@@ -321,6 +321,13 @@
           }
           const current = frame.__protoDockNavigationOptions;
           if (isBackControl(control) && typeof current?.onBack === 'function') {
+            const pageOwnsBackBridge = control.hasAttribute?.('data-protodock-back') && (
+              documentForFrame.__protoDockBackBridgeInstalled
+              || typeof frame.contentWindow?.ProtoDockBackBridge?.back === 'function'
+            );
+            if (pageOwnsBackBridge) {
+              return;
+            }
             handledEvents.add(event);
             event.preventDefault();
             event.stopImmediatePropagation?.();

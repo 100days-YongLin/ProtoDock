@@ -11,6 +11,20 @@ from protodock_validation import validate_cross_page_navigation
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts" / "protodock-validate"
+BACK_BRIDGE = """
+<script>
+document.addEventListener("click", (event) => {
+  const control = event.target.closest("[data-protodock-back]");
+  if (!control) return;
+  const fallbackPageId = control.getAttribute("data-protodock-back") || null;
+  if (typeof window.ProtoDockPreview?.back === "function") {
+    window.ProtoDockPreview.back(fallbackPageId);
+  } else {
+    window.parent.postMessage({ type: "protodock:back", fallbackPageId }, "*");
+  }
+});
+</script>
+"""
 
 
 def manifest():
@@ -93,7 +107,7 @@ class PackageValidatorTests(unittest.TestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["stats"]["routeCount"], 2)
 
-    def test_accepts_explicit_back_control_with_fallback(self):
+    def test_rejects_back_attribute_without_executable_bridge(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             data = write_project(
@@ -104,9 +118,64 @@ class PackageValidatorTests(unittest.TestCase):
 
             result = validate_cross_page_navigation(root, data)
 
+        self.assertTrue(any("页面自带返回桥接不完整" in issue for issue in result["issues"]))
+        self.assertTrue(any("不能只依赖 ProtoDock 宿主自动拦截" in issue for issue in result["issues"]))
+
+    def test_accepts_back_attribute_with_complete_inline_bridge(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(
+                root,
+                '<button data-protodock-page="detail">查看详情</button>',
+                detail_html='<button data-protodock-back="home" aria-label="返回"></button>' + BACK_BRIDGE,
+            )
+
+            result = validate_cross_page_navigation(root, data)
+
         self.assertEqual(result["issues"], [])
+        self.assertEqual(result["stats"]["backBridgePageCount"], 1)
         self.assertTrue(any(route["control"] == "返回" for route in result["routes"]))
         self.assertTrue(any(route["targetPageId"] == "home" for route in result["routes"]))
+
+    def test_accepts_complete_bridge_from_local_script(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(
+                root,
+                '<button data-protodock-page="detail">查看详情</button>',
+                detail_html=(
+                    '<button data-protodock-back="home" aria-label="返回"></button>'
+                    '<script src="./back-bridge.js"></script>'
+                ),
+            )
+            script = BACK_BRIDGE.replace("<script>", "").replace("</script>", "")
+            (root / "pages/detail/back-bridge.js").write_text(script, encoding="utf-8")
+
+            result = validate_cross_page_navigation(root, data)
+
+        self.assertEqual(result["issues"], [])
+        self.assertGreaterEqual(result["stats"]["scannedFileCount"], 3)
+
+    def test_rejects_partial_bridge_without_postmessage_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(
+                root,
+                '<button data-protodock-page="detail">查看详情</button>',
+                detail_html="""
+                    <button data-protodock-back="home" aria-label="返回"></button>
+                    <script>
+                    document.addEventListener("click", (event) => {
+                      const control = event.target.closest("[data-protodock-back]");
+                      window.ProtoDockPreview?.back(control.getAttribute("data-protodock-back"));
+                    });
+                    </script>
+                """,
+            )
+
+            result = validate_cross_page_navigation(root, data)
+
+        self.assertTrue(any("postMessage 兜底" in issue for issue in result["issues"]))
 
     def test_accepts_back_api_and_message(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -219,6 +288,30 @@ class PackageValidatorTests(unittest.TestCase):
         self.assertFalse(report["ok"])
         self.assertEqual(report["sourceType"], "zip")
         self.assertTrue(any("data-page=detail" in issue for issue in report["errors"]))
+
+    def test_cli_rejects_back_attribute_without_runtime_bridge(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "project"
+            root.mkdir()
+            write_project(
+                root,
+                '<button data-protodock-page="detail">查看详情</button>',
+                detail_html='<button data-protodock-back="home">返回</button>',
+            )
+            archive_path = Path(directory) / "prototype-protodock-upload.zip"
+            archive_project(root, archive_path)
+
+            completed = subprocess.run(
+                [str(VALIDATOR), "--json", str(archive_path)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report = json.loads(completed.stdout)
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertTrue(any("页面自带返回桥接不完整" in issue for issue in report["errors"]))
 
 
 if __name__ == "__main__":

@@ -96,7 +96,9 @@ ProtoDock runs page entries in iframes in the right-side player and the public S
 - Internal interactions stay inside the page and need no ProtoDock-specific code.
 - Every control that moves to another manifest page must declare the exact target with `data-protodock-page="<pageId>"` or an anchor such as `href="protodock:<pageId>"`. This is required, not optional, for new or modified pages.
 - A runtime may call `window.ProtoDockPreview?.navigate(pageId)` after load, or use `window.parent.postMessage({ type: 'protodock:navigate', pageId }, '*')`.
-- A control that means “return to the previously visited page” must use `data-protodock-back`. It may set a fallback page ID, for example `data-protodock-back="home"`, for direct-entry cases with no visit history. Runtime equivalents are `window.ProtoDockPreview?.back(fallbackPageId)` and `{ type: 'protodock:back', fallbackPageId }`.
+- A control that means “return to the previously visited page” must use `data-protodock-back`. It may set a fallback page ID, for example `data-protodock-back="home"`, for direct-entry cases with no visit history.
+- `data-protodock-back` is declarative metadata, not an executable implementation. Every independent static page containing it must also ship a click bridge. The bridge must first call `window.ProtoDockPreview.back(fallbackPageId)` when available and otherwise send `window.parent.postMessage({ type: 'protodock:back', fallbackPageId }, '*')`. Depending only on ProtoDock host interception is forbidden for new or modified pages.
+- Copy the installed `templates/protodock-back-bridge.js` into the project, normally as `assets/protodock-back-bridge.js`, and include it from every page that has a back control. A page at `pages/<page-id>/index.html` can use `<script src="../../assets/protodock-back-bridge.js"></script>`.
 - Do not use `history.back()`, `history.go(-1)`, an empty icon button, or a fixed parent route as a substitute for visit-history back behavior. ProtoDock page transitions happen in the host player, not the iframe's browser history.
 - Keep canvas edge labels aligned with visible control labels. Legacy static pages receive a navigation fallback only when one outgoing edge label matches one control exactly after normalization; never rely on fuzzy or positional guessing.
 - Before delivery, smoke-test a key click, input or scroll interaction and one cross-page transition in both the canvas player and `/s/<share-id>`.
@@ -113,7 +115,9 @@ Treat navigation validation as a release-blocking check on the extracted final Z
 6. Reject navigation targets containing `localhost`, `file://`, local absolute paths, undeclared entry paths, or paths that escape the ZIP root.
 7. Produce a route table with source page, visible control, declared target page, and target entry. Ambiguous or unresolved rows are errors, not warnings.
 8. Smoke-test at least one transition for every navigation mechanism used by the project in both the right-side player and public Share preview. Confirm the expected page content, not only the absence of a 404.
-9. Scan controls labeled or identified as back/return. Every such control must declare `data-protodock-back` or use the back API/message, and the smoke test must enter a second-level page and return to the actual source page.
+9. Scan controls labeled or identified as back/return. Every such control must declare `data-protodock-back` or use the back API/message.
+10. For every page containing `data-protodock-back`, statically require executable click binding, selection or reading of the back attribute, a `ProtoDockPreview.back()` call, and a `protodock:back` postMessage fallback. The attribute alone is a release-blocking error. A recognized shared runtime script is valid only when its final ZIP file is present and contains all four capabilities.
+11. Actually click a back control in the player and public Share preview. Test both history behavior (`source page -> second-level page -> back` returns to the real source with query/hash restored) and fallback behavior (direct entry to the second-level page returns to its declared fallback). DOM inspection or calling the back function directly is not an acceptance test.
 
 ProtoDock's runtime recovery for legacy pages is compatibility behavior only. It must not be used as evidence that a new delivery satisfies this gate.
 

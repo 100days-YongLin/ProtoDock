@@ -33,6 +33,14 @@ PROTODOCK_BACK_PATTERN = re.compile(
     r"(?:window\s*\.\s*)?ProtoDockPreview\s*\??\.\s*back\s*\(\s*(?:(['\"])([^'\"]+)\1)?",
     re.IGNORECASE,
 )
+BACK_BRIDGE_ATTRIBUTE_PATTERN = re.compile(
+    r"data-protodock-back|dataset\s*\.\s*protodockBack",
+    re.IGNORECASE,
+)
+CLICK_BINDING_PATTERN = re.compile(
+    r"addEventListener\s*\(\s*(['\"])click\1|\.\s*onclick\s*=",
+    re.IGNORECASE,
+)
 HISTORY_BACK_PATTERN = re.compile(
     r"(?:window\s*\.\s*)?history\s*\.\s*(?:back\s*\(|go\s*\(\s*-1\s*\))",
     re.IGNORECASE,
@@ -352,6 +360,74 @@ def back_target_from_control(control: dict) -> tuple[str, str] | None:
     return None
 
 
+def has_back_message(script: str) -> bool:
+    return any(
+        MESSAGE_BACK_TYPE_PATTERN.search(match.group("body"))
+        for match in POST_MESSAGE_PATTERN.finditer(script)
+    )
+
+
+def has_complete_inline_back_bridge(control: dict) -> bool:
+    handler = control["attrs"].get("onclick", "")
+    return bool(PROTODOCK_BACK_PATTERN.search(handler) and has_back_message(handler))
+
+
+def back_bridge_missing_capabilities(script: str) -> list[str]:
+    checks = (
+        ("data-protodock-back 控件选择", BACK_BRIDGE_ATTRIBUTE_PATTERN.search(script)),
+        ("click 事件绑定", CLICK_BINDING_PATTERN.search(script)),
+        ("ProtoDockPreview.back() 调用", PROTODOCK_BACK_PATTERN.search(script)),
+        ("protodock:back postMessage 兜底", has_back_message(script)),
+    )
+    return [label for label, matched in checks if not matched]
+
+
+def collect_page_scripts(
+    parser: PrototypeHTMLParser,
+    *,
+    page_id: str,
+    entry: str,
+    entry_path: Path,
+    project_root: Path,
+    scanned_script_contexts: set,
+) -> dict:
+    records = [
+        {
+            "source": "".join(inline_script["text"]),
+            "file": entry,
+            "line": inline_script["line"],
+        }
+        for inline_script in parser.inline_scripts
+    ]
+    issues = []
+    warnings = []
+    files = set()
+
+    for script_source, source_line in parser.script_sources:
+        parsed_source = urlsplit(script_source)
+        if parsed_source.scheme or parsed_source.netloc:
+            if LOCAL_URL_PATTERN.search(script_source):
+                issues.append(f"{page_id} · {entry}:{source_line} 的脚本引用了本地 URL：{script_source}")
+            continue
+        resolved = (entry_path.parent / unquote(parsed_source.path)).resolve()
+        script_context = (page_id, resolved)
+        if project_root not in resolved.parents or not resolved.is_file() or script_context in scanned_script_contexts:
+            continue
+        scanned_script_contexts.add(script_context)
+        files.add(resolved)
+        try:
+            script = resolved.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            warnings.append(f"{page_id} · {resolved.relative_to(project_root)} 不是 UTF-8，未执行导航扫描")
+            continue
+        records.append({
+            "source": script,
+            "file": resolved.relative_to(project_root).as_posix(),
+            "line": 1,
+        })
+    return {"records": records, "issues": issues, "warnings": warnings, "files": files}
+
+
 def target_from_control(control: dict) -> tuple[str, str] | None:
     attributes = control["attrs"]
     for name in EXPLICIT_TARGET_ATTRIBUTES:
@@ -491,6 +567,7 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
     scanned_files = set()
     scanned_page_ids = set()
     scanned_script_contexts = set()
+    back_bridge_page_count = 0
 
     for page_id, page in pages.items():
         if not isinstance(page, dict):
@@ -512,6 +589,41 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
         except Exception as error:
             issues.append(f"{page_id} · {entry} 无法解析 HTML：{error}")
             continue
+
+        page_scripts = collect_page_scripts(
+            parser,
+            page_id=page_id,
+            entry=entry,
+            entry_path=entry_path,
+            project_root=project_root,
+            scanned_script_contexts=scanned_script_contexts,
+        )
+        issues.extend(page_scripts["issues"])
+        warnings.extend(page_scripts["warnings"])
+        scanned_files.update(page_scripts["files"])
+
+        back_controls = [
+            control
+            for control in parser.controls
+            if BACK_TARGET_ATTRIBUTE in control["attrs"]
+        ]
+        if back_controls:
+            inline_bridge_complete = all(
+                has_complete_inline_back_bridge(control)
+                for control in back_controls
+            )
+            missing_capabilities = []
+            if not inline_bridge_complete:
+                combined_script = "\n".join(record["source"] for record in page_scripts["records"])
+                missing_capabilities = back_bridge_missing_capabilities(combined_script)
+            if missing_capabilities:
+                issues.append(
+                    f"{page_id} · {entry} 声明了 data-protodock-back，"
+                    f"但页面自带返回桥接不完整，缺少：{'、'.join(missing_capabilities)}；"
+                    "不能只依赖 ProtoDock 宿主自动拦截"
+                )
+            else:
+                back_bridge_page_count += 1
 
         edge_labels = outgoing_edge_labels(manifest, page_id)
         for control in parser.controls:
@@ -585,41 +697,14 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
             if normalized_label in edge_labels or (normalized_action and normalized_action in edge_labels):
                 issues.append(f"{location} 仅依赖 Canvas 连线文案推断目标；请显式声明 ProtoDock pageId")
 
-        for inline_script in parser.inline_scripts:
+        for script_record in page_scripts["records"]:
             result = scan_script(
-                "".join(inline_script["text"]),
+                script_record["source"],
                 manifest=manifest,
                 counts=counts,
                 page_id=page_id,
-                file_label=entry,
-                first_line=inline_script["line"],
-            )
-            issues.extend(result["issues"])
-            routes.extend(result["routes"])
-
-        for script_source, source_line in parser.script_sources:
-            parsed_source = urlsplit(script_source)
-            if parsed_source.scheme or parsed_source.netloc:
-                if LOCAL_URL_PATTERN.search(script_source):
-                    issues.append(f"{page_id} · {entry}:{source_line} 的脚本引用了本地 URL：{script_source}")
-                continue
-            resolved = (entry_path.parent / unquote(parsed_source.path)).resolve()
-            script_context = (page_id, resolved)
-            if project_root not in resolved.parents or not resolved.is_file() or script_context in scanned_script_contexts:
-                continue
-            scanned_script_contexts.add(script_context)
-            scanned_files.add(resolved)
-            try:
-                script = resolved.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                warnings.append(f"{page_id} · {resolved.relative_to(project_root)} 不是 UTF-8，未执行导航扫描")
-                continue
-            result = scan_script(
-                script,
-                manifest=manifest,
-                counts=counts,
-                page_id=page_id,
-                file_label=resolved.relative_to(project_root).as_posix(),
+                file_label=script_record["file"],
+                first_line=script_record["line"],
             )
             issues.extend(result["issues"])
             routes.extend(result["routes"])
@@ -642,5 +727,6 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
             "scannedFileCount": len(scanned_files),
             "routeCount": len(deduplicated_routes),
             "navigationIssueCount": len(deduplicated_issues),
+            "backBridgePageCount": back_bridge_page_count,
         },
     }

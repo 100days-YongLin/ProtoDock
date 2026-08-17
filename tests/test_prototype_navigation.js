@@ -240,6 +240,24 @@ documentClickHandler({
 global.setTimeout = originalSetTimeout;
 assert.equal(backedToPageId, 'home');
 
+backedToPageId = undefined;
+prevented = false;
+frameDocument.__protoDockBackBridgeInstalled = true;
+documentClickHandler({
+  button: 0,
+  target: explicitBackControl,
+  composedPath() {
+    return [explicitBackControl];
+  },
+  preventDefault() {
+    prevented = true;
+  },
+  stopImmediatePropagation() {}
+});
+assert.equal(backedToPageId, undefined);
+assert.equal(prevented, false);
+frameDocument.__protoDockBackBridgeInstalled = false;
+
 let recoveredNavigation = null;
 const redirectedFrame = {
   dataset: {},
