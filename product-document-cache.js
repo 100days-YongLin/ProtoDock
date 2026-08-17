@@ -183,8 +183,11 @@
 
   function createProjectRevisionSession(options = {}) {
     const directoryFingerprints = new Map();
+    const shareRevision = options.shareId
+      ? `share:${options.shareId}:${options.manifestHash || 'unknown'}`
+      : '';
     const sharedAssetsRevision = options.shareId
-      ? Promise.resolve(`share:${options.shareId}`)
+      ? Promise.resolve(shareRevision)
       : options.projectHandle
         ? directoryFingerprint(options.projectHandle, 'assets')
         : Promise.resolve(options.manifestHash || options.projectBaseUrl || 'remote');
@@ -198,7 +201,7 @@
 
     async function pageRevision(page) {
       if (options.shareId) {
-        return `share:${options.shareId}`;
+        return shareRevision;
       }
       if (options.projectHandle) {
         return localDirectoryRevision(dirname(page.entry));
@@ -217,7 +220,7 @@
           version: CACHE_VERSION,
           project: options.projectId || '',
           source: options.shareId
-            ? `${options.projectBaseUrl || ''}|share:${options.shareId}`
+            ? `${options.projectBaseUrl || ''}|${shareRevision}`
             : options.projectDirectoryName || options.projectBaseUrl || '',
           pageId: page.id || page.pageId || '',
           entry: page.entry || '',

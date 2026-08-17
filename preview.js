@@ -1,6 +1,7 @@
 (() => {
   const MANIFEST_FILE = 'protodock.project.json';
   const DOC_CONCURRENCY = 8;
+  const PRINT_CAPTURE_CONCURRENCY = 3;
   const FRAME_BRIDGE_SOURCE = `(() => {
     if (window.__protoDockShareBridgeInstalled || window.parent === window) return;
     window.__protoDockShareBridgeInstalled = true;
@@ -90,6 +91,10 @@
     frameByPageId: new Map(),
     pageHistory: [],
     activePageId: '',
+    manifestRevision: '',
+    printPreparing: false,
+    printImageUrls: new Set(),
+    printCaptureAssetCache: new Map(),
     prototypeObserverSuppressedUntil: 0,
     prototypeObserver: null,
     activeObserver: null
@@ -297,6 +302,224 @@
     };
   }
 
+  function waitForFrameReady(frame, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = async () => {
+        if (settled) {
+          return;
+        }
+        try {
+          const documentRef = frame.contentDocument;
+          const href = documentRef?.location?.href || '';
+          if (!documentRef || documentRef.readyState !== 'complete' || !href || href === 'about:blank') {
+            return;
+          }
+          settled = true;
+          window.clearTimeout(timer);
+          frame.removeEventListener('load', finish);
+          await documentRef.fonts?.ready?.catch(() => {});
+          await Promise.race([
+            Promise.all(Array.from(documentRef.images || []).map((image) => {
+              if (image.complete) {
+                return Promise.resolve();
+              }
+              return new Promise((done) => {
+                image.addEventListener('load', done, { once: true });
+                image.addEventListener('error', done, { once: true });
+              });
+            })),
+            new Promise((done) => window.setTimeout(done, 4000))
+          ]);
+          window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+        } catch (error) {
+          settled = true;
+          window.clearTimeout(timer);
+          frame.removeEventListener('load', finish);
+          reject(error);
+        }
+      };
+      const timer = window.setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          frame.removeEventListener('load', finish);
+          reject(new Error('原型页面加载超时'));
+        }
+      }, timeout);
+      frame.addEventListener('load', finish);
+      finish();
+    });
+  }
+
+  async function acquirePrintFrame(page, preset) {
+    const existing = state.frameByPageId.get(page.id);
+    if (existing) {
+      try {
+        await waitForFrameReady(existing);
+        return { frame: existing, temporary: false };
+      } catch (error) {
+        console.warn(`ProtoDock: active preview was not ready for ${page.id}; using a clean print frame.`, error);
+      }
+    }
+    const frame = document.createElement('iframe');
+    frame.className = 'print-capture-frame';
+    frame.title = `${page.title}打印截图`;
+    frame.style.width = `${preset.width}px`;
+    frame.style.height = `${preset.height}px`;
+    document.body.append(frame);
+    frame.src = projectFileUrl(page.entry);
+    try {
+      await waitForFrameReady(frame);
+      return { frame, temporary: true };
+    } catch (error) {
+      frame.remove();
+      throw error;
+    }
+  }
+
+  async function installPrintScreenshot(page, blob) {
+    const article = state.articleByPageId.get(page.id);
+    const mount = article?.querySelector(`[data-prototype-page="${CSS.escape(page.id)}"]`);
+    if (!mount) {
+      return;
+    }
+    mount.querySelector('.prototype-print-shot, .prototype-print-error')?.remove();
+    const image = new Image();
+    const url = URL.createObjectURL(blob);
+    state.printImageUrls.add(url);
+    image.className = 'prototype-print-shot';
+    image.alt = `${page.title}原型全图`;
+    image.src = url;
+    mount.append(image);
+    if (image.decode) {
+      await image.decode().catch(() => {});
+    }
+  }
+
+  function installPrintError(page, message) {
+    const article = state.articleByPageId.get(page.id);
+    const mount = article?.querySelector(`[data-prototype-page="${CSS.escape(page.id)}"]`);
+    if (!mount) {
+      return;
+    }
+    mount.querySelector('.prototype-print-shot, .prototype-print-error')?.remove();
+    const error = document.createElement('div');
+    error.className = 'prototype-print-error';
+    error.textContent = message || '原型截图生成失败';
+    mount.append(error);
+  }
+
+  async function preparePrintSnapshots() {
+    if (state.pages.every((page) => state.articleByPageId.get(page.id)?.querySelector('.prototype-print-shot'))) {
+      return;
+    }
+    if (!window.ProtoDockCapture?.capturePagePng || !window.ProtoDockProductDocumentCache) {
+      throw new Error('打印截图模块未加载');
+    }
+    const preset = devicePresets[state.manifest.project?.devicePreset] || devicePresets['iphone-portrait'];
+    const safeArea = configuredSafeArea(preset);
+    const captureProfile = {
+      preset: state.manifest.project?.devicePreset || 'iphone-portrait',
+      width: preset.width,
+      height: preset.height,
+      frameWidth: preset.frameWidth || preset.width,
+      frameHeight: preset.frameHeight || preset.height,
+      safeAreaEnabled: safeArea.enabled,
+      safeAreaTop: safeArea.top,
+      safeAreaBottom: safeArea.bottom,
+      includeFrame: true,
+      fullPage: true,
+      rendererVersion: 5
+    };
+    const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
+      projectId: state.manifest.project?.id || '',
+      projectBaseUrl: state.shareBaseUrl,
+      shareId: state.shareId,
+      manifestHash: state.manifestRevision
+    });
+    const screenshotCache = window.ProtoDockProductDocumentCache.screenshotCache;
+    let nextIndex = 0;
+    let completed = 0;
+    let failed = 0;
+
+    async function captureScreenshot(page) {
+      let lastError = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        let capture = null;
+        try {
+          capture = await acquirePrintFrame(page, preset);
+          return await window.ProtoDockCapture.capturePagePng({
+            iframe: capture.frame,
+            preset,
+            safeAreaEnabled: safeArea.enabled,
+            safeAreaTop: safeArea.top,
+            safeAreaBottom: safeArea.bottom,
+            includeFrame: true,
+            fullPage: true,
+            assetCache: state.printCaptureAssetCache
+          });
+        } catch (error) {
+          lastError = error;
+        } finally {
+          if (capture?.temporary) {
+            capture.frame.remove();
+          }
+        }
+      }
+      throw lastError || new Error('原型截图生成失败');
+    }
+
+    async function worker() {
+      while (nextIndex < state.pages.length) {
+        const page = state.pages[nextIndex++];
+        if (state.articleByPageId.get(page.id)?.querySelector('.prototype-print-shot')) {
+          completed += 1;
+          els.progress.textContent = `正在准备打印 ${completed} / ${state.pages.length}`;
+          continue;
+        }
+        try {
+          const cacheKey = await revisionSession.keyForPage(page, captureProfile);
+          let screenshot = await screenshotCache.get(cacheKey);
+          if (!screenshot) {
+            screenshot = await captureScreenshot(page);
+            await screenshotCache.set(cacheKey, screenshot);
+          }
+          await installPrintScreenshot(page, screenshot);
+        } catch (error) {
+          failed += 1;
+          console.warn(`ProtoDock: print capture failed for ${page.id}`, error);
+          installPrintError(page, `截图生成失败：${error.message || '未知错误'}`);
+        } finally {
+          completed += 1;
+          els.progress.textContent = `正在准备打印 ${completed} / ${state.pages.length}`;
+        }
+      }
+    }
+    await Promise.all(Array.from({
+      length: Math.min(PRINT_CAPTURE_CONCURRENCY, state.pages.length)
+    }, worker));
+    return { failed };
+  }
+
+  async function printDocument() {
+    if (state.printPreparing) {
+      return;
+    }
+    state.printPreparing = true;
+    els.print.disabled = true;
+    try {
+      const result = await preparePrintSnapshots();
+      els.progress.textContent = result?.failed ? `${result.failed} 个原型截图未生成` : '打印内容已准备';
+      window.print();
+    } catch (error) {
+      console.error(error);
+      els.progress.textContent = error.message || '打印准备失败';
+    } finally {
+      state.printPreparing = false;
+      els.print.disabled = false;
+    }
+  }
+
   function frameMarkup(page) {
     return `<iframe class="prototype-live-frame" title="${escapeHtml(page.title)}可操作原型" loading="lazy"></iframe>`;
   }
@@ -423,7 +646,8 @@
         const bridgeScript = frameDocument.createElement('script');
         bridgeScript.textContent = FRAME_BRIDGE_SOURCE;
         bridgeScript.dataset.protodockShareBridge = 'true';
-        (frameDocument.head || frameDocument.documentElement).append(bridgeScript);
+        const bridgeRoot = frameDocument.head || frameDocument.documentElement;
+        bridgeRoot?.append(bridgeScript);
       }
       frameWindow.ProtoDockPreview = {
         navigate(targetPageId) {
@@ -561,7 +785,7 @@
   }
 
   function bindEvents() {
-    els.print.addEventListener('click', () => window.print());
+    els.print.addEventListener('click', printDocument);
     els.toggleOutline.addEventListener('click', () => {
       const open = document.body.classList.toggle('is-outline-open');
       els.toggleOutline.setAttribute('aria-expanded', String(open));
@@ -612,6 +836,10 @@
         els.toggleOutline.setAttribute('aria-expanded', 'false');
       }
     });
+    window.addEventListener('afterprint', () => setProgress(state.pages.length, state.pages.length));
+    window.addEventListener('beforeunload', () => {
+      state.printImageUrls.forEach((url) => URL.revokeObjectURL(url));
+    });
   }
 
   function renderError(message) {
@@ -637,6 +865,12 @@
         throw new Error('分享项目不存在或已经失效。');
       }
       state.manifest = await response.json();
+      state.manifestRevision = [
+        response.headers.get('etag') || '',
+        response.headers.get('last-modified') || '',
+        response.headers.get('content-length') || '',
+        JSON.stringify(state.manifest)
+      ].join('|');
       state.sections = buildSections(state.manifest);
       state.pages = state.sections.flatMap((section) => section.pages || []);
       state.pages.forEach((page) => state.pageById.set(page.id, page));

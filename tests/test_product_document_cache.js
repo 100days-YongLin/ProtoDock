@@ -73,6 +73,7 @@ function directoryHandle(entries) {
   const shareSession = ProtoDockProductDocumentCache.createProjectRevisionSession({
     projectId: 'demo',
     shareId: 'immutable-share',
+    manifestHash: 'revision-a',
     fetch: async () => {
       fetched = true;
       throw new Error('share cache should not fetch');
@@ -80,6 +81,16 @@ function directoryHandle(entries) {
   });
   assert.match(await shareSession.keyForPage(page, profile), /^prd-shot-v1:/);
   assert.equal(fetched, false);
+
+  const updatedShareSession = ProtoDockProductDocumentCache.createProjectRevisionSession({
+    projectId: 'demo',
+    shareId: 'immutable-share',
+    manifestHash: 'revision-b'
+  });
+  assert.notEqual(
+    await updatedShareSession.keyForPage(page, profile),
+    await shareSession.keyForPage(page, profile)
+  );
 
   console.log('product document screenshot cache tests passed');
 })().catch((error) => {

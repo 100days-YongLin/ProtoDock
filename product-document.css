@@ -935,8 +935,15 @@ button {
   }
 
   .product-page-body {
-    grid-template-columns: 58mm minmax(0, 1fr);
-    gap: 10mm;
+    display: flow-root;
+  }
+
+  .prototype-shot {
+    float: left;
+    width: 58mm;
+    margin: 0 10mm 6mm 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .prototype-shot img {

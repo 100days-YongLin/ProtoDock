@@ -32,6 +32,21 @@
   margin: 0;
 }
 
+.prototype-print-shot,
+.prototype-print-error {
+  display: none;
+}
+
+.print-capture-frame {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .prototype-live-stage {
   position: relative;
   display: flex;
@@ -199,7 +214,54 @@
 }
 
 @media print {
-  .prototype-live-frame {
-    pointer-events: none;
+  .share-document .product-page-header {
+    break-after: avoid;
+  }
+
+  .share-document .product-markdown .toastui-editor-contents {
+    font-size: 10pt;
+    line-height: 1.55;
+  }
+
+  .share-document .product-markdown .toastui-editor-contents h2 {
+    margin: 7mm 0 2.5mm;
+    font-size: 15pt;
+  }
+
+  .share-document .product-markdown .toastui-editor-contents h3 {
+    margin: 5mm 0 2mm;
+    font-size: 12pt;
+  }
+
+  .prototype-live {
+    float: left;
+    width: 58mm;
+    min-height: 0;
+    margin: 0 10mm 6mm 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .prototype-live-stage,
+  .prototype-live-placeholder,
+  .prototype-live-error {
+    display: none !important;
+  }
+
+  .prototype-print-shot {
+    display: block;
+    width: 100%;
+    max-height: 210mm;
+    object-fit: contain;
+    object-position: top center;
+  }
+
+  .prototype-print-error {
+    display: block;
+    border: 1px solid #c9ccd2;
+    color: #6b7280;
+    padding: 8mm;
+    font-size: 10pt;
+    text-align: center;
   }
 }
