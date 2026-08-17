@@ -1,5 +1,5 @@
 (function initProtoDockShareReference(global) {
-  const RESERVED_COMPONENTS = new Set(['canvas', 'download']);
+  const RESERVED_COMPONENTS = new Set(['canvas', 'download', 'latest']);
 
   function isValidLegacyId(value) {
     return /^[A-Za-z0-9_-]{6,80}$/.test(String(value || ''));

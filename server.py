@@ -34,6 +34,8 @@ DOCS_EXPORT_DIR = ROOT / "docs-dist"
 SECRETS_DIR = ROOT / ".secrets"
 GITHUB_WORK_DIR = ROOT / ".github-work"
 MANIFEST_FILE = "protodock.project.json"
+LATEST_SHARE_COMPONENT = "latest"
+LATEST_POINTER_FILE = ".latest.json"
 
 MAX_UPLOAD_BYTES = int(os.environ.get("PROTODOCK_MAX_UPLOAD_BYTES", 100 * 1024 * 1024))
 MAX_EXTRACTED_BYTES = int(os.environ.get("PROTODOCK_MAX_EXTRACTED_BYTES", 250 * 1024 * 1024))
@@ -103,7 +105,7 @@ def is_valid_share_branch_component(value: str) -> bool:
         and not text.endswith(".")
         and not text.endswith(".lock")
         and ".." not in text
-        and text.lower() not in {"canvas", "download"}
+        and text.lower() not in {"canvas", "download", LATEST_SHARE_COMPONENT}
     )
 
 
@@ -124,6 +126,13 @@ def share_reference_path(reference: str, suffix: str = "") -> str:
     return f"/s/{encoded}{suffix}"
 
 
+def latest_share_path(product_name: str, suffix: str = "") -> str:
+    product = str(product_name or "").strip()
+    if not is_valid_share_branch_component(product):
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+    return f"/s/{quote(product, safe='')}/{LATEST_SHARE_COMPONENT}{suffix}"
+
+
 def share_directory_path(reference: str) -> Path:
     normalized = normalize_share_reference(reference)
     if not normalized:
@@ -132,6 +141,55 @@ def share_directory_path(reference: str) -> Path:
     if os.path.commonpath([SHARES_DIR.resolve(), directory]) != str(SHARES_DIR.resolve()):
         raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
     return directory
+
+
+def latest_pointer_path(product_name: str) -> Path:
+    product = str(product_name or "").strip()
+    if not is_valid_share_branch_component(product):
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享项目不存在")
+    return SHARES_DIR / product / LATEST_POINTER_FILE
+
+
+def prepare_latest_pointer(product_name: str, version: str) -> tuple[Path, Path]:
+    pointer_path = latest_pointer_path(product_name)
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = pointer_path.parent / f".latest-{secrets.token_urlsafe(8)}.tmp"
+    payload = {
+        "version": version,
+        "updatedAt": int(time.time()),
+    }
+    try:
+        temp_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+    return temp_path, pointer_path
+
+
+def latest_share_reference(product_name: str) -> str:
+    product = str(product_name or "").strip()
+    pointer_path = latest_pointer_path(product)
+    try:
+        payload = json.loads(pointer_path.read_text(encoding="utf-8"))
+        version = str(payload.get("version") or "") if isinstance(payload, dict) else ""
+    except (OSError, json.JSONDecodeError):
+        version = ""
+
+    if is_valid_share_branch_component(version):
+        reference = f"{product}/{version}"
+        if (share_directory_path(reference) / MANIFEST_FILE).is_file():
+            return reference
+
+    candidates = []
+    product_dir = pointer_path.parent
+    if product_dir.is_dir():
+        for manifest_path in product_dir.glob(f"*/{MANIFEST_FILE}"):
+            candidate_version = manifest_path.parent.name
+            if is_valid_share_branch_component(candidate_version):
+                candidates.append((manifest_path.stat().st_mtime, candidate_version))
+    if not candidates:
+        raise ProtoDockError(HTTPStatus.NOT_FOUND, "该产品还没有可用的发布版本")
+    return f"{product}/{max(candidates)[1]}"
 
 
 def clean_zip_name(name: str) -> PurePosixPath | None:
@@ -800,7 +858,7 @@ def safe_branch_component(value: str, label: str) -> str:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}只能包含英文、数字、点、中横线和下划线")
     if text.endswith(".") or text.endswith(".lock") or ".." in text:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}不能作为 Git 分支名")
-    if text.lower() in {"canvas", "download"}:
+    if text.lower() in {"canvas", "download", LATEST_SHARE_COMPONENT}:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, f"{label}不能使用系统保留名称 {text}")
     return text
 
@@ -1369,27 +1427,30 @@ def publish_project_snapshot(
     sync_github: bool,
 ) -> dict:
     branch = github_branch_name(product_name, version)
+    product, version_name = branch.split("/", 1)
     final_dir = share_directory_path(branch)
     existed = final_dir.exists()
     backup_dir = SHARES_DIR / f".publish-{secrets.token_urlsafe(10)}"
     final_dir.parent.mkdir(parents=True, exist_ok=True)
+    pointer_temp, pointer_path = prepare_latest_pointer(product, version_name)
 
-    if existed:
-        final_dir.rename(backup_dir)
+    backup_created = False
+    published = False
     try:
+        if existed:
+            final_dir.rename(backup_dir)
+            backup_created = True
         project_dir.rename(final_dir)
-    except Exception:
-        if backup_dir.exists() and not final_dir.exists():
-            backup_dir.rename(final_dir)
-        raise
-
-    github_result = None
-    try:
+        published = True
+        github_result = None
         if sync_github:
             github_result = push_project_to_github(final_dir, product_name, version, commit_message)
+        os.replace(pointer_temp, pointer_path)
     except Exception:
-        shutil.rmtree(final_dir, ignore_errors=True)
-        if backup_dir.exists():
+        pointer_temp.unlink(missing_ok=True)
+        if published and final_dir.exists():
+            shutil.rmtree(final_dir, ignore_errors=True)
+        if backup_created and backup_dir.exists():
             backup_dir.rename(final_dir)
         raise
     else:
@@ -1401,6 +1462,7 @@ def publish_project_snapshot(
         "id": branch,
         "branch": branch,
         "path": path,
+        "latestPath": latest_share_path(product),
         "action": "updated" if existed else "created",
         "github": github_result,
     }
@@ -1635,6 +1697,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             shutil.rmtree(temp_dir, ignore_errors=True)
 
         result["url"] = self.absolute_url(result["path"])
+        result["latestUrl"] = self.absolute_url(result["latestPath"])
         result["canvasValidation"] = validation["canvas"]
         result["navigationValidation"] = validation["navigation"]["stats"]
         result["productDocValidation"] = validation["productDocs"]
@@ -1766,6 +1829,19 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         is_canvas_route = route_parts[-1:] == ["canvas"]
         if is_canvas_route:
             route_parts = route_parts[:-1]
+        if len(route_parts) == 2 and route_parts[1].lower() == LATEST_SHARE_COMPONENT:
+            reference = latest_share_reference(route_parts[0])
+            suffix = "/canvas" if is_canvas_route else ""
+            target = share_reference_path(reference, suffix)
+            query = urlparse(self.path).query
+            if query:
+                target = f"{target}?{query}"
+            self.send_response(HTTPStatus.FOUND)
+            self.send_header("Location", target)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         share_id = normalize_share_reference("/".join(route_parts))
         if not share_id or len(route_parts) not in {1, 2}:
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "分享链接不存在")

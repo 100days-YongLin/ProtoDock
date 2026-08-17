@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,8 +37,41 @@ class PublishingTests(unittest.TestCase):
 
         self.assertEqual(result["id"], "pictale/v1")
         self.assertEqual(result["path"], "/s/pictale/v1")
+        self.assertEqual(result["latestPath"], "/s/pictale/latest")
         self.assertEqual(result["action"], "created")
         self.assertEqual(published_name, "First")
+
+    def test_latest_reference_tracks_last_successful_publish(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shares = root / "shares"
+            first = root / "first"
+            second = root / "second"
+            write_snapshot(first, "First")
+            write_snapshot(second, "Second")
+            with patch.object(server, "SHARES_DIR", shares):
+                server.publish_project_snapshot(first, "pictale", "v1", "", False)
+                server.publish_project_snapshot(second, "pictale", "v2", "", False)
+                latest = server.latest_share_reference("pictale")
+
+        self.assertEqual(latest, "pictale/v2")
+
+    def test_latest_reference_falls_back_for_existing_products(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shares = root / "shares"
+            older = shares / "pictale" / "v1"
+            newer = shares / "pictale" / "v2"
+            write_snapshot(older, "First")
+            write_snapshot(newer, "Second")
+            older_manifest = older / server.MANIFEST_FILE
+            newer_manifest = newer / server.MANIFEST_FILE
+            os.utime(older_manifest, (100, 100))
+            os.utime(newer_manifest, (200, 200))
+            with patch.object(server, "SHARES_DIR", shares):
+                latest = server.latest_share_reference("pictale")
+
+        self.assertEqual(latest, "pictale/v2")
 
     def test_publish_rolls_back_share_when_github_push_fails(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -58,6 +92,29 @@ class PublishingTests(unittest.TestCase):
                 restored_name = server.project_name_for_directory(restored, "")
 
         self.assertEqual(restored_name, "Stable")
+
+    def test_failed_publish_does_not_advance_latest_reference(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shares = root / "shares"
+            stable = root / "stable"
+            broken = root / "broken"
+            write_snapshot(stable, "Stable")
+            write_snapshot(broken, "Broken")
+            with patch.object(server, "SHARES_DIR", shares):
+                server.publish_project_snapshot(stable, "pictale", "v1", "", False)
+                with patch.object(
+                    server,
+                    "push_project_to_github",
+                    side_effect=server.ProtoDockError(server.HTTPStatus.BAD_REQUEST, "push failed"),
+                ):
+                    with self.assertRaises(server.ProtoDockError):
+                        server.publish_project_snapshot(broken, "pictale", "v2", "update", True)
+                latest = server.latest_share_reference("pictale")
+                failed_version_exists = (shares / "pictale" / "v2").exists()
+
+        self.assertEqual(latest, "pictale/v1")
+        self.assertFalse(failed_version_exists)
 
     def test_publish_returns_github_result_from_same_branch(self):
         github_result = {

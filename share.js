@@ -31,6 +31,7 @@
     result: document.getElementById('shareResult'),
     copySummary: document.getElementById('copyPublishSummary'),
     shareUrl: document.getElementById('shareUrl'),
+    latestShareUrl: document.getElementById('latestShareUrl'),
     branchUrl: document.getElementById('githubBranchUrl'),
     commitUrl: document.getElementById('githubCommitUrl'),
     fileName: document.getElementById('shareFileName')
@@ -437,9 +438,15 @@
   function renderResult(payload) {
     const sharePath = payload.path || window.ProtoDockShareReference?.sharePath?.(payload.id);
     const shareUrl = sharePath ? appUrl(sharePath) : '';
+    const latestShareUrl = payload.latestPath ? appUrl(payload.latestPath) : (payload.latestUrl || '');
     if (els.shareUrl) {
       els.shareUrl.href = shareUrl || '#';
-      els.shareUrl.textContent = shareUrl ? `公开预览：${shareUrl}` : '公开预览地址生成失败';
+      els.shareUrl.textContent = shareUrl ? `当前版本：${shareUrl}` : '当前版本地址生成失败';
+    }
+    if (els.latestShareUrl) {
+      els.latestShareUrl.hidden = !latestShareUrl;
+      els.latestShareUrl.href = latestShareUrl || '#';
+      els.latestShareUrl.textContent = latestShareUrl ? `最新版入口：${latestShareUrl}` : '';
     }
     const github = payload.github || null;
     if (els.branchUrl) {
@@ -461,6 +468,7 @@
       version: els.version?.value,
       updateContent: els.commitMessage?.value || state.currentChangeDescription,
       shareUrl,
+      latestShareUrl,
       branchUrl: github?.branchUrl || ''
     }) || '';
     if (els.copySummary) {

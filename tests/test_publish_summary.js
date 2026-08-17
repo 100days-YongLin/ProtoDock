@@ -9,6 +9,7 @@ assert.equal(summary.build({
   version: 'v1.1',
   updateContent: '补充成长报告与返回流程。',
   shareUrl: 'https://example.com/s/pictale/v1.1',
+  latestShareUrl: 'https://example.com/s/pictale/latest',
   branchUrl: 'https://github.com/example/prototypes/tree/pictale/v1.1'
 }), [
   'PicTale 家长端 v1.1 已更新',
@@ -16,7 +17,8 @@ assert.equal(summary.build({
   '更新内容：',
   '补充成长报告与返回流程。',
   '',
-  '公开预览：https://example.com/s/pictale/v1.1',
+  '当前版本：https://example.com/s/pictale/v1.1',
+  '最新版入口：https://example.com/s/pictale/latest',
   'GitHub 分支：https://github.com/example/prototypes/tree/pictale/v1.1'
 ].join('\n'));
 

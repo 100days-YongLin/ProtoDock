@@ -8,6 +8,7 @@
     const version = clean(options.version);
     const updateContent = clean(options.updateContent) || '完成本次原型更新。';
     const shareUrl = clean(options.shareUrl);
+    const latestShareUrl = clean(options.latestShareUrl);
     const branchUrl = clean(options.branchUrl);
     const title = [projectName, version].filter(Boolean).join(' ');
     const lines = [
@@ -17,7 +18,10 @@
       updateContent
     ];
     if (shareUrl) {
-      lines.push('', `公开预览：${shareUrl}`);
+      lines.push('', `当前版本：${shareUrl}`);
+    }
+    if (latestShareUrl) {
+      lines.push(`最新版入口：${latestShareUrl}`);
     }
     if (branchUrl) {
       lines.push(`GitHub 分支：${branchUrl}`);
