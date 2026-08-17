@@ -51,6 +51,11 @@
     return path ? `/api/shares/${path}/download` : '';
   }
 
+  function pdfPath(reference, suffix = '') {
+    const path = encoded(reference);
+    return path ? `/api/shares/${path}/pdf${suffix}` : '';
+  }
+
   function decodePathPart(value) {
     try {
       return decodeURIComponent(value);
@@ -88,6 +93,7 @@
     isValidBranchComponent,
     isValidLegacyId,
     normalize,
+    pdfPath,
     sharePath
   });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -23,6 +23,26 @@ npx mint export
 
 `mint export` 会生成离线部署包。部署时将导出包解压到服务端 `docs-dist/`，ProtoDock 的 Python 服务会把 `/docs` 指向这份 Mintlify 产物。
 
+## PDF 运行时
+
+公开分享使用服务端预生成 PDF。首次部署时安装隔离运行时：
+
+```bash
+./scripts/install-pdf-runtime.sh
+```
+
+脚本会在 `.pdf-runtime/` 安装 Playwright 和 Chromium，不修改系统 Python。Ubuntu 26.04 会自动使用 Ubuntu 24.04 兼容浏览器构建。systemd 环境建议配置：
+
+```bash
+PROTODOCK_PDF_PYTHON=/home/akitumn/protodock-share/.pdf-runtime/bin/python
+PROTODOCK_PDF_PLAYWRIGHT_PLATFORM=ubuntu24.04-x64
+PROTODOCK_PDF_RENDER_WORKERS=2
+PROTODOCK_PDF_RENDER_TIMEOUT_SECONDS=600
+PROTODOCK_PDF_INTERNAL_ORIGIN=http://127.0.0.1:6080
+```
+
+PDF 保存在 `.pdf-cache/`，缓存键包含最终项目文件内容和渲染器版本。同一份发布内容只生成一次；同版本重新发布且内容变化时自动生成新文件。发布响应不会等待 PDF，后台队列完成后分享页直接下载。
+
 ## 公开访问
 
 如果服务通过 FRP 或反向代理暴露，主应用仍然使用当前访问地址生成分享链接。文档入口固定为 `/docs`，跟随同一个域名访问。

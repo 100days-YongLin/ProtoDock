@@ -404,20 +404,31 @@
     };
   }
 
-  function canvasToPngBlob(canvas) {
+  function canvasToBlob(canvas, mimeType = 'image/png', quality) {
     return new Promise((resolve, reject) => {
       canvas.toBlob((blob) => {
         if (blob) {
           resolve(blob);
         } else {
-          reject(new Error('无法生成 PNG'));
+          reject(new Error('无法生成截图'));
         }
-      }, 'image/png');
+      }, mimeType, quality);
     });
   }
 
-  async function capturePagePng(options) {
+  function resetCanvas(ctx, width, height, backgroundColor = '') {
+    ctx.clearRect(0, 0, width, height);
+    if (backgroundColor) {
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, width, height);
+    }
+  }
+
+  async function capturePageImage(options) {
     const preset = options.preset;
+    const mimeType = options.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+    const quality = mimeType === 'image/jpeg' ? Number(options.quality || 0.88) : undefined;
+    const backgroundColor = mimeType === 'image/jpeg' ? (options.backgroundColor || '#fff') : '';
     const measuredPageHeight = options.fullPage
       ? measureFullPageHeight(options.iframe.contentDocument, Number(preset.height || 830))
       : 0;
@@ -441,14 +452,14 @@
 
     if (options.includeFrame === false) {
       const { canvas, ctx } = createCanvas(screenWidth, screenHeight);
-      ctx.clearRect(0, 0, screenWidth, screenHeight);
+      resetCanvas(ctx, screenWidth, screenHeight, backgroundColor);
       drawScreenOnly(ctx, pageImage, {
         screenWidth,
         screenHeight,
         safeTop,
         safeBottom
       });
-      return canvasToPngBlob(canvas);
+      return canvasToBlob(canvas, mimeType, quality);
     }
 
     const isDevice = !!preset.deviceClass;
@@ -468,7 +479,7 @@
       safeBottom
     };
 
-    ctx.clearRect(0, 0, outputWidth, outputHeight);
+    resetCanvas(ctx, outputWidth, outputHeight, backgroundColor);
     if (preset.deviceClass?.includes('iphone')) {
       drawIphoneShell(ctx, pageImage, metrics);
     } else if (preset.deviceClass?.includes('ipad')) {
@@ -480,7 +491,11 @@
         frameHeight: screenHeight + barHeight
       });
     }
-    return canvasToPngBlob(canvas);
+    return canvasToBlob(canvas, mimeType, quality);
+  }
+
+  async function capturePagePng(options) {
+    return capturePageImage({ ...options, mimeType: 'image/png' });
   }
 
   function downloadBlob(blob, filename) {
@@ -505,6 +520,7 @@
 
   const root = typeof window !== 'undefined' ? window : globalThis;
   root.ProtoDockCapture = {
+    capturePageImage,
     capturePagePng,
     copyPngBlob,
     captureGeometry,

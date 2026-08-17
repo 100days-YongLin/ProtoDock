@@ -92,7 +92,9 @@
     pageHistory: [],
     activePageId: '',
     manifestRevision: '',
+    documentReady: false,
     printPreparing: false,
+    printPreparationPromise: null,
     printImageUrls: new Set(),
     printCaptureAssetCache: new Map(),
     prototypeObserverSuppressedUntil: 0,
@@ -404,7 +406,7 @@
     if (state.pages.every((page) => state.articleByPageId.get(page.id)?.querySelector('.prototype-print-shot'))) {
       return;
     }
-    if (!window.ProtoDockCapture?.capturePagePng || !window.ProtoDockProductDocumentCache) {
+    if (!window.ProtoDockCapture?.capturePageImage || !window.ProtoDockProductDocumentCache) {
       throw new Error('打印截图模块未加载');
     }
     const preset = devicePresets[state.manifest.project?.devicePreset] || devicePresets['iphone-portrait'];
@@ -420,7 +422,9 @@
       safeAreaBottom: safeArea.bottom,
       includeFrame: true,
       fullPage: true,
-      rendererVersion: 6
+      mimeType: 'image/jpeg',
+      quality: 0.88,
+      rendererVersion: 7
     };
     const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
       projectId: state.manifest.project?.id || '',
@@ -439,7 +443,7 @@
         let capture = null;
         try {
           capture = await acquirePrintFrame(page, preset);
-          return await window.ProtoDockCapture.capturePagePng({
+          return await window.ProtoDockCapture.capturePageImage({
             iframe: capture.frame,
             preset,
             safeAreaEnabled: safeArea.enabled,
@@ -447,6 +451,9 @@
             safeAreaBottom: safeArea.bottom,
             includeFrame: true,
             fullPage: true,
+            mimeType: 'image/jpeg',
+            quality: 0.88,
+            backgroundColor: '#fff',
             assetCache: state.printCaptureAssetCache
           });
         } catch (error) {
@@ -492,6 +499,55 @@
     return { failed };
   }
 
+  async function preparePrintContent() {
+    if (state.printPreparationPromise) {
+      return state.printPreparationPromise;
+    }
+    state.printPreparationPromise = (async () => {
+      const result = await preparePrintSnapshots();
+      await document.fonts?.ready?.catch(() => {});
+      await Promise.all(Array.from(document.images || []).map((image) => (
+        image.decode ? image.decode().catch(() => {}) : Promise.resolve()
+      )));
+      document.body.classList.add('is-server-print-ready');
+      return result || { failed: 0 };
+    })().catch((error) => {
+      state.printPreparationPromise = null;
+      throw error;
+    });
+    return state.printPreparationPromise;
+  }
+
+  function serverPdfStatusText(status) {
+    if (status === 'queued') {
+      return 'PDF 已进入生成队列';
+    }
+    if (status === 'generating') {
+      return '服务端正在生成 PDF，完成后自动下载';
+    }
+    return '正在检查 PDF 缓存';
+  }
+
+  async function downloadServerPdf() {
+    const statusPath = window.ProtoDockShareReference?.pdfPath?.(state.shareId, '/status');
+    const pdfPath = window.ProtoDockShareReference?.pdfPath?.(state.shareId);
+    if (!statusPath || !pdfPath || !window.ProtoDockPdfExport?.waitForReady) {
+      return false;
+    }
+    const result = await window.ProtoDockPdfExport.waitForReady({
+      statusUrl: statusPath,
+      onStatus(status) {
+        els.progress.textContent = serverPdfStatusText(status);
+      }
+    });
+    if (result.status !== 'ready') {
+      return false;
+    }
+    els.progress.textContent = 'PDF 已生成，正在下载';
+    window.location.href = pdfPath;
+    return true;
+  }
+
   async function printDocument() {
     if (state.printPreparing) {
       return;
@@ -499,7 +555,11 @@
     state.printPreparing = true;
     els.print.disabled = true;
     try {
-      const result = await preparePrintSnapshots();
+      if (await downloadServerPdf()) {
+        return;
+      }
+      els.progress.textContent = '服务端 PDF 暂不可用，正在使用浏览器打印';
+      const result = await preparePrintContent();
       els.progress.textContent = result?.failed ? `${result.failed} 个原型截图未生成` : '打印内容已准备';
       window.print();
     } catch (error) {
@@ -870,6 +930,7 @@
       }
       renderStructure();
       await loadDocuments();
+      state.documentReady = true;
       els.print.disabled = false;
       installObservers();
     } catch (error) {
@@ -878,6 +939,10 @@
   }
 
   bindEvents();
+  window.ProtoDockPrint = Object.freeze({
+    isDocumentReady: () => state.documentReady,
+    prepare: preparePrintContent
+  });
   window.lucide?.createIcons();
   init();
 })();

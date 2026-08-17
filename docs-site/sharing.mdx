@@ -47,7 +47,7 @@ GitHub 凭据位于折叠的 **GitHub 连接配置** 中。Deploy Key 私钥、G
 
 需要查看画布节点、连线和右侧文档时，打开 `/s/<product>/<version>/canvas`；长期入口可使用 `/s/<product>/latest/canvas`。这些入口都是只读画布，不允许浏览者编辑 Canvas、文档或页面信息。
 
-公开预览顶部提供下载按钮，对应接口为 `/api/shares/<product>/<version>/download`。
+公开预览顶部提供项目包下载和 A4 PDF 下载。项目包接口为 `/api/shares/<product>/<version>/download`；PDF 接口为 `/api/shares/<product>/<version>/pdf`，生成状态在 `/pdf/status` 查询。发布成功后服务端会后台预生成 PDF，并按项目内容哈希复用缓存；生成失败时页面自动退回浏览器打印。
 
 ## 高速上传
 

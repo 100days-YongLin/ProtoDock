@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 global.window = global;
 require('../capture.js');
 
+assert.equal(typeof ProtoDockCapture.capturePageImage, 'function');
+
 function element({ scrollHeight, clientHeight, offsetHeight = clientHeight, top = 0 }) {
   return {
     scrollHeight,

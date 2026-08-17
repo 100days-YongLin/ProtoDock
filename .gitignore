@@ -7,3 +7,5 @@ docs-site/export.zip
 .tmp-mint-starter/
 .secrets/
 .github-work/
+.pdf-cache/
+.pdf-runtime/

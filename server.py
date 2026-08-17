@@ -25,6 +25,7 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 from urllib.parse import quote, unquote, urlparse
 
+from pdf_service import PdfService
 from protodock_validation import validate_changelog, validate_cross_page_navigation, validate_product_documents
 
 
@@ -33,6 +34,12 @@ SHARES_DIR = ROOT / "shares"
 DOCS_EXPORT_DIR = ROOT / "docs-dist"
 SECRETS_DIR = ROOT / ".secrets"
 GITHUB_WORK_DIR = ROOT / ".github-work"
+PDF_CACHE_DIR = Path(os.environ.get("PROTODOCK_PDF_CACHE_DIR", ROOT / ".pdf-cache")).expanduser()
+PDF_RENDERER_SCRIPT = ROOT / "pdf_renderer.py"
+PDF_RENDER_PYTHON = Path(os.environ.get(
+    "PROTODOCK_PDF_PYTHON",
+    ROOT / ".pdf-runtime" / "bin" / "python",
+)).expanduser()
 MANIFEST_FILE = "protodock.project.json"
 LATEST_SHARE_COMPONENT = "latest"
 LATEST_POINTER_FILE = ".latest.json"
@@ -52,12 +59,22 @@ GITHUB_PUSH_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_PUSH_TIMEOUT_
 GITHUB_OPEN_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_GITHUB_OPEN_TIMEOUT_SECONDS", "120"))
 GITHUB_PROXY = os.environ.get("PROTODOCK_GITHUB_PROXY", "").strip()
 UPLOAD_ORIGIN = os.environ.get("PROTODOCK_UPLOAD_ORIGIN", "").strip()
+PDF_INTERNAL_ORIGIN = os.environ.get(
+    "PROTODOCK_PDF_INTERNAL_ORIGIN",
+    f"http://127.0.0.1:{os.environ.get('PROTODOCK_PORT', '6080')}",
+).strip().rstrip("/")
+PDF_RENDER_TIMEOUT_SECONDS = int(os.environ.get("PROTODOCK_PDF_RENDER_TIMEOUT_SECONDS", "600"))
+PDF_RENDER_WORKERS = max(1, min(4, int(os.environ.get("PROTODOCK_PDF_RENDER_WORKERS", "2"))))
+PDF_PLAYWRIGHT_PLATFORM = os.environ.get("PROTODOCK_PDF_PLAYWRIGHT_PLATFORM", "").strip()
+PDF_RENDERER_VERSION = "2"
 
 ALLOWED_ROOT_FILES = {MANIFEST_FILE}
 ALLOWED_ROOT_DIRS = {"pages", "docs", "assets"}
 PRIVATE_ROOT_NAMES = {
     ".git",
     ".github-work",
+    ".pdf-cache",
+    ".pdf-runtime",
     ".secrets",
     "shares",
     "protodock",
@@ -66,7 +83,14 @@ PRIVATE_ROOT_NAMES = {
     "docs-site",
     "docs-dist",
 }
-PRIVATE_STATIC_FILES = {"server.py", "protodock.log", "protodock.pid"}
+PRIVATE_STATIC_FILES = {
+    "server.py",
+    "pdf_service.py",
+    "pdf_renderer.py",
+    "requirements-pdf.txt",
+    "protodock.log",
+    "protodock.pid",
+}
 DOCS_ASSET_ROOTS = {"_next", "favicons", "images", "logo"}
 DOCS_PAGE_ROOTS = {
     "quickstart",
@@ -824,6 +848,27 @@ def iter_share_files(directory: Path):
             relative = PurePosixPath(path.relative_to(directory).as_posix())
             if allowed_project_path(relative):
                 yield path, relative.as_posix()
+
+
+PDF_SERVICE = PdfService(
+    root=ROOT,
+    cache_dir=PDF_CACHE_DIR,
+    renderer_script=PDF_RENDERER_SCRIPT,
+    renderer_python=PDF_RENDER_PYTHON,
+    internal_origin=PDF_INTERNAL_ORIGIN,
+    render_timeout_seconds=PDF_RENDER_TIMEOUT_SECONDS,
+    render_workers=PDF_RENDER_WORKERS,
+    playwright_platform=PDF_PLAYWRIGHT_PLATFORM,
+    renderer_version=PDF_RENDERER_VERSION,
+    latest_component=LATEST_SHARE_COMPONENT,
+    normalize_reference=normalize_share_reference,
+    latest_reference=latest_share_reference,
+    share_directory=share_directory_for,
+    iter_share_files=iter_share_files,
+    share_reference_path=share_reference_path,
+    project_download_filename=download_filename_for_share,
+    not_found=lambda message: ProtoDockError(HTTPStatus.NOT_FOUND, message),
+)
 
 
 def build_share_archive(share_id: str) -> tuple[Path, str]:
@@ -1598,7 +1643,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
                 self.handle_github_config()
                 return
             if path.startswith("/api/shares/"):
-                self.handle_share_download(path)
+                self.handle_share_resource(path)
                 return
             if path.startswith("/s/"):
                 self.serve_share_index(path)
@@ -1698,6 +1743,8 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
 
         result["url"] = self.absolute_url(result["path"])
         result["latestUrl"] = self.absolute_url(result["latestPath"])
+        PDF_SERVICE.invalidate(result["id"])
+        result["pdf"] = PDF_SERVICE.status(result["id"], enqueue=True)
         result["canvasValidation"] = validation["canvas"]
         result["navigationValidation"] = validation["navigation"]["stats"]
         result["productDocValidation"] = validation["productDocs"]
@@ -1736,11 +1783,14 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             raise
 
         path = f"/s/{share_id}"
+        PDF_SERVICE.invalidate(share_id)
+        pdf_status = PDF_SERVICE.status(share_id, enqueue=True)
         self.send_json(status, {
             "id": share_id,
             "path": path,
             "url": self.absolute_url(path),
             "action": "updated" if is_update else "created",
+            "pdf": pdf_status,
             "canvasValidation": validation["canvas"],
             "navigationValidation": validation["navigation"]["stats"],
             "productDocValidation": validation["productDocs"],
@@ -1758,6 +1808,8 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             payload.get("projectPath", ""),
         )
         result["url"] = self.absolute_url(result["path"])
+        PDF_SERVICE.invalidate(result["id"])
+        result["pdf"] = PDF_SERVICE.status(result["id"], enqueue=True)
         self.send_json(HTTPStatus.CREATED, result)
 
     def handle_github_push(self) -> None:
@@ -1799,18 +1851,29 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         items.sort(key=lambda item: item.get("updatedAt") or 0, reverse=True)
         self.send_json(HTTPStatus.OK, {"items": items})
 
-    def handle_share_download(self, path: str) -> None:
-        parts = [unquote(part) for part in path.split("/") if part]
-        if len(parts) not in {4, 5} or parts[:2] != ["api", "shares"] or parts[-1] != "download":
-            raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
-        share_id = normalize_share_reference("/".join(parts[2:-1]))
-        if not share_id:
-            raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
-        archive_path, download_name = build_share_archive(share_id)
-        try:
-            self.serve_file(archive_path, content_type="application/zip", download_name=download_name)
-        finally:
-            archive_path.unlink(missing_ok=True)
+    def handle_share_resource(self, path: str) -> None:
+        resource, share_id = PDF_SERVICE.parse_resource_path(path)
+        if resource == "download":
+            archive_path, download_name = build_share_archive(share_id)
+            try:
+                self.serve_file(archive_path, content_type="application/zip", download_name=download_name)
+            finally:
+                archive_path.unlink(missing_ok=True)
+            return
+
+        status = PDF_SERVICE.status(share_id, enqueue=True)
+        if resource == "pdf-status" or status["status"] != "ready":
+            response_status = HTTPStatus.OK if resource == "pdf-status" else HTTPStatus.ACCEPTED
+            self.send_json(response_status, status)
+            return
+
+        directory = share_directory_for(status["reference"])
+        artifact_path = PDF_SERVICE.artifact_path(status["reference"], status["revision"])
+        self.serve_file(
+            artifact_path,
+            content_type="application/pdf",
+            download_name=PDF_SERVICE.download_filename(directory, status["reference"]),
+        )
 
     def create_share_id(self) -> str:
         while True:
@@ -1902,9 +1965,10 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(file_path.stat().st_size))
         if download_name:
+            fallback_name = "protodock-document.pdf" if download_name.lower().endswith(".pdf") else "protodock-project.zip"
             self.send_header(
                 "Content-Disposition",
-                f"attachment; filename=\"protodock-project.zip\"; filename*=UTF-8''{quote(download_name)}"
+                f"attachment; filename=\"{fallback_name}\"; filename*=UTF-8''{quote(download_name)}"
             )
         self.end_headers()
         if self.command != "HEAD":

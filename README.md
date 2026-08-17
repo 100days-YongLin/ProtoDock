@@ -199,7 +199,7 @@ http://<server-ip>:6080/index.html
 
 发布成功后可以点击“复制更新文案”，一次复制项目与版本、本次更新内容、当前版本链接、最新版入口和 GitHub 分支链接；本次未同步 GitHub 时不会复制可能过期的仓库链接。
 
-公开链接默认进入产品文档式预览页：左侧目录按业务分组提供快速切页，中间每个页面都并排展示可交互原型与完整 PRD。原型中的按钮、Tab 和返回操作会联动定位到对应页面章节；原型 iframe 按滚动位置延迟加载，避免一次打开大量页面。右上角支持按 A4 横版打印或导出 PDF；打印前会生成并缓存每个页面的 2 倍高分辨率完整原型截图，打印时保持原图宽高比缩放、替换 iframe，并隐藏工具栏和目录。项目内容从 `shares/<product>/<version>/` 读取，不会写回上传者本地文件。
+公开链接默认进入产品文档式预览页：左侧目录按业务分组提供快速切页，中间每个页面都并排展示可交互原型与完整 PRD。原型中的按钮、Tab 和返回操作会联动定位到对应页面章节；原型 iframe 按滚动位置延迟加载，避免一次打开大量页面。发布成功后，服务端会在后台预生成并按项目内容哈希缓存 A4 横版 PDF；分享页点击“下载 A4 PDF”时直接复用该文件，不再让每位访问者重新生成全部长截图。服务端运行时不可用或生成失败时会自动退回浏览器打印。项目内容从 `shares/<product>/<version>/` 读取，不会写回上传者本地文件。
 
 如果需要查看画布节点、连线和右侧文档，可以打开 `/s/<product>/<version>/canvas`，或使用始终指向最新版的 `/s/<product>/latest/canvas`。这个入口仍然是只读画布，不允许浏览者编辑 canvas、docs 或页面信息。历史随机 ID 链接 `/s/<share-id>` 仍然兼容，但新发布统一使用产品与版本路径。
 
@@ -222,6 +222,25 @@ export PROTODOCK_UPLOAD_ORIGIN=http://100.113.173.18:6080
 ```
 
 浏览器仍从当前访问地址生成分享链接，但 ZIP 会优先发送到高速入口的 `/api/publish`；高速入口不可达时自动回退当前地址。高速入口只填写 origin，不要包含接口路径。
+
+## 服务端 PDF
+
+服务端 PDF 使用隔离的 Playwright Chromium 运行时。首次部署执行：
+
+```bash
+./scripts/install-pdf-runtime.sh
+```
+
+默认运行时位于 `.pdf-runtime/`，生成文件位于 `.pdf-cache/`，两者均不进入项目包或 Git。Ubuntu 26.04 会自动使用 Playwright 的 Ubuntu 24.04 兼容构建。服务从 `PROTODOCK_PDF_PYTHON` 指定的 Python 启动渲染器，默认值为 `.pdf-runtime/bin/python`；后台默认同时处理 2 个任务，单任务超时 600 秒。
+
+```bash
+export PROTODOCK_PDF_PYTHON=/path/to/ProtoDock/.pdf-runtime/bin/python
+export PROTODOCK_PDF_RENDER_WORKERS=2
+export PROTODOCK_PDF_RENDER_TIMEOUT_SECONDS=600
+export PROTODOCK_PDF_PLAYWRIGHT_PLATFORM=ubuntu24.04-x64
+```
+
+固定版本 PDF 使用 `/api/shares/<product>/<version>/pdf`，状态接口在其后追加 `/status`。`/api/shares/<product>/latest/pdf` 会解析到产品最新版。发布接口不会等待 PDF 完成；首次任务在后台生成，后续访问同一内容直接返回缓存文件。
 
 ## GitHub 同步
 
