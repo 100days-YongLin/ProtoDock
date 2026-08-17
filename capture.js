@@ -1,4 +1,6 @@
 (() => {
+  const MAX_FULL_PAGE_HEIGHT = 12000;
+
   function roundRect(ctx, x, y, width, height, radius) {
     const r = Math.min(radius, width / 2, height / 2);
     ctx.beginPath();
@@ -122,9 +124,63 @@
     }
   }
 
-  async function prepareHtmlForSvg(documentRef, width, height, assetCache = new Map()) {
+  function elementExtent(element, documentRef) {
+    const height = Math.max(
+      Number(element?.scrollHeight || 0),
+      Number(element?.offsetHeight || 0),
+      Number(element?.clientHeight || 0)
+    );
+    if (!height) {
+      return 0;
+    }
+    try {
+      const rect = element.getBoundingClientRect?.();
+      const scrollTop = Number(documentRef.defaultView?.scrollY || documentRef.scrollingElement?.scrollTop || 0);
+      return Math.max(0, Number(rect?.top || 0) + scrollTop) + height;
+    } catch (error) {
+      return height;
+    }
+  }
+
+  function measureFullPageHeight(documentRef, viewportHeight, maxHeight = MAX_FULL_PAGE_HEIGHT) {
+    const minimum = Math.max(1, Number(viewportHeight || 1));
+    const elements = [
+      documentRef?.documentElement,
+      documentRef?.body,
+      ...Array.from(documentRef?.querySelectorAll?.('*') || [])
+    ].filter(Boolean);
+    const measured = elements.reduce(
+      (height, element) => Math.max(height, elementExtent(element, documentRef)),
+      minimum
+    );
+    return Math.min(Math.max(minimum, Math.ceil(measured)), Math.max(minimum, Number(maxHeight || MAX_FULL_PAGE_HEIGHT)));
+  }
+
+  function expandScrollableClones(documentRef, clone) {
+    const sourceElements = [
+      documentRef.documentElement,
+      ...Array.from(documentRef.documentElement?.querySelectorAll?.('*') || [])
+    ];
+    const clonedElements = [clone, ...Array.from(clone.querySelectorAll?.('*') || [])];
+    sourceElements.forEach((source, index) => {
+      const target = clonedElements[index];
+      const scrollHeight = Number(source.scrollHeight || 0);
+      const clientHeight = Number(source.clientHeight || 0);
+      if (!target?.style || !clientHeight || scrollHeight <= clientHeight + 1) {
+        return;
+      }
+      target.style.setProperty('height', `${scrollHeight}px`, 'important');
+      target.style.setProperty('max-height', 'none', 'important');
+      target.style.setProperty('overflow-y', 'visible', 'important');
+    });
+  }
+
+  async function prepareHtmlForSvg(documentRef, width, height, assetCache = new Map(), options = {}) {
     const clone = documentRef.documentElement.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+    if (options.fullPage) {
+      expandScrollableClones(documentRef, clone);
+    }
     clone.querySelectorAll('script').forEach((script) => script.remove());
     clone.querySelectorAll('link[rel~="stylesheet" i]').forEach((link) => link.remove());
 
@@ -163,7 +219,7 @@
     });
   }
 
-  async function iframeToImage(iframe, width, height, assetCache) {
+  async function iframeToImage(iframe, width, height, assetCache, options = {}) {
     const documentRef = iframe.contentDocument;
     if (!documentRef?.documentElement) {
       throw new Error('无法读取页面预览');
@@ -171,7 +227,7 @@
     if (documentRef.fonts?.ready) {
       await documentRef.fonts.ready.catch(() => {});
     }
-    const html = await prepareHtmlForSvg(documentRef, width, height, assetCache);
+    const html = await prepareHtmlForSvg(documentRef, width, height, assetCache, options);
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
         <foreignObject x="0" y="0" width="${width}" height="${height}">
@@ -308,6 +364,29 @@
     return { canvas, ctx };
   }
 
+  function captureGeometry(preset, options = {}, measuredPageHeight = 0) {
+    const safeTop = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaTop || 0)) : 0;
+    const safeBottom = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaBottom || 0)) : 0;
+    const baseScreenWidth = Number(preset.width || 390);
+    const baseScreenHeight = Number(preset.height || 830);
+    const baseContentHeight = Math.max(1, baseScreenHeight - safeTop - safeBottom);
+    const measuredHeight = Math.min(MAX_FULL_PAGE_HEIGHT, Math.max(0, Number(measuredPageHeight || 0)));
+    const contentHeight = options.fullPage && measuredHeight > baseScreenHeight + 1
+      ? measuredHeight
+      : baseContentHeight;
+    const screenHeight = contentHeight + safeTop + safeBottom;
+    const baseFrameHeight = Number(preset.frameHeight || baseScreenHeight);
+    return {
+      safeTop,
+      safeBottom,
+      screenWidth: baseScreenWidth,
+      screenHeight,
+      contentHeight,
+      frameWidth: Number(preset.frameWidth || baseScreenWidth),
+      frameHeight: baseFrameHeight + (screenHeight - baseScreenHeight)
+    };
+  }
+
   function canvasToPngBlob(canvas) {
     return new Promise((resolve, reject) => {
       canvas.toBlob((blob) => {
@@ -322,12 +401,26 @@
 
   async function capturePagePng(options) {
     const preset = options.preset;
-    const safeTop = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaTop || 0)) : 0;
-    const safeBottom = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaBottom || 0)) : 0;
-    const screenWidth = Number(preset.width || 390);
-    const screenHeight = Number(preset.height || 830);
-    const contentHeight = Math.max(1, screenHeight - safeTop - safeBottom);
-    const pageImage = await iframeToImage(options.iframe, screenWidth, contentHeight, options.assetCache);
+    const measuredPageHeight = options.fullPage
+      ? measureFullPageHeight(options.iframe.contentDocument, Number(preset.height || 830))
+      : 0;
+    const geometry = captureGeometry(preset, options, measuredPageHeight);
+    const {
+      safeTop,
+      safeBottom,
+      screenWidth,
+      screenHeight,
+      contentHeight,
+      frameWidth,
+      frameHeight
+    } = geometry;
+    const pageImage = await iframeToImage(
+      options.iframe,
+      screenWidth,
+      contentHeight,
+      options.assetCache,
+      { fullPage: !!options.fullPage }
+    );
 
     if (options.includeFrame === false) {
       const { canvas, ctx } = createCanvas(screenWidth, screenHeight);
@@ -341,8 +434,6 @@
       return canvasToPngBlob(canvas);
     }
 
-    const frameWidth = Number(preset.frameWidth || screenWidth);
-    const frameHeight = Number(preset.frameHeight || screenHeight);
     const isDevice = !!preset.deviceClass;
     const margin = isDevice ? 34 : 22;
     const barHeight = isDevice ? 0 : 44;
@@ -398,6 +489,9 @@
   const root = typeof window !== 'undefined' ? window : globalThis;
   root.ProtoDockCapture = {
     capturePagePng,
-    copyPngBlob
+    copyPngBlob,
+    captureGeometry,
+    measureFullPageHeight,
+    expandScrollableClones
   };
 })();

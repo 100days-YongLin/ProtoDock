@@ -1187,7 +1187,9 @@ async function openFullProductDocument() {
       safeAreaEnabled: safeAreaEnabled(),
       safeAreaTop: safeArea.top,
       safeAreaBottom: safeArea.bottom,
-      includeFrame: true
+      includeFrame: true,
+      fullPage: true,
+      rendererVersion: 3
     };
     const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
       projectId: state.manifest.project?.id || '',
@@ -1234,6 +1236,7 @@ async function openFullProductDocument() {
             safeAreaTop: safeArea.top,
             safeAreaBottom: safeArea.bottom,
             includeFrame: true,
+            fullPage: true,
             assetCache: captureAssetCache
           });
           await screenshotCache.set(cacheKey, screenshot);

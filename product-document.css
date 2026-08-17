@@ -551,7 +551,7 @@ button {
   inset: 0;
   display: grid;
   overflow: auto;
-  place-items: center;
+  place-items: start center;
   background: rgba(0, 0, 0, 0.84);
   padding: 72px 32px 40px;
 }
