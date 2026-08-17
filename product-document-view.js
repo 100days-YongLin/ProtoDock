@@ -29,6 +29,8 @@
     coverPageCount: document.getElementById('coverPageCount'),
     coverGroupCount: document.getElementById('coverGroupCount'),
     coverGeneratedAt: document.getElementById('coverGeneratedAt'),
+    coverCurrentVersion: document.getElementById('coverCurrentVersion'),
+    coverChangeLogList: document.getElementById('coverChangeLogList'),
     sections: document.getElementById('documentSections'),
     imagePreview: document.getElementById('imagePreview'),
     previewImage: document.getElementById('previewImage'),
@@ -124,6 +126,26 @@
     }).join('');
   }
 
+  function renderChangeLog(entries, project) {
+    const items = window.ProtoDockChangeLog?.normalize(entries) || [];
+    const current = items[items.length - 1] || null;
+    const currentVersion = current?.version || window.ProtoDockChangeLog?.inferredVersion({ project }) || '';
+    els.coverCurrentVersion.hidden = !currentVersion;
+    els.coverCurrentVersion.textContent = currentVersion ? `当前版本 ${currentVersion}` : '';
+    els.coverChangeLogList.innerHTML = items.length
+      ? items.map((entry, index) => `
+        <li class="${index === items.length - 1 ? 'is-current' : ''}">
+          <div>
+            <time datetime="${escapeHtml(entry.changedAt)}">${escapeHtml(window.ProtoDockChangeLog.formatDate(entry.changedAt))}</time>
+            <strong>${escapeHtml(entry.version)}</strong>
+          </div>
+          <p>${escapeHtml(entry.description)}</p>
+          ${index === items.length - 1 ? '<span>当前</span>' : ''}
+        </li>
+      `).join('')
+      : '<li class="is-empty">尚无变更记录，下一次在 ProtoDock 保存项目后生成。</li>';
+  }
+
   function showImage(url, title) {
     els.previewImage.src = url;
     els.previewImage.alt = title;
@@ -153,6 +175,7 @@
       dateStyle: 'long',
       timeStyle: 'short'
     }).format(new Date(payload.generatedAt || Date.now()));
+    renderChangeLog(project.changelog, project);
     els.outlinePageCount.textContent = `${pages.length} 个页面`;
     els.loading.hidden = true;
     els.cover.hidden = false;

@@ -1783,6 +1783,31 @@ select {
   width: min(460px, 100%);
 }
 
+.change-log-modal {
+  width: min(540px, 100%);
+}
+
+.change-log-form {
+  display: grid;
+  gap: 14px;
+}
+
+.change-log-form .field {
+  display: grid;
+  gap: 7px;
+}
+
+.change-log-form .field > span:first-child {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.change-log-form textarea {
+  min-height: 124px;
+  border-radius: 10px;
+}
+
 .field-message {
   min-height: 18px;
   color: var(--danger);

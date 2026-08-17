@@ -275,7 +275,8 @@ const state = {
   manifestCheckInFlight: false,
   manifestExternalDialogOpen: false,
   ignoredExternalManifestHash: null,
-  productDocumentGenerating: false
+  productDocumentGenerating: false,
+  projectSaving: false
 };
 
 function escapeHtml(value) {
@@ -602,6 +603,7 @@ function normalizeManifest(input) {
     safeAreaBottom: clampSafeAreaInset(manifest.project?.safeAreaBottom, safeAreaDefaults.bottom)
   };
   manifest.pages = manifest.pages || {};
+  manifest.changelog = window.ProtoDockChangeLog?.normalize(manifest.changelog) || [];
   manifest.canvas = manifest.canvas || {};
   manifest.canvas.nodes = Array.isArray(manifest.canvas.nodes) ? manifest.canvas.nodes : [];
   manifest.canvas.edges = Array.isArray(manifest.canvas.edges) ? manifest.canvas.edges : [];
@@ -851,6 +853,9 @@ async function createShareArchive(options = {}) {
   }
   if (!window.ProtoDockZip?.createZipFile) {
     throw new Error('当前页面缺少 zip 打包模块');
+  }
+  if (state.dirty || state.docDirty.size) {
+    throw new Error('当前项目有未保存修改，请先保存并填写本次变更记录');
   }
 
   await checkExternalManifestChange('manual');
@@ -1874,6 +1879,7 @@ function renderProjectActions() {
   ].forEach((control) => {
     control?.toggleAttribute('disabled', !canEdit);
   });
+  buttons.saveProject?.toggleAttribute('disabled', !canEdit || state.projectSaving);
   buttons.reloadProject?.toggleAttribute('disabled', !hasProject || (!state.projectHandle && !state.projectBaseUrl));
   els.productSelect?.toggleAttribute('disabled', !canEdit);
   els.productSelect?.setAttribute('aria-disabled', String(!canEdit));
@@ -3625,6 +3631,7 @@ function starterManifest(name, devicePreset) {
       safeAreaTop: safeAreaDefaults.top,
       safeAreaBottom: safeAreaDefaults.bottom
     },
+    changelog: [],
     pages: {
       home: {
         title: '起始页面',
@@ -3726,6 +3733,7 @@ ${pages}
 - 产品文档放在 \`docs/<page-id>.md\`，必须覆盖页面定位、场景、规则、状态、数据影响和产品验收。
 - 产品验收统一使用“前提 / 操作 / 预期”，源码路径和技术实现不要写入 PRD 主体。
 - 可以更新 \`${MANIFEST_FILE}\` 中的 \`pages\` 字段，但不要改 \`canvas.nodes[].x\`、\`canvas.nodes[].y\`、\`canvas.edges\` 或 \`canvas.groups\`，除非用户要求调整 flow 或页面组。
+- 每次完成一批修改后，向 \`${MANIFEST_FILE}\` 的 \`changelog\` 末尾追加版本号、ISO 8601 时间和变更内容；末条代表当前版本，不得改写历史项。
 `;
 }
 
@@ -4004,6 +4012,11 @@ async function saveProject() {
     setStatus(message);
     return { ok: false, message };
   }
+  if (state.projectSaving) {
+    return { ok: false, message: '项目正在保存' };
+  }
+  state.projectSaving = true;
+  renderProjectActions();
   try {
     const currentText = await (await state.manifestHandle.getFile()).text();
     const currentHash = await hashText(currentText);
@@ -4025,11 +4038,23 @@ async function saveProject() {
       }
     }
 
+    let changeLogEntry = null;
+    if (state.dirty || state.docDirty.size) {
+      changeLogEntry = await window.ProtoDockChangeLogDialog.open(state.manifest);
+      if (!changeLogEntry) {
+        setStatus('已取消保存');
+        return { ok: false, message: '已取消保存' };
+      }
+    }
+
     for (const pageId of state.docDirty) {
       const page = state.manifest.pages[pageId];
       if (page?.doc) {
         await writeTextFile(page.doc, state.docCache.get(pageId) || '');
       }
+    }
+    if (changeLogEntry) {
+      window.ProtoDockChangeLog.append(state.manifest, changeLogEntry);
     }
     const text = manifestText(state.manifest);
     const writable = await state.manifestHandle.createWritable();
@@ -4047,6 +4072,9 @@ async function saveProject() {
     const message = `保存失败：${error.message || '无法写入文件'}`;
     setStatus(message);
     return { ok: false, message };
+  } finally {
+    state.projectSaving = false;
+    renderProjectActions();
   }
 }
 

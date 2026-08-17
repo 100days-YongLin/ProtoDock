@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
@@ -62,6 +63,66 @@ PRODUCT_DOC_SECTIONS = (
 TECHNICAL_DOC_HEADINGS = {"源码", "源码位置", "原型入口", "react来源", "技术实现", "实现说明"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_ACCEPTANCE_LABELS = ("前提", "操作", "预期")
+
+
+def validate_changelog(manifest: dict) -> dict:
+    entries = manifest.get("changelog") if isinstance(manifest, dict) else None
+    issues = []
+    warnings = []
+    if entries is None or entries == []:
+        warnings.append("项目尚未记录 changelog；下一次修改应追加版本、时间和变更内容")
+        return {
+            "issues": issues,
+            "warnings": warnings,
+            "stats": {"changeLogCount": 0, "currentVersion": ""},
+        }
+    if not isinstance(entries, list):
+        return {
+            "issues": ["changelog 必须是数组"],
+            "warnings": warnings,
+            "stats": {"changeLogCount": 0, "currentVersion": ""},
+        }
+
+    previous_time = None
+    current_version = ""
+    for index, entry in enumerate(entries):
+        label = f"changelog[{index}]"
+        if not isinstance(entry, dict):
+            issues.append(f"{label} 必须是对象")
+            continue
+        version = str(entry.get("version") or "").strip()
+        changed_at = str(entry.get("changedAt") or "").strip()
+        description = str(entry.get("description") or "").strip()
+        if not version:
+            issues.append(f"{label}.version 不能为空")
+        if not description:
+            issues.append(f"{label}.description 不能为空")
+        parsed_time = None
+        if not changed_at:
+            issues.append(f"{label}.changedAt 不能为空")
+        else:
+            try:
+                parsed_time = datetime.fromisoformat(changed_at.replace("Z", "+00:00"))
+                if parsed_time.tzinfo is None:
+                    issues.append(f"{label}.changedAt 必须包含时区")
+                    parsed_time = None
+            except ValueError:
+                issues.append(f"{label}.changedAt 必须是 ISO 8601 日期时间")
+        if parsed_time and previous_time and parsed_time < previous_time:
+            warnings.append(f"{label}.changedAt 早于上一条记录；当前版本仍按数组末项判断")
+        if parsed_time:
+            previous_time = parsed_time
+        if version:
+            current_version = version
+
+    return {
+        "issues": issues,
+        "warnings": warnings,
+        "stats": {
+            "changeLogCount": len(entries),
+            "currentVersion": current_version,
+        },
+    }
 
 
 def normalize_text(value: str) -> str:

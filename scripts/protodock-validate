@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import server  # noqa: E402
-from protodock_validation import validate_cross_page_navigation, validate_product_documents  # noqa: E402
+from protodock_validation import validate_changelog, validate_cross_page_navigation, validate_product_documents  # noqa: E402
 
 
 def parse_args():
@@ -62,10 +62,15 @@ def inspect_target(target: Path) -> dict:
     product_docs = validate_product_documents(project_dir, manifest) if isinstance(manifest, dict) else {
         "issues": [], "warnings": [], "stats": {}
     }
+    changelog = validate_changelog(manifest) if isinstance(manifest, dict) else {
+        "issues": [], "warnings": [], "stats": {}
+    }
+    errors.extend(issue for issue in changelog["issues"] if issue not in errors)
     canvas = result.get("canvas", {}) if result else canvas_validation["stats"]
     warnings = list(result.get("warnings", [])) if result else list(canvas_validation["warnings"])
     warnings.extend(warning for warning in navigation["warnings"] if warning not in warnings)
     warnings.extend(warning for warning in product_docs["warnings"] if warning not in warnings)
+    warnings.extend(warning for warning in changelog["warnings"] if warning not in warnings)
     pages = manifest.get("pages", {}) if isinstance(manifest, dict) else {}
     entry_count = sum(
         1 for page in pages.values()
@@ -89,6 +94,7 @@ def inspect_target(target: Path) -> dict:
             **canvas,
             **navigation["stats"],
             **(result.get("productDocs", product_docs["stats"]) if result else product_docs["stats"]),
+            **(result.get("changelog", changelog["stats"]) if result else changelog["stats"]),
         },
     }
     if temporary is not None:

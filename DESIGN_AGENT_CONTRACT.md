@@ -45,6 +45,7 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 27. Run `scripts/protodock-validate <final-upload.zip>` after packaging. A non-zero exit code blocks delivery; source-directory checks and prose reviews do not satisfy this gate.
 28. Back controls must use `data-protodock-back[="<fallbackPageId>"]` and ship an executable click bridge that prefers `ProtoDockPreview.back()` and falls back to the `protodock:back` message. The attribute alone is not an implementation. Do not use iframe `history.back()` or rely on host auto-interception; click-test history return and direct-entry fallback in both player and Share.
 29. Every new or modified `docs/<page-id>.md` must follow the Product Documentation Contract below. Acceptance scenarios use the Chinese labels `前提 / 操作 / 预期`; source paths and implementation details belong in manifest metadata, not the PRD body.
+30. Every completed batch of Agent edits must append one item to top-level `changelog` with `version`, ISO 8601 `changedAt`, and a concise `description`. The final array item is the current version. Never rewrite, reorder, or delete earlier entries; creating or refreshing a ZIP without logging its changes is not a complete delivery.
 
 ## Product Documentation Contract
 
@@ -99,6 +100,7 @@ Before delivery, produce a route table containing source page, visible control, 
 
 Design agents may update:
 
+- `changelog` by appending exactly one entry for the completed edit batch
 - `pages.<pageId>.title`
 - `pages.<pageId>.kind`
 - `pages.<pageId>.tag`

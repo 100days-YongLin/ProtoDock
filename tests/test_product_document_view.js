@@ -1,10 +1,16 @@
 const assert = require('node:assert/strict');
 
 global.window = global;
+require('../project-changelog.js');
 require('../product-document.js');
 
 const manifest = {
   project: { id: 'demo', name: '演示项目' },
+  changelog: [{
+    version: 'v1.1',
+    changedAt: '2026-08-17T09:30:00+08:00',
+    description: '补充完整产品文档。'
+  }],
   pages: {
     home: { title: '首页', kind: '入口', entry: 'pages/home/index.html', doc: 'docs/home.md' },
     meal: { title: '进餐详情', kind: '详情', entry: 'pages/meal/index.html', doc: 'docs/meal.md' },
@@ -118,6 +124,7 @@ const fakeController = {
   assert.deepEqual(result, { total: 4, failed: 1, cached: 1 });
   assert.equal(maxActiveBuilds, 2);
   assert.equal(sentMessages[0].action, 'start');
+  assert.deepEqual(sentMessages[0].payload.project.changelog, manifest.changelog);
   const pageMessages = sentMessages.filter((message) => message.action === 'page');
   assert.equal(pageMessages.length, 8);
   assert.equal(pageMessages.filter((message) => message.payload.capturePending).length, 4);

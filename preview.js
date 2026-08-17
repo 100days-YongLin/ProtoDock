@@ -48,6 +48,8 @@
     coverDescription: document.getElementById('coverDescription'),
     coverPageCount: document.getElementById('coverPageCount'),
     coverGroupCount: document.getElementById('coverGroupCount'),
+    coverCurrentVersion: document.getElementById('coverCurrentVersion'),
+    coverChangeLogList: document.getElementById('coverChangeLogList'),
     sections: document.getElementById('documentSections')
   };
 
@@ -197,6 +199,26 @@
     }).join('');
   }
 
+  function renderChangeLog(entries, manifest) {
+    const items = window.ProtoDockChangeLog?.normalize(entries) || [];
+    const current = items[items.length - 1] || null;
+    const currentVersion = current?.version || window.ProtoDockChangeLog?.inferredVersion(manifest) || '';
+    els.coverCurrentVersion.hidden = !currentVersion;
+    els.coverCurrentVersion.textContent = currentVersion ? `当前版本 ${currentVersion}` : '';
+    els.coverChangeLogList.innerHTML = items.length
+      ? items.map((entry, index) => `
+        <li class="${index === items.length - 1 ? 'is-current' : ''}">
+          <div>
+            <time datetime="${escapeHtml(entry.changedAt)}">${escapeHtml(window.ProtoDockChangeLog.formatDate(entry.changedAt))}</time>
+            <strong>${escapeHtml(entry.version)}</strong>
+          </div>
+          <p>${escapeHtml(entry.description)}</p>
+          ${index === items.length - 1 ? '<span>当前</span>' : ''}
+        </li>
+      `).join('')
+      : '<li class="is-empty">尚无变更记录，下一次在 ProtoDock 保存项目后生成。</li>';
+  }
+
   function renderStructure() {
     const project = state.manifest.project || {};
     const groupedCount = state.sections.filter((section) => !section.ungrouped).length;
@@ -206,6 +228,7 @@
     els.coverDescription.textContent = project.description || '可操作原型与页面 PRD 汇总文档。';
     els.coverPageCount.textContent = `${state.pages.length} 页`;
     els.coverGroupCount.textContent = `${groupedCount} 组`;
+    renderChangeLog(state.manifest.changelog, state.manifest);
     els.outlinePageCount.textContent = `${state.pages.length} 个页面`;
     els.loading.hidden = true;
     els.cover.hidden = false;

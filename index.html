@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="./vendor/devices.css">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=5">
   <link rel="stylesheet" href="./canvas-groups.css">
   <link rel="stylesheet" href="./canvas-minimap.css">
 </head>
@@ -379,6 +379,35 @@
     </section>
   </div>
 
+  <div class="project-modal-backdrop" id="changeLogModal" hidden>
+    <section class="project-modal change-log-modal" role="dialog" aria-modal="true" aria-labelledby="changeLogModalTitle">
+      <header class="modal-head">
+        <div>
+          <strong id="changeLogModalTitle">记录本次变更</strong>
+          <span>保存项目时会把这一批修改追加到同一份变更历史中。</span>
+        </div>
+        <button class="tool-button" id="closeChangeLogModal" type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      </header>
+
+      <div class="change-log-form">
+        <label class="field">
+          <span>版本号</span>
+          <input id="changeLogVersion" maxlength="40" autocomplete="off" placeholder="例如：v1.1">
+        </label>
+        <label class="field">
+          <span>变更内容</span>
+          <textarea id="changeLogDescription" maxlength="1200" rows="5" placeholder="说明本次新增、调整或修复了什么"></textarea>
+        </label>
+        <span class="field-message" id="changeLogMessage" aria-live="polite"></span>
+      </div>
+
+      <div class="action-row">
+        <button class="primary" id="confirmChangeLog" type="button">记录并保存</button>
+        <button class="secondary" id="cancelChangeLog" type="button">取消</button>
+      </div>
+    </section>
+  </div>
+
   <div class="project-modal-backdrop" id="conflictModal" hidden>
     <section class="project-modal conflict-modal" role="dialog" aria-modal="true" aria-labelledby="conflictModalTitle">
       <header class="modal-head">
@@ -665,9 +694,11 @@
   <script src="./capture.js?v=4"></script>
   <script src="./capture-options.js"></script>
   <script src="./github-preferences.js"></script>
+  <script src="./project-changelog.js?v=1"></script>
+  <script src="./project-changelog-dialog.js?v=1"></script>
   <script src="./product-document-cache.js?v=2"></script>
-  <script src="./product-document.js?v=2"></script>
-  <script src="./app.js?v=4"></script>
+  <script src="./product-document.js?v=5"></script>
+  <script src="./app.js?v=5"></script>
   <script src="./project-name.js"></script>
   <script src="./share.js"></script>
   <script src="./github.js"></script>

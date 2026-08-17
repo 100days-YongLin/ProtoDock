@@ -280,7 +280,8 @@
         project: {
           id: manifest.project?.id || '',
           name: manifest.project?.name || '未命名项目',
-          description: manifest.project?.description || ''
+          description: manifest.project?.description || '',
+          changelog: global.ProtoDockChangeLog?.normalize(manifest.changelog) || []
         },
         generatedAt: new Date().toISOString(),
         sections

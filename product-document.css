@@ -378,6 +378,101 @@ button {
   font-weight: 720;
 }
 
+.cover-changelog {
+  max-width: 900px;
+  margin-top: 62px;
+}
+
+.cover-changelog > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.cover-changelog > header span {
+  color: var(--blue);
+  font-size: 10px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.cover-changelog h2 {
+  margin: 6px 0 0;
+  font-size: 25px;
+}
+
+.cover-changelog > header > strong {
+  border-radius: 999px;
+  background: #e8f2ff;
+  color: #0969da;
+  padding: 7px 11px;
+  font-size: 12px;
+}
+
+.cover-changelog ol {
+  max-height: 360px;
+  overflow-y: auto;
+  margin: 0;
+  border-top: 1px solid var(--line-strong);
+  padding: 0;
+  list-style: none;
+}
+
+.cover-changelog li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 22px;
+  border-bottom: 1px solid var(--line);
+  padding: 17px 14px;
+}
+
+.cover-changelog li > div {
+  display: grid;
+  gap: 5px;
+}
+
+.cover-changelog time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.cover-changelog li > div strong {
+  font-size: 13px;
+}
+
+.cover-changelog li > p {
+  margin: 0;
+  color: #4d5158;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.cover-changelog li > span {
+  border: 1px solid #9ac7ff;
+  border-radius: 999px;
+  color: #0969da;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.cover-changelog li.is-current {
+  border-left: 3px solid var(--blue);
+  background: #f5f9ff;
+  padding-left: 11px;
+}
+
+.cover-changelog li.is-empty {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .product-group {
   scroll-margin-top: calc(var(--header-height) + 24px);
 }
@@ -709,6 +804,29 @@ button {
     margin: 0;
   }
 
+  .cover-changelog {
+    margin-top: 44px;
+  }
+
+  .cover-changelog > header {
+    align-items: start;
+  }
+
+  .cover-changelog li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .cover-changelog li > p {
+    grid-column: 1 / -1;
+  }
+
+  .cover-changelog li > span {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
   .product-group-header {
     min-height: 150px;
     padding: 44px 22px 26px;
@@ -795,6 +913,15 @@ button {
   .document-cover,
   .product-group-header {
     break-after: page;
+  }
+
+  .cover-changelog ol {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .cover-changelog li {
+    break-inside: avoid;
   }
 
   .product-page {

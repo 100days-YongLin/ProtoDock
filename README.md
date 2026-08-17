@@ -41,6 +41,7 @@ prototype-project/
 
 - `pages/**`、`docs/**`、`assets/**` 可以由 Agent 生成或更新。
 - `protodock.project.json` 中的 `project` 和 `pages` 可以由 Agent 按需更新。
+- Agent 每次完成一批项目修改时，必须向 `changelog` 末尾追加版本号、ISO 8601 时间和变更内容；最后一条代表当前版本，历史项不得回写或删除。
 - `canvas.nodes`、`canvas.edges`、`canvas.notes`、`canvas.groups` 默认视为用户在 ProtoDock 中编辑过的布局数据，Agent 不得整体重写。
 - Agent 如需新增页面节点，只能按 `id` 或 `pageId` 增量追加缺失节点，并必须保留已有节点的 `x`、`y`、`fromSide`、`toSide`、锚点、说明文本以及未知字段。
 - 只有用户明确说“重排画布”“重建 flow”或“覆盖 canvas”时，Agent 才能重写 `canvas`。
@@ -70,6 +71,13 @@ protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json
     "safeAreaTop": 59,
     "safeAreaBottom": 34
   },
+  "changelog": [
+    {
+      "version": "v1.1",
+      "changedAt": "2026-08-17T15:30:00+08:00",
+      "description": "补充成长报告页面与产品验收说明。"
+    }
+  ],
   "pages": {
     "home": {
       "title": "首页",
@@ -123,7 +131,9 @@ http://localhost:4175/index.html
 
 打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json` 与 `docs/*.md`。
 
-打开项目后，可以点击顶部显示的当前项目名称进行重命名。点击“保存名称”会立即把名称写回 `protodock.project.json`，重新载入项目后仍会保留；公开预览等只读项目不允许重命名。
+打开项目后，可以点击顶部显示的当前项目名称进行重命名。点击“保存名称”后需要填写版本号和变更内容，再把名称与本次记录一并写回 `protodock.project.json`；公开预览等只读项目不允许重命名。
+
+只要项目存在未保存修改，顶部保存按钮都会要求记录本次版本和变更内容。记录追加到 `changelog` 末尾，最后一条作为当前版本显示在完整产品文档中。旧项目没有 `changelog` 时仍可打开，第一次保存后自动建立历史。存在未保存修改时，分享和 GitHub 推送会要求先完成保存，避免发布内容没有对应版本记录。
 
 选中页面后，右侧标题区的“复制页面 PNG”按钮会把当前页面首屏写入剪贴板。复制按钮右侧可以切换“带设备框”和“无设备框”：带框模式会合成项目设备壳，无框模式按项目真实视口输出纯页面截图并保留安全区。浏览器不支持图片剪贴板写入时，会自动下载 PNG。
 
@@ -175,13 +185,13 @@ http://<server-ip>:6080/index.html
 ./scripts/protodock-validate /path/to/project-v1.1-protodock-upload.zip
 ```
 
-校验器会检查 ZIP 根目录、manifest 文件路径、Canvas 节点/连线/分组、节点重叠和跨页导航，并输出跨页路由表。发现缺失文件、重复节点、悬空连线、旧 `data-page`、`window.location`、根路径 `/pages/...` 或无效目标时返回非零退出码。`--json` 可供 Agent 和 CI 读取，`--warnings-as-errors` 可让连线交叉、穿过节点及间距不足也阻止发布。分享上传和 GitHub 导入会在服务端再次执行同一套核心校验。
+校验器会检查 ZIP 根目录、manifest 文件路径、Canvas 节点/连线/分组、节点重叠、跨页导航和变更历史，并输出跨页路由表。`changelog` 缺失会作为旧项目兼容警告；字段存在但版本、时间或变更内容不完整时会阻止上传。发现缺失文件、重复节点、悬空连线、旧 `data-page`、`window.location`、根路径 `/pages/...` 或无效目标时同样返回非零退出码。`--json` 可供 Agent 和 CI 读取，`--warnings-as-errors` 可让连线交叉、穿过节点及间距不足也阻止发布。分享上传和 GitHub 导入会在服务端再次执行同一套核心校验。
 
 建议分别命名为 `<project>-<version>-protodock-upload.zip` 和 `<project>-<version>-full-release.zip`，不要向用户推荐后者用于 ProtoDock 上传。
 
-自动打包只读取当前项目目录中的 `pages/**`、`docs/**` 和 `assets/**`，并把当前内存里的 manifest 状态写入包内的 `protodock.project.json`。如果右侧文档有未保存修改，也会进入分享包，但不会因此写回本地磁盘。
+自动打包只读取当前项目目录中的 `pages/**`、`docs/**` 和 `assets/**`，并把已保存的 manifest 状态写入包内的 `protodock.project.json`。如果画布或右侧文档仍有未保存修改，ProtoDock 会先要求保存并填写变更记录，不允许绕过版本历史直接分享或推送。
 
-打开项目后，顶部的“完整产品文档”会在新标签页生成项目级 PRD 阅读视图。它按 `canvas.groups` 汇总业务模块；旧项目没有分组时自动按画布页面顺序展示。每个页面包含带设备框的完整长截图和对应 `docs/<page-id>.md` 正文，长截图会自动展开页面及内层滚动区域直至内容底部；支持目录定位、点击后滚动查看原尺寸大图，以及打印或导出 PDF。文档顶部的“返回流程图”会优先回到原 Canvas 标签；浏览器无法关闭文档标签时则在当前标签打开来源流程图。首次打开会并行生成截图并复用相同图片、字体和样式资源；截图完成后写入浏览器持久缓存，再次打开时直接读取。页面目录、公共素材、设备规格、安全区或截图模式变化后，对应缓存会自动失效。单页截图失败不会阻断其他 PRD 内容。
+打开项目后，顶部的“完整产品文档”会在新标签页生成项目级 PRD 阅读视图。封面读取 `changelog` 展示日期、时间、版本号和变更内容，并高亮末条当前版本。正文按 `canvas.groups` 汇总业务模块；旧项目没有分组时自动按画布页面顺序展示。每个页面包含带设备框的完整长截图和对应 `docs/<page-id>.md` 正文，长截图会自动展开页面及内层滚动区域直至内容底部；支持目录定位、点击后滚动查看原尺寸大图，以及打印或导出 PDF。文档顶部的“返回流程图”会优先回到原 Canvas 标签；浏览器无法关闭文档标签时则在当前标签打开来源流程图。首次打开会并行生成截图并复用相同图片、字体和样式资源；截图完成后写入浏览器持久缓存，再次打开时直接读取。页面目录、公共素材、设备规格、安全区或截图模式变化后，对应缓存会自动失效。单页截图失败不会阻断其他 PRD 内容。
 
 完整产品文档是运行时汇总视图，不会生成或覆盖新的总 Markdown 文件，也不会把截图写回项目目录。页面级 `docs/*.md` 仍然是产品文档的唯一来源；本地编辑器中尚未保存的文档内容也会进入本次阅读视图。
 

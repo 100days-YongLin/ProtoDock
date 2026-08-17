@@ -41,6 +41,7 @@ Before editing, read:
 7. Validate every declared page entry and document against the final project artifact.
 8. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
 9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
+10. After completing a batch of project edits, append one `changelog` item with the version, ISO 8601 timestamp, and concise change description. The final item is the current version; never rewrite prior history.
 
 ## Manifest Contract
 
@@ -50,6 +51,7 @@ Before editing, read:
 - Page resources must be self-contained or use project-relative assets.
 - Do not use localhost URLs, local absolute paths, dev-server-only routes, or unavailable external runtime dependencies.
 - React, Vue, Svelte, and other framework pages must be built into static artifacts before delivery.
+- Top-level `changelog` is append-only. Each entry requires `version`, `changedAt`, and `description`; every Agent-authored delivery must add one entry describing that batch.
 - “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
 
 ## Product Documentation Contract
@@ -235,6 +237,7 @@ After packaging, extract the final ZIP into a new temporary directory and valida
 - all manifest paths are relative to the extracted root;
 - entries contain no localhost URL, local absolute path, or unavailable external dependency;
 - the validated entry and document counts match the manifest page count.
+- `changelog` contains the delivered version as its final item, with a valid timestamp and non-empty change description;
 - every cross-page control has an explicit, valid manifest target and no unresolved script-only or root-absolute navigation remains;
 - every visible back control uses the ProtoDock back protocol; no `history.back()`, `history.go(-1)`, or unbound back icon remains;
 - every page has exactly one node, all edge endpoints exist, and no nodes overlap;

@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="/assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="/vendor/devices.css">
-  <link rel="stylesheet" href="/product-document.css?v=4">
+  <link rel="stylesheet" href="/product-document.css?v=5">
   <link rel="stylesheet" href="/preview.css?v=4">
 </head>
 <body class="share-document">
@@ -59,6 +59,13 @@
           <div><dt>业务分组</dt><dd id="coverGroupCount"></dd></div>
           <div><dt>更新方式</dt><dd>实时读取公开项目</dd></div>
         </dl>
+        <section class="cover-changelog" aria-labelledby="coverChangeLogTitle">
+          <header>
+            <div><span>Project updates</span><h2 id="coverChangeLogTitle">变更历史</h2></div>
+            <strong id="coverCurrentVersion" hidden></strong>
+          </header>
+          <ol id="coverChangeLogList"></ol>
+        </section>
       </section>
 
       <div id="documentSections"></div>
@@ -67,8 +74,9 @@
 
   <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
   <script src="/vendor/lucide.min.js"></script>
-  <script src="/product-document.js?v=4"></script>
+  <script src="/project-changelog.js?v=1"></script>
+  <script src="/product-document.js?v=5"></script>
   <script src="/prototype-navigation.js?v=3"></script>
-  <script src="/preview.js?v=19"></script>
+  <script src="/preview.js?v=20"></script>
 </body>
 </html>
