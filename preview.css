@@ -235,9 +235,9 @@
 
   .prototype-live {
     float: left;
-    width: 58mm;
+    width: 68mm;
     min-height: 0;
-    margin: 0 10mm 6mm 0;
+    margin: 0 9mm 4mm 0;
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -251,7 +251,7 @@
   .prototype-print-shot {
     display: block;
     width: 100%;
-    max-height: 210mm;
+    max-height: 126mm;
     object-fit: contain;
     object-position: top center;
   }
