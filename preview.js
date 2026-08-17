@@ -38,6 +38,7 @@
     progress: document.getElementById('documentProgress'),
     canvasLink: document.getElementById('canvasLink'),
     downloadLink: document.getElementById('downloadLink'),
+    print: document.getElementById('printDocument'),
     toggleOutline: document.getElementById('toggleOutline'),
     outlinePageCount: document.getElementById('outlinePageCount'),
     outlineNavigation: document.getElementById('outlineNavigation'),
@@ -560,6 +561,7 @@
   }
 
   function bindEvents() {
+    els.print.addEventListener('click', () => window.print());
     els.toggleOutline.addEventListener('click', () => {
       const open = document.body.classList.toggle('is-outline-open');
       els.toggleOutline.setAttribute('aria-expanded', String(open));
@@ -643,6 +645,7 @@
       }
       renderStructure();
       await loadDocuments();
+      els.print.disabled = false;
       installObservers();
     } catch (error) {
       renderError(error.message || '无法读取分享项目。');
