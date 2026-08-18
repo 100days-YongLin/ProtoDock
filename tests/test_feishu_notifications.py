@@ -62,7 +62,7 @@ class FeishuNotificationTests(unittest.TestCase):
         self.assertEqual(message["card"]["header"]["template"], "green")
         self.assertEqual(
             message["card"]["header"]["title"]["content"],
-            "优儿嘉幼师版小程序 发布成功",
+            "【产品原型】优儿嘉幼师版小程序 发布成功",
         )
         metadata = message["card"]["elements"][0]["fields"]
         self.assertIn("v1.1-version7", metadata[0]["text"]["content"])

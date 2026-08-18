@@ -101,7 +101,7 @@ def build_publish_card(payload: dict) -> dict:
     tag_url = clean_url(payload.get("tagUrl"), "GitHub 当前版本地址")
     branch_url = clean_url(payload.get("branchUrl"), "GitHub 分支地址")
     published_at = format_publish_time(payload.get("publishedAt"))
-    title = f"{project_name} 发布成功"
+    title = f"【产品原型】{project_name} 发布成功"
 
     link_sections = [
         link_section("PRD 入口", [("当前版本", share_url), ("持续最新版", latest_url)]),
