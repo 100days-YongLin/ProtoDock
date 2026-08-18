@@ -18,13 +18,13 @@
       updateContent
     ];
     if (shareUrl) {
-      lines.push('', `当前版本：${shareUrl}`);
+      lines.push('', `当前版本PRD入口：${shareUrl}`);
     }
     if (latestShareUrl) {
-      lines.push(`最新版入口：${latestShareUrl}`);
+      lines.push(`持续最新版PRD入口：${latestShareUrl}`);
     }
     if (branchUrl) {
-      lines.push(`GitHub 分支：${branchUrl}`);
+      lines.push(`原型 GitHub 分支：${branchUrl}`);
     }
     return lines.join('\n');
   }
