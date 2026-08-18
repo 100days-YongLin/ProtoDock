@@ -185,7 +185,7 @@ Write acceptance scenarios with Chinese labels rather than English Given/When/Th
 - Keep source paths, component names, `initialScreen`, framework details, static-export checks, and device-shell stability out of the PRD body. ProtoDock already exposes source metadata in the page-information view.
 - Do not invent unknown permissions, account rules, prices, limits, synchronization scope, or exception behavior. Ask the product owner before completing the document or implementation.
 - Product-document validation warnings include missing sections, missing `前提 / 操作 / 预期`, unfinished `请填写` placeholders, and technical-only headings. Existing projects remain compatible by default; use `--warnings-as-errors` when documentation compliance is a release gate.
-- ProtoDock's `完整产品文档` view assembles page documents by Canvas group and pairs each one with a runtime prototype screenshot. It is a review surface, not a second source file. Keep each `docs/<page-id>.md` complete and independently understandable; do not create a manually duplicated aggregate PRD that can drift from the page documents.
+- ProtoDock's `完整产品文档` view assembles page documents by Canvas group. Web presets use the executable page entry in an interactive iframe for online reading, while cached screenshots are reserved for print/PDF; mobile and tablet presets retain the device-framed screenshot layout. It is a review surface, not a second source file. Keep each `docs/<page-id>.md` complete and independently understandable; do not create a manually duplicated aggregate PRD that can drift from the page documents.
 
 ## Interactive Preview Contract
 

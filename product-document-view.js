@@ -8,6 +8,13 @@
     : null;
   const pageElements = new Map();
   const screenshotUrls = new Set();
+  const prototypeSources = new Map();
+  const prototypeFrames = new Map();
+  let prototypeObserver = null;
+  let prototypeHistory = null;
+  let navigationManifest = { pages: {}, canvas: { nodes: [], edges: [] } };
+  let project = {};
+  let webDocument = false;
   let readyTimer = null;
   let started = false;
 
@@ -160,10 +167,190 @@
     document.body.classList.remove('is-previewing-image');
   }
 
+  function prototypeFigure(page) {
+    if (!webDocument) {
+      return `
+        <figure class="prototype-shot">
+          <div class="shot-placeholder"><i></i><span>正在生成原型截图</span></div>
+        </figure>
+      `;
+    }
+    return `
+      <figure class="prototype-shot prototype-live" data-prototype-page="${escapeHtml(page.id)}">
+        <div class="prototype-live-placeholder"><i></i><span>滚动到这里即可操作原型</span></div>
+      </figure>
+    `;
+  }
+
+  function webPreset() {
+    return project.devicePreset === 'web-portrait'
+      ? { width: 900, height: 1440 }
+      : { width: 1440, height: 900 };
+  }
+
+  function fitBrowser(mount) {
+    const stage = mount.querySelector('.prototype-live-stage');
+    const viewport = mount.querySelector('.prototype-live-browser-viewport');
+    const browser = mount.querySelector('.prototype-live-browser');
+    if (!stage || !viewport || !browser || !window.ProtoDockCapture?.scaledViewportGeometry) {
+      return;
+    }
+    const fit = () => {
+      const preset = webPreset();
+      const geometry = window.ProtoDockCapture.scaledViewportGeometry(
+        preset,
+        Math.max(220, stage.clientWidth || preset.width),
+        { chromeHeight: 30, maxScale: 1 }
+      );
+      viewport.style.setProperty('--prototype-browser-scaled-width', `${geometry.scaledWidth}px`);
+      viewport.style.setProperty('--prototype-browser-scaled-height', `${geometry.scaledHeight}px`);
+      browser.style.setProperty('--prototype-browser-scale', geometry.scale.toFixed(5));
+      browser.style.setProperty('--prototype-browser-width', `${geometry.width}px`);
+      browser.style.setProperty('--prototype-browser-height', `${geometry.height + geometry.chromeHeight}px`);
+      browser.style.setProperty('--prototype-width', `${geometry.width}px`);
+      browser.style.setProperty('--prototype-height', `${geometry.height}px`);
+    };
+    fit();
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(fit);
+      observer.observe(stage);
+    }
+  }
+
+  function scrollToPrototype(pageId) {
+    const article = pageElements.get(pageId);
+    if (!article) {
+      return;
+    }
+    mountPrototype(pageId);
+    article.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    els.outlineNavigation.querySelectorAll('[data-outline-page]').forEach((link) => {
+      link.classList.toggle('is-active', link.dataset.outlinePage === pageId);
+    });
+  }
+
+  function navigatePrototype(fromPageId, targetPageId, suffix = '') {
+    if (!navigationManifest.pages?.[targetPageId]) {
+      return;
+    }
+    if (fromPageId && fromPageId !== targetPageId) {
+      prototypeHistory?.push(fromPageId);
+    }
+    mountPrototype(targetPageId, suffix);
+    scrollToPrototype(targetPageId);
+  }
+
+  function backPrototype(fallbackPageId) {
+    const previous = prototypeHistory?.pop();
+    const targetPageId = previous?.index || fallbackPageId;
+    if (targetPageId) {
+      mountPrototype(targetPageId, previous?.suffix || '');
+      scrollToPrototype(targetPageId);
+    }
+  }
+
+  function bindPrototypeFrame(frame, pageId) {
+    window.ProtoDockNavigation?.bindFrame(frame, {
+      manifest: navigationManifest,
+      pageId,
+      onNavigate(targetPageId, source, navigation) {
+        navigatePrototype(pageId, targetPageId, navigation?.suffix || '');
+      },
+      onBack(fallbackPageId) {
+        backPrototype(fallbackPageId);
+      }
+    });
+  }
+
+  function mountPrototype(pageId, suffix = '') {
+    if (!webDocument) {
+      return null;
+    }
+    const source = prototypeSources.get(pageId);
+    const article = pageElements.get(pageId);
+    const mount = article?.querySelector(`[data-prototype-page="${CSS.escape(pageId)}"]`);
+    if (!source || !mount) {
+      return null;
+    }
+    const existing = prototypeFrames.get(pageId);
+    if (existing) {
+      if (suffix && source.src) {
+        const target = new URL(source.src, window.location.href);
+        const routed = new URL(suffix, target);
+        target.search = routed.search;
+        target.hash = routed.hash;
+        existing.src = target.toString();
+      }
+      return existing;
+    }
+    if (source.error || (!source.src && !source.srcdoc)) {
+      mount.innerHTML = `<div class="prototype-live-error"><strong>原型不可用</strong><span>${escapeHtml(source.error || '该页面没有可操作入口。')}</span></div>`;
+      return null;
+    }
+    mount.innerHTML = `
+      <div class="prototype-live-stage">
+        <div class="prototype-live-browser-viewport">
+          <div class="prototype-live-browser">
+            <div class="prototype-live-browser-bar"><i></i><i></i><i></i></div>
+            <iframe class="prototype-live-frame" title="${escapeHtml(navigationManifest.pages?.[pageId]?.title || pageId)}可操作原型" loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+    `;
+    fitBrowser(mount);
+    const frame = mount.querySelector('.prototype-live-frame');
+    if (!frame) {
+      return null;
+    }
+    prototypeFrames.set(pageId, frame);
+    bindPrototypeFrame(frame, pageId);
+    if (source.srcdoc) {
+      frame.srcdoc = source.srcdoc;
+    } else {
+      frame.src = source.src;
+    }
+    prototypeObserver?.unobserve(article);
+    return frame;
+  }
+
+  function installPrototypeObserver() {
+    prototypeObserver?.disconnect();
+    if (!webDocument || typeof IntersectionObserver !== 'function') {
+      return;
+    }
+    prototypeObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && mountPrototype(entry.target.dataset.pageId)) {
+          prototypeObserver.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '900px 0px' });
+    pageElements.forEach((article) => prototypeObserver.observe(article));
+  }
+
+  function rememberPrototype(payload) {
+    if (!webDocument || (!payload.prototypeSrc && !payload.prototypeSrcdoc && !payload.prototypeError)) {
+      return;
+    }
+    prototypeSources.set(payload.id, {
+      src: payload.prototypeSrc || '',
+      srcdoc: payload.prototypeSrcdoc || '',
+      error: payload.prototypeError || ''
+    });
+    const article = pageElements.get(payload.id);
+    const rect = article?.getBoundingClientRect?.();
+    if (!rect || (rect.top < window.innerHeight + 900 && rect.bottom > -900)) {
+      mountPrototype(payload.id);
+    }
+  }
+
   function renderStart(payload) {
     started = true;
     window.clearInterval(readyTimer);
-    const project = payload.project || {};
+    project = payload.project || {};
+    navigationManifest = payload.navigationManifest || navigationManifest;
+    webDocument = window.ProtoDockProductDocument?.documentLayoutMode?.(project) === 'web';
+    prototypeHistory = window.ProtoDockNavigation?.createPageHistory?.() || null;
     const sections = Array.isArray(payload.sections) ? payload.sections : [];
     const pages = sections.flatMap((section) => section.pages || []);
     window.ProtoDockProductDocument?.applyDocumentLayout?.(document.body, project);
@@ -204,9 +391,7 @@
               ${page.tag ? `<strong>${escapeHtml(page.tag)}</strong>` : ''}
             </header>
             <div class="product-page-body">
-              <figure class="prototype-shot">
-                <div class="shot-placeholder"><i></i><span>正在生成原型截图</span></div>
-              </figure>
+              ${prototypeFigure(page)}
               <section class="product-markdown" aria-label="${escapeHtml(page.title)}产品文档">
                 <div class="markdown-placeholder"><i></i><i></i><i></i><i></i></div>
               </section>
@@ -222,6 +407,7 @@
         pageElements.set(page.id, article);
       }
     });
+    installPrototypeObserver();
   }
 
   function renderPage(payload) {
@@ -231,6 +417,8 @@
     }
     const shot = article.querySelector('.prototype-shot');
     const markdownMount = article.querySelector('.product-markdown');
+
+    rememberPrototype(payload);
 
     if (!article.dataset.markdownReady) {
       markdownMount.innerHTML = '';
@@ -245,11 +433,22 @@
       return;
     }
 
-    shot.innerHTML = '';
+    if (!webDocument) {
+      shot.innerHTML = '';
+    } else {
+      shot.querySelector('.prototype-print-shot, .prototype-print-error')?.remove();
+    }
 
     if (payload.screenshot instanceof Blob) {
       const url = URL.createObjectURL(payload.screenshot);
       screenshotUrls.add(url);
+      if (webDocument) {
+        const image = document.createElement('img');
+        image.className = 'prototype-print-shot';
+        image.src = url;
+        image.alt = `${payload.title || payload.id}原型截图`;
+        shot.append(image);
+      } else {
       const button = document.createElement('button');
       button.className = 'prototype-shot-button';
       button.type = 'button';
@@ -260,8 +459,15 @@
       button.append(image);
       button.addEventListener('click', () => showImage(url, image.alt));
       shot.append(button);
+      }
     } else {
-      shot.innerHTML = `<div class="shot-error"><strong>截图暂不可用</strong><span>${escapeHtml(payload.captureError || '无法生成此页面截图')}</span></div>`;
+      const errorClass = webDocument ? 'prototype-print-error' : 'shot-error';
+      const errorMarkup = `<div class="${errorClass}"><strong>截图暂不可用</strong><span>${escapeHtml(payload.captureError || '无法生成此页面截图')}</span></div>`;
+      if (webDocument) {
+        shot.insertAdjacentHTML('beforeend', errorMarkup);
+      } else {
+        shot.innerHTML = errorMarkup;
+      }
     }
 
     article.classList.remove('is-loading');
@@ -303,6 +509,26 @@
   }
 
   function handleMessage(event) {
+    for (const [pageId, frame] of prototypeFrames) {
+      const targetPageId = window.ProtoDockNavigation?.pageIdFromMessage?.(
+        event,
+        frame,
+        navigationManifest
+      );
+      if (targetPageId) {
+        navigatePrototype(pageId, targetPageId);
+        return;
+      }
+      const backAction = window.ProtoDockNavigation?.backActionFromMessage?.(
+        event,
+        frame,
+        navigationManifest
+      );
+      if (backAction) {
+        backPrototype(backAction.fallbackPageId);
+        return;
+      }
+    }
     if (!channel && event.source !== window.opener) {
       return;
     }
@@ -350,6 +576,7 @@
     }
   });
   window.addEventListener('beforeunload', () => {
+    prototypeObserver?.disconnect();
     screenshotUrls.forEach((url) => URL.revokeObjectURL(url));
     channel?.close();
   });

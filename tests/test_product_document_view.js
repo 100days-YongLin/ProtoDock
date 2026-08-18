@@ -119,6 +119,7 @@ const fakeController = {
     concurrency: 2,
     openViewer: () => fakeController,
     loadMarkdown: async (page) => `# ${page.title}`,
+    loadPrototype: async (page) => ({ prototypeSrc: `http://localhost/${page.entry}` }),
     buildPage: async (page, context) => {
       assert.equal(context.markdown, `# ${page.title}`);
       activeBuilds += 1;
@@ -145,10 +146,13 @@ const fakeController = {
   assert.equal(sentMessages[0].action, 'start');
   assert.deepEqual(sentMessages[0].payload.project.changelog, manifest.changelog);
   assert.equal(sentMessages[0].payload.project.devicePreset, 'iphone-portrait');
+  assert.deepEqual(Object.keys(sentMessages[0].payload.navigationManifest.pages), Object.keys(manifest.pages));
+  assert.deepEqual(sentMessages[0].payload.navigationManifest.canvas.nodes, manifest.canvas.nodes);
   const pageMessages = sentMessages.filter((message) => message.action === 'page');
   assert.equal(pageMessages.length, 8);
   assert.equal(pageMessages.filter((message) => message.payload.capturePending).length, 4);
   assert.equal(pageMessages.filter((message) => !message.payload.capturePending).length, 4);
+  assert.equal(pageMessages.every((message) => message.payload.prototypeSrc?.startsWith('http://localhost/')), true);
   assert.equal(pageMessages.find((message) => message.payload.capturePending).payload.markdown.startsWith('# '), true);
   assert.equal(sentMessages.at(-1).action, 'complete');
   assert.equal(disposed, true);

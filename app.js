@@ -1260,6 +1260,10 @@ async function openFullProductDocument() {
 
   try {
     const preset = presetFor();
+    const interactiveWebDocument = window.ProtoDockProductDocument.documentLayoutMode(
+      state.manifest.project
+    ) === 'web';
+    const livePreviewSessionId = `product-document-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const safeArea = configuredSafeAreaInsets();
     const captureProfile = {
       preset: state.manifest.project?.devicePreset || 'iphone-portrait',
@@ -1290,6 +1294,25 @@ async function openFullProductDocument() {
       concurrency: PRODUCT_DOCUMENT_CAPTURE_CONCURRENCY,
       loadMarkdown(descriptor) {
         return loadDocForPage(descriptor.id, state.manifest.pages[descriptor.id]);
+      },
+      async loadPrototype(descriptor) {
+        if (!interactiveWebDocument) {
+          return {};
+        }
+        const page = state.manifest.pages[descriptor.id];
+        if (!page?.entry) {
+          throw new Error('页面没有配置入口文件');
+        }
+        if (state.projectBaseUrl) {
+          return {
+            prototypeSrc: new URL(page.entry, state.projectBaseUrl).toString()
+          };
+        }
+        const nodeId = `${livePreviewSessionId}-${descriptor.nodeId || descriptor.id}`;
+        const html = await readTextFile(page.entry);
+        return {
+          prototypeSrcdoc: await rewriteHtmlForLocalPreview(html, page.entry, nodeId)
+        };
       },
       async buildPage(descriptor, context = {}) {
         const page = state.manifest.pages[descriptor.id];
@@ -1330,6 +1353,9 @@ async function openFullProductDocument() {
       },
       onPageError(descriptor, error) {
         console.warn(`ProtoDock: product document capture failed for ${descriptor.id}`, error);
+      },
+      onPrototypeError(descriptor, error) {
+        console.warn(`ProtoDock: interactive product preview failed for ${descriptor.id}`, error);
       },
       onProgress(current, total, progress) {
         const cacheLabel = progress.cached ? `，缓存 ${progress.cached}` : '';

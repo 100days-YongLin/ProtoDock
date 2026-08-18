@@ -306,6 +306,13 @@
           devicePreset: manifest.project?.devicePreset || 'iphone-portrait',
           changelog: global.ProtoDockChangeLog?.normalize(manifest.changelog) || []
         },
+        navigationManifest: {
+          pages: manifest.pages || {},
+          canvas: {
+            nodes: Array.isArray(manifest.canvas?.nodes) ? manifest.canvas.nodes : [],
+            edges: Array.isArray(manifest.canvas?.edges) ? manifest.canvas.edges : []
+          }
+        },
         generatedAt: new Date().toISOString(),
         sections
       });
@@ -321,12 +328,24 @@
         }
         const descriptor = pages[index];
         let markdown = '';
+        let prototypePayload = {};
         let pagePayload;
         try {
           markdown = await options.loadMarkdown(descriptor);
+          if (typeof options.loadPrototype === 'function') {
+            try {
+              prototypePayload = await options.loadPrototype(descriptor) || {};
+            } catch (error) {
+              prototypePayload = {
+                prototypeError: error.message || '无法加载可操作原型'
+              };
+              options.onPrototypeError?.(descriptor, error);
+            }
+          }
           controller.send('page', {
             ...descriptor,
             markdown,
+            ...prototypePayload,
             screenshot: null,
             capturePending: true
           });
@@ -349,6 +368,7 @@
         controller.send('page', {
           ...descriptor,
           markdown,
+          ...prototypePayload,
           ...pagePayload,
           capturePending: false
         });
