@@ -79,7 +79,7 @@ function directoryHandle(entries) {
       throw new Error('share cache should not fetch');
     }
   });
-  assert.match(await shareSession.keyForPage(page, profile), /^prd-shot-v1:/);
+  assert.match(await shareSession.keyForPage(page, profile), /^prd-shot-v2:/);
   assert.equal(fetched, false);
 
   const updatedShareSession = ProtoDockProductDocumentCache.createProjectRevisionSession({

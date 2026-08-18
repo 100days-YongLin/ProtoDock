@@ -1,5 +1,5 @@
 (function initProductDocumentScreenshotCache(global) {
-  const CACHE_VERSION = 'prd-shot-v1';
+  const CACHE_VERSION = 'prd-shot-v2';
   const DATABASE_NAME = 'protodock-cache';
   const DATABASE_VERSION = 1;
   const STORE_NAME = 'product-document-screenshots';
