@@ -1594,8 +1594,23 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
     server_version = "ProtoDockShare/1.0"
     protocol_version = "HTTP/1.1"
 
+    def handle(self) -> None:
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+
     def log_message(self, fmt: str, *args) -> None:
         print("%s - - [%s] %s" % (self.address_string(), self.log_date_time_string(), fmt % args))
+
+    def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
+        try:
+            status = int(code)
+        except (TypeError, ValueError):
+            status = 0
+        if urlparse(self.path).path.startswith("/shares/") and status in {200, 304}:
+            return
+        super().log_request(code, size)
 
     def send_json(self, status: HTTPStatus, payload: dict) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
