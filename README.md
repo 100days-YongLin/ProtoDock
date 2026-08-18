@@ -199,7 +199,7 @@ http://<server-ip>:6080/index.html
 
 校验器会检查 ZIP 根目录、manifest 文件路径、Canvas 节点/连线/分组、节点重叠、跨页导航和变更历史，并输出跨页路由表。`changelog` 缺失会作为旧项目兼容警告；字段存在但版本、时间或变更内容不完整时会阻止上传。发现缺失文件、重复节点、悬空连线、旧 `data-page`、`window.location`、根路径 `/pages/...` 或无效目标时同样返回非零退出码。`--json` 可供 Agent 和 CI 读取，`--warnings-as-errors` 可让连线交叉、穿过节点及间距不足也阻止发布。统一发布和 GitHub 导入会在服务端再次执行同一套核心校验。
 
-建议分别命名为 `<project>-<version>-protodock-upload.zip` 和 `<project>-<version>-full-release.zip`，不要向用户推荐后者用于 ProtoDock 上传。
+通过本地完整项目发布时不需要手动生成 ZIP；只有 CI 或外部 Agent 需要归档时，才在项目根目录之外生成 `<project>-<version>-protodock-upload.zip`。
 
 自动打包只读取当前项目目录中的 `pages/**`、`docs/**` 和 `assets/**`，并把已保存的 manifest 状态写入包内的 `protodock.project.json`。如果画布或右侧文档仍有未保存修改，ProtoDock 会先要求保存并填写变更记录，不允许绕过版本历史直接发布。
 
@@ -207,7 +207,7 @@ http://<server-ip>:6080/index.html
 
 完整产品文档是运行时汇总视图，不会生成或覆盖新的总 Markdown 文件，也不会把截图写回项目目录。页面级 `docs/*.md` 仍然是产品文档的唯一来源；本地编辑器中尚未保存的文档内容也会进入本次阅读视图。
 
-发布时填写 `产品标识` 和 `版本`，两者共同形成固定公开版本链接。例如产品标识 `pictale`、版本 `v1` 会得到 `/s/pictale/v1`。GitHub 同步使用另一套连续历史：产品稳定分支为 `project/pictale`，当前版本创建不可变 Tag `release/pictale/v1`。每次成功发布还会更新产品级最新版入口 `/s/pictale/latest`；`/s/pictale/latest/canvas` 同样可直达最新版画布。同版本相同内容可以重复发布，同版本内容发生变化时必须填写新版本，避免覆盖已经交付的 Tag。GitHub 已配置时“同步到 GitHub”默认开启，也可以在发布前关闭。
+发布时填写 `产品标识` 和 `发布版本`，两者共同形成固定公开版本链接。例如产品标识 `pictale`、版本 `v1` 会得到 `/s/pictale/v1`。弹窗会在提交前并列展示当前版本 PRD、持续最新版 PRD、产品稳定分支 `project/pictale` 和不可变版本 Tag `release/pictale/v1`，不再把公开路径与 Git 分支混在同一字段里。每次成功发布还会更新产品级最新版入口 `/s/pictale/latest`；`/s/pictale/latest/canvas` 同样可直达最新版画布。同版本相同内容可以重复发布，同版本内容发生变化时必须填写新版本，避免覆盖已经交付的 Tag。GitHub 已配置时“同步”默认开启，也可以按次关闭；关闭后只发布两个 PRD 入口。
 
 发布成功后可以点击“复制更新文案”，一次复制项目与版本、本次更新内容、当前版本链接、最新版入口、GitHub 当前版本 Tag 和持续最新版分支；本次未同步 GitHub 时不会复制可能过期的仓库链接。发布结果中的 Git Diff 可以展开查看本次交付实际修改的文件。
 

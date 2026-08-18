@@ -5,9 +5,12 @@
     close: document.getElementById('closeShareModal'),
     product: document.getElementById('publishProductName'),
     version: document.getElementById('publishVersion'),
+    targetSummary: document.querySelector('.publish-target-summary'),
     branchPreview: document.getElementById('publishBranchPreview'),
-    gitPreview: document.getElementById('publishGitPreview'),
+    tagPreview: document.getElementById('publishTagPreview'),
     urlPreview: document.getElementById('publishUrlPreview'),
+    latestUrlPreview: document.getElementById('publishLatestUrlPreview'),
+    githubMode: document.getElementById('publishGithubMode'),
     syncGithub: document.getElementById('publishSyncGithub'),
     commitField: document.getElementById('publishCommitField'),
     commitMessage: document.getElementById('publishCommitMessage'),
@@ -20,10 +23,10 @@
     autoPanel: document.getElementById('shareAutoPanel'),
     autoTitle: document.getElementById('shareAutoTitle'),
     autoDescription: document.getElementById('shareAutoDescription'),
+    manualUpload: document.getElementById('shareManualUpload'),
     dropzone: document.getElementById('shareDropZone'),
     dropHint: document.getElementById('shareDropHint'),
     input: document.getElementById('shareFileInput'),
-    choose: document.getElementById('chooseShareFile'),
     publish: document.getElementById('uploadShareFile'),
     status: document.getElementById('shareStatus'),
     progress: document.getElementById('shareProgress'),
@@ -138,7 +141,14 @@
   }
 
   function publishReference() {
-    return window.ProtoDockShareReference?.branch?.(els.product?.value, els.version?.value) || '';
+    return publishTargets().reference;
+  }
+
+  function publishTargets() {
+    return window.ProtoDockPublishTargets?.build?.({
+      product: els.product?.value,
+      version: els.version?.value
+    }) || {};
   }
 
   function syncGithubEnabled() {
@@ -263,8 +273,11 @@
     }
     if (els.autoDescription && usingAuto) {
       const state = protoDockState();
-      const dirtyText = state.dirty ? '发布前会先要求保存当前改动。' : '将读取页面、文档和素材。';
+      const dirtyText = state.dirty ? '发布前会先要求保存当前改动。' : '只读取清单、页面、文档和发布素材。';
       els.autoDescription.textContent = `${state.projectDirectoryName || '本地项目'}：${dirtyText}`;
+    }
+    if (els.manualUpload && !autoAvailable) {
+      els.manualUpload.open = true;
     }
     if (els.fileName && !selectedFile) {
       els.fileName.textContent = autoAvailable ? '也可以拖入项目 zip，改用手动上传' : '拖入项目 zip，或点击选择';
@@ -278,22 +291,24 @@
 
   function updateState() {
     updatePackageSourceUi();
-    const reference = publishReference();
-    const sharePath = window.ProtoDockShareReference?.sharePath?.(reference) || '';
+    const targets = publishTargets();
     if (els.branchPreview) {
-      els.branchPreview.textContent = reference || '-';
+      els.branchPreview.textContent = targets.branch || '-';
     }
-    if (els.gitPreview) {
-      const product = String(els.product?.value || '').trim();
-      const version = String(els.version?.value || '').trim();
-      els.gitPreview.textContent = product && version
-        ? `Git：project/${product} · Tag：release/${product}/${version}`
-        : 'Git：填写产品名和版本号后生成';
+    if (els.tagPreview) {
+      els.tagPreview.textContent = targets.tag || '-';
     }
     if (els.urlPreview) {
-      const url = sharePath ? appUrl(sharePath) : '';
+      const url = targets.currentPath ? appUrl(targets.currentPath) : '';
       els.urlPreview.href = url || '#';
-      els.urlPreview.textContent = url || '填写产品名和版本号后生成';
+      els.urlPreview.textContent = url || '填写产品标识和发布版本后生成';
+      els.urlPreview.setAttribute('aria-disabled', String(!url));
+    }
+    if (els.latestUrlPreview) {
+      const url = targets.latestPath ? appUrl(targets.latestPath) : '';
+      els.latestUrlPreview.href = url || '#';
+      els.latestUrlPreview.textContent = url || '填写产品标识和发布版本后生成';
+      els.latestUrlPreview.setAttribute('aria-disabled', String(!url));
     }
     if (els.syncGithub) {
       els.syncGithub.disabled = isPublishing || isLoadingConfig || !githubConfig?.configured;
@@ -301,17 +316,26 @@
         els.syncGithub.checked = false;
       }
     }
+    const githubEnabled = syncGithubEnabled();
+    els.targetSummary?.classList.toggle('github-disabled', !githubEnabled);
+    if (els.githubMode) {
+      if (isLoadingConfig) {
+        els.githubMode.textContent = '正在读取 GitHub 配置';
+      } else if (!githubConfig?.configured) {
+        els.githubMode.textContent = '仅发布公开预览';
+      } else {
+        els.githubMode.textContent = githubEnabled ? '将同步 GitHub' : '本次不推送 GitHub';
+      }
+      els.githubMode.classList.toggle('is-active', githubEnabled);
+    }
     if (els.commitMessage) {
       els.commitMessage.disabled = isPublishing;
     }
     els.commitField?.classList.toggle('is-disabled', isPublishing);
     if (els.publish) {
       els.publish.disabled = !canPublish();
-      const source = uploadSource() === 'auto' ? '打包并发布' : '上传并发布';
-      els.publish.textContent = syncGithubEnabled() ? `${source}，同步 GitHub` : source;
-    }
-    if (els.choose) {
-      els.choose.disabled = isPublishing;
+      const source = uploadSource() === 'auto' ? '发布当前项目' : '发布 ZIP';
+      els.publish.textContent = githubEnabled ? `${source}并同步 GitHub` : source;
     }
     if (els.refreshGithub) {
       els.refreshGithub.disabled = isPublishing || isLoadingConfig;
@@ -692,6 +716,9 @@
       return;
     }
     selectedFile = file && file.name.toLowerCase().endsWith('.zip') ? file : null;
+    if (selectedFile && els.manualUpload) {
+      els.manualUpload.open = true;
+    }
     if (els.fileName) {
       els.fileName.textContent = selectedFile ? file.name : '拖入项目 zip，或点击选择';
     }
@@ -829,6 +856,9 @@
     preparePublishTarget();
     fillDefaults();
     resetProgress();
+    if (els.manualUpload) {
+      els.manualUpload.open = !canAutoPackage();
+    }
     els.modal.hidden = false;
     setStatus('正在读取 GitHub 配置...');
     renderGithubConfig();
@@ -860,7 +890,6 @@
   els.openFeishuSettings?.addEventListener('click', openFeishuSettings);
   els.saveFeishuSettings?.addEventListener('click', saveFeishuSettings);
   els.close?.addEventListener('click', closeModal);
-  els.choose?.addEventListener('click', () => els.input?.click());
   els.input?.addEventListener('change', () => selectFile(els.input.files?.[0] || null));
   els.publish?.addEventListener('click', publishProject);
   els.modal?.addEventListener('click', (event) => {

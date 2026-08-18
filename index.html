@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="./vendor/devices.css">
-  <link rel="stylesheet" href="./styles.css?v=10">
+  <link rel="stylesheet" href="./styles.css?v=11">
   <link rel="stylesheet" href="./canvas-groups.css">
   <link rel="stylesheet" href="./canvas-minimap.css">
 </head>
@@ -503,34 +503,53 @@
       <header class="modal-head">
         <div>
           <strong id="shareModalTitle">发布原型项目</strong>
-          <span>公开版本保持固定链接；GitHub 使用产品稳定分支和不可变版本 Tag。</span>
+          <span>一次发布更新当前版本与持续最新版，并可同步产品稳定分支和版本 Tag。</span>
         </div>
         <button class="tool-button" id="closeShareModal" title="关闭" aria-label="关闭">×</button>
       </header>
 
       <div class="github-form-grid publish-identity-grid">
         <label>
-          <span>产品名</span>
+          <span>产品标识</span>
           <input id="publishProductName" type="text" autocomplete="off" placeholder="pictale">
         </label>
         <label>
-          <span>版本号</span>
+          <span>发布版本</span>
           <input id="publishVersion" type="text" autocomplete="off" placeholder="v1">
         </label>
       </div>
 
-      <div class="github-branch-preview publish-route-preview">
-        <div>
-          <span>公开版本</span>
-          <strong id="publishBranchPreview">-</strong>
-          <span id="publishGitPreview">Git：填写产品名和版本号后生成</span>
+      <section class="publish-target-summary" aria-labelledby="publishTargetTitle">
+        <header>
+          <div>
+            <strong id="publishTargetTitle">本次发布目标</strong>
+            <span>版本入口永久保留；latest 与产品稳定分支持续向前。</span>
+          </div>
+          <span class="publish-mode" id="publishGithubMode">正在读取 GitHub 配置</span>
+        </header>
+        <div class="publish-target-grid">
+          <div>
+            <span>当前版本 PRD</span>
+            <a id="publishUrlPreview" href="#" target="_blank" rel="noreferrer">填写产品标识和发布版本后生成</a>
+          </div>
+          <div>
+            <span>持续最新版 PRD</span>
+            <a id="publishLatestUrlPreview" href="#" target="_blank" rel="noreferrer">填写产品标识和发布版本后生成</a>
+          </div>
+          <div data-github-target>
+            <span>产品稳定分支</span>
+            <code id="publishBranchPreview">-</code>
+          </div>
+          <div data-github-target>
+            <span>不可变版本 Tag</span>
+            <code id="publishTagPreview">-</code>
+          </div>
         </div>
-        <a id="publishUrlPreview" href="#" target="_blank" rel="noreferrer">填写产品名和版本号后生成</a>
-      </div>
+      </section>
 
       <section class="github-config-panel publish-github-panel">
         <div>
-          <strong>同步到 GitHub</strong>
+          <strong>GitHub 仓库</strong>
           <span id="githubRepoText">正在读取服务器配置...</span>
         </div>
         <label class="publish-sync-control" for="publishSyncGithub">
@@ -566,12 +585,18 @@
         </div>
       </div>
 
-      <div class="share-dropzone" id="shareDropZone" role="button" tabindex="0" aria-label="上传 ProtoDock 项目压缩包">
-        <i data-lucide="upload-cloud"></i>
-        <strong id="shareFileName">拖入项目 zip，或点击选择</strong>
-        <span id="shareDropHint">ZIP 根目录必须直接包含 protodock.project.json、pages/ 和 docs/。</span>
-        <input id="shareFileInput" type="file" accept=".zip,application/zip" hidden>
-      </div>
+      <details class="share-manual-upload" id="shareManualUpload">
+        <summary>
+          <strong>改用 ZIP 发布</strong>
+          <span>仅在无法读取当前项目目录或需要发布其他快照时使用</span>
+        </summary>
+        <div class="share-dropzone" id="shareDropZone" role="button" tabindex="0" aria-label="上传 ProtoDock 项目压缩包">
+          <i data-lucide="upload-cloud"></i>
+          <strong id="shareFileName">拖入项目 zip，或点击选择</strong>
+          <span id="shareDropHint">ZIP 根目录必须直接包含 protodock.project.json、pages/ 和 docs/。</span>
+          <input id="shareFileInput" type="file" accept=".zip,application/zip" hidden>
+        </div>
+      </details>
 
       <div class="share-status" id="shareStatus" aria-live="polite">填写发布信息后即可生成公开预览</div>
 
@@ -621,7 +646,6 @@
       </div>
 
       <div class="action-row">
-        <button class="secondary" id="chooseShareFile" type="button">选择 zip</button>
         <button class="primary" id="uploadShareFile" type="button" disabled>发布项目</button>
       </div>
     </section>
@@ -678,6 +702,7 @@
   <script src="./capture-options.js"></script>
   <script src="./github-preferences.js?v=2"></script>
   <script src="./share-reference.js?v=4"></script>
+  <script src="./publish-targets.js?v=1"></script>
   <script src="./publish-summary.js?v=4"></script>
   <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=2"></script>
@@ -687,6 +712,6 @@
   <script src="./product-document.js?v=5"></script>
   <script src="./app.js?v=9"></script>
   <script src="./project-name.js"></script>
-  <script src="./share.js?v=7"></script>
+  <script src="./share.js?v=8"></script>
 </body>
 </html>
