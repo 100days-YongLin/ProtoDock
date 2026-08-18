@@ -168,7 +168,21 @@
       const target = clonedElements[index];
       const scrollHeight = Number(source.scrollHeight || 0);
       const clientHeight = Number(source.clientHeight || 0);
-      if (!target?.style || !clientHeight || scrollHeight <= clientHeight + 1) {
+      let overflowY = '';
+      try {
+        const computed = documentRef.defaultView?.getComputedStyle?.(source);
+        overflowY = String(computed?.overflowY || computed?.overflow || '').toLowerCase();
+      } catch (error) {
+        overflowY = '';
+      }
+      const isDocumentScroller = source === documentRef.scrollingElement;
+      const isScrollableOverflow = ['auto', 'scroll', 'overlay'].includes(overflowY);
+      if (
+        !target?.style
+        || !clientHeight
+        || scrollHeight <= clientHeight + 1
+        || (!isDocumentScroller && !isScrollableOverflow)
+      ) {
         return;
       }
       target.style.setProperty('height', `${scrollHeight}px`, 'important');

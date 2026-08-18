@@ -5,11 +5,12 @@ require('../capture.js');
 
 assert.equal(typeof ProtoDockCapture.capturePageImage, 'function');
 
-function element({ scrollHeight, clientHeight, offsetHeight = clientHeight, top = 0 }) {
+function element({ scrollHeight, clientHeight, offsetHeight = clientHeight, top = 0, overflowY = 'visible' }) {
   return {
     scrollHeight,
     clientHeight,
     offsetHeight,
+    overflowY,
     getBoundingClientRect() {
       return { top };
     }
@@ -23,7 +24,10 @@ const documentRef = {
   documentElement: root,
   body,
   scrollingElement: root,
-  defaultView: { scrollY: 0 },
+  defaultView: {
+    scrollY: 0,
+    getComputedStyle: (target) => ({ overflowY: target.overflowY })
+  },
   querySelectorAll: () => [nestedScroller]
 };
 
@@ -71,27 +75,37 @@ function styleRecorder() {
   };
 }
 
-const sourceScroller = element({ scrollHeight: 1200, clientHeight: 700 });
+const sourceScroller = element({ scrollHeight: 1200, clientHeight: 700, overflowY: 'auto' });
+const sourceVisualOverflow = element({ scrollHeight: 980, clientHeight: 140, overflowY: 'visible' });
 const sourceWrapper = element({ scrollHeight: 700, clientHeight: 700 });
 const sourceBody = element({ scrollHeight: 700, clientHeight: 700 });
 const sourceRoot = element({ scrollHeight: 830, clientHeight: 830 });
 sourceScroller.parentElement = sourceWrapper;
 sourceWrapper.parentElement = sourceBody;
 sourceBody.parentElement = sourceRoot;
-sourceRoot.querySelectorAll = () => [sourceBody, sourceWrapper, sourceScroller];
+sourceVisualOverflow.parentElement = sourceWrapper;
+sourceRoot.querySelectorAll = () => [sourceBody, sourceWrapper, sourceScroller, sourceVisualOverflow];
 const cloneBody = { style: styleRecorder() };
 const cloneWrapper = { style: styleRecorder() };
 const cloneScroller = { style: styleRecorder() };
+const cloneVisualOverflow = { style: styleRecorder() };
 const cloneRoot = {
   style: styleRecorder(),
-  querySelectorAll: () => [cloneBody, cloneWrapper, cloneScroller]
+  querySelectorAll: () => [cloneBody, cloneWrapper, cloneScroller, cloneVisualOverflow]
 };
-ProtoDockCapture.expandScrollableClones({ documentElement: sourceRoot, body: sourceBody }, cloneRoot);
+ProtoDockCapture.expandScrollableClones({
+  documentElement: sourceRoot,
+  body: sourceBody,
+  defaultView: {
+    getComputedStyle: (target) => ({ overflowY: target.overflowY })
+  }
+}, cloneRoot);
 assert.equal(cloneScroller.style.values.get('height'), '1200px');
 assert.equal(cloneScroller.style.values.get('overflow-y'), 'visible');
 assert.equal(cloneWrapper.style.values.get('height'), 'auto');
 assert.equal(cloneWrapper.style.values.get('overflow-y'), 'visible');
 assert.equal(cloneBody.style.values.has('height'), false);
 assert.equal(cloneRoot.style.values.has('height'), false);
+assert.equal(cloneVisualOverflow.style.values.has('height'), false);
 
 console.log('capture tests passed');
