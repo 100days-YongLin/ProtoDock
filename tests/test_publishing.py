@@ -23,6 +23,8 @@ class PublishingTests(unittest.TestCase):
         self.assertEqual(server.share_reference_path("pictale/v1"), "/s/pictale/v1")
         self.assertEqual(server.normalize_share_reference("legacy_123"), "legacy_123")
         self.assertEqual(server.normalize_share_reference("pictale/canvas"), "")
+        self.assertEqual(server.github_product_branch_name("pictale"), "project/pictale")
+        self.assertEqual(server.github_release_tag_name("pictale", "v1"), "release/pictale/v1")
 
     def test_publish_uses_branch_as_stable_share_reference(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -116,12 +118,14 @@ class PublishingTests(unittest.TestCase):
         self.assertEqual(latest, "pictale/v1")
         self.assertFalse(failed_version_exists)
 
-    def test_publish_returns_github_result_from_same_branch(self):
+    def test_publish_returns_github_product_branch_and_release_tag(self):
         github_result = {
-            "branch": "pictale/v2",
+            "branch": "project/pictale",
+            "tag": "release/pictale/v2",
             "commit": "abc123",
             "action": "pushed",
-            "branchUrl": "https://github.com/example/repo/tree/pictale/v2",
+            "branchUrl": "https://github.com/example/repo/tree/project/pictale",
+            "tagUrl": "https://github.com/example/repo/tree/release/pictale/v2",
             "commitUrl": "https://github.com/example/repo/commit/abc123",
         }
         with tempfile.TemporaryDirectory() as directory:
@@ -139,6 +143,32 @@ class PublishingTests(unittest.TestCase):
         push.assert_called_once()
         self.assertEqual(result["branch"], "pictale/v2")
         self.assertEqual(result["github"], github_result)
+
+    def test_github_push_uses_stable_branch_and_release_tag_urls(self):
+        delivery = {
+            "branch": "project/pictale",
+            "tag": "release/pictale/v2",
+            "commit": "abc123",
+            "previousCommit": "def456",
+            "action": "pushed",
+            "changes": ["M\tdocs/home.md"],
+            "diffStat": "1 file changed",
+            "workspaceReused": True,
+        }
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            server,
+            "GITHUB_REPO_URL",
+            "https://github.com/example/prototypes.git",
+        ), patch.object(server, "GITHUB_DELIVERY_DIR", Path(directory) / "delivery"), patch.object(
+            server,
+            "publish_git_delivery",
+            return_value=delivery,
+        ) as publish:
+            result = server.push_project_to_github(Path(directory), "pictale", "v2", "release v2")
+
+        self.assertEqual(result["branchUrl"], "https://github.com/example/prototypes/tree/project/pictale")
+        self.assertEqual(result["tagUrl"], "https://github.com/example/prototypes/tree/release/pictale/v2")
+        publish.assert_called_once()
 
 
 if __name__ == "__main__":

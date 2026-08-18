@@ -67,6 +67,7 @@ def build_publish_card(payload: dict) -> dict:
     update_content = clean_text(payload.get("updateContent"), "更新内容", maximum=4000, required=True)
     share_url = clean_url(payload.get("shareUrl"), "当前版本地址", required=True)
     latest_url = clean_url(payload.get("latestShareUrl"), "最新版地址")
+    tag_url = clean_url(payload.get("tagUrl"), "GitHub 当前版本地址")
     branch_url = clean_url(payload.get("branchUrl"), "GitHub 分支地址")
     title = f"{project_name}{f' {version}' if version else ''} 发布成功"
 
@@ -79,10 +80,15 @@ def build_publish_card(payload: dict) -> dict:
             "is_short": False,
             "text": {"tag": "lark_md", "content": f"**持续最新版 PRD**\n[{latest_url}]({latest_url})"},
         })
+    if tag_url:
+        fields.append({
+            "is_short": False,
+            "text": {"tag": "lark_md", "content": f"**GitHub 当前版本**\n[{tag_url}]({tag_url})"},
+        })
     if branch_url:
         fields.append({
             "is_short": False,
-            "text": {"tag": "lark_md", "content": f"**GitHub 分支**\n[{branch_url}]({branch_url})"},
+            "text": {"tag": "lark_md", "content": f"**GitHub 持续最新版**\n[{branch_url}]({branch_url})"},
         })
 
     actions = [{
@@ -98,12 +104,13 @@ def build_publish_card(payload: dict) -> dict:
             "type": "default",
             "url": latest_url,
         })
-    if branch_url:
+    github_copy_url = tag_url or branch_url
+    if github_copy_url:
         actions.append({
             "tag": "button",
             "text": {"tag": "plain_text", "content": "复制 GitHub 链接"},
             "type": "default",
-            "url": build_copy_link_url(share_url, branch_url),
+            "url": build_copy_link_url(share_url, github_copy_url),
         })
 
     return {

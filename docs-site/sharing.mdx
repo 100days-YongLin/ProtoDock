@@ -1,9 +1,9 @@
 ---
 title: 统一发布
-description: 一次生成稳定公开预览，并可同步到同名 GitHub 分支。
+description: 一次生成稳定公开预览，并同步到产品分支与版本 Tag。
 ---
 
-部署内置 Python 服务后，点击右上角 **发布**，可以把同一份 ProtoDock 项目同时发布为公开预览和 GitHub 分支。
+部署内置 Python 服务后，点击右上角 **发布**，可以把同一份 ProtoDock 项目同时发布为公开预览、GitHub 产品分支和版本 Tag。
 
 ```bash
 PROTODOCK_PORT=6080 python3 server.py
@@ -11,19 +11,20 @@ PROTODOCK_PORT=6080 python3 server.py
 
 ## 发布标识
 
-填写 `产品标识` 和 `版本` 后，ProtoDock 会使用同一标识生成 Git 分支和分享路径。
+填写 `产品标识` 和 `版本` 后，ProtoDock 会生成固定分享路径、持续更新的产品分支和不可变版本 Tag。
 
 ```text
 产品标识：pictale
 版本：v1
-Git 分支：pictale/v1
+Git 产品分支：project/pictale
+Git 版本 Tag：release/pictale/v1
 公开链接：/s/pictale/v1
 最新版入口：/s/pictale/latest
 ```
 
-再次发布 `pictale/v1` 会更新原有内容，固定版本链接保持不变。每次成功发布还会把 `/s/pictale/latest` 指向该产品最后一次完整发布成功的版本，适合长期发给产品、设计和研发；旧产品没有最新版指针时会按最近发布时间自动兼容。旧版随机 ID 链接 `/s/<share-id>` 继续兼容，但新发布不再要求用户区分“新建分享”和“更新分享”。
+相同内容可以幂等发布到 `pictale/v1`；版本Tag存在但内容不同时必须使用新版本号。每次成功发布还会把 `/s/pictale/latest` 指向该产品最后一次完整发布成功的版本。旧版随机ID和旧版本分支继续兼容，但新发布不再创建永久版本分支。
 
-发布成功后点击 **复制更新文案**，可以一次复制项目与版本、本次更新内容、当前版本链接、最新版入口和 GitHub 分支链接。本次未同步 GitHub 时不会带出旧的仓库链接。
+发布成功后点击 **复制更新文案**，可以一次复制项目与版本、本次更新内容、当前版本链接、最新版入口、GitHub 当前版本 Tag 和持续最新版分支。发布结果还可以展开逐文件 Git Diff。
 
 ## 发送到飞书机器人
 
@@ -43,9 +44,9 @@ ProtoDock 上传包应与完整交付包分开生成。建议使用 `<project>-<
 
 服务端配置固定 GitHub 仓库后，发布弹窗中的 **同步到 GitHub** 默认开启，也可以按次关闭。Commit message 仅在同步开启时必填。
 
-公开版本和 GitHub 推送使用同一份已校验项目包，并写入同一个 `产品标识/版本`。如果 GitHub 推送失败，服务端会恢复发布前的公开版本，避免分享链接与仓库分支内容不一致。
+服务端把已校验项目包同步到持久交付工作区，再与 `project/<产品>` 比较并提交Diff，最后原子推送稳定分支和 `release/<产品>/<版本>` Tag。稳定分支禁止强推，Tag禁止覆盖。如果 GitHub 推送失败，服务端会恢复发布前的公开版本。
 
-GitHub 凭据位于折叠的 **GitHub 连接配置** 中。Deploy Key 私钥、GitHub App 私钥和工作目录只保存在服务端，不会进入项目包或公开预览。
+GitHub 凭据位于折叠的 **GitHub 连接配置** 中。Deploy Key 私钥、GitHub App 私钥和工作目录只保存在服务端，不会进入项目包或公开预览。交付工作区默认是 `.github-work/delivery/`，也可以通过 `PROTODOCK_GITHUB_DELIVERY_DIR` 指定；它由ProtoDock独占，不能人工编辑。
 
 ## 预览与下载
 

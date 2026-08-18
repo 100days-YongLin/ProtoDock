@@ -43,6 +43,35 @@ Before editing, read:
 9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
 10. After completing a batch of project edits, append one `changelog` item with the version, ISO 8601 timestamp, and concise change description. The final item is the current version; never rewrite prior history.
 
+## Git Delivery Contract
+
+ProtoDock may use two directories with different ownership:
+
+- The editable project source directory is where an Agent updates `pages`, `docs`, `assets`, and the manifest.
+- The server-managed Git delivery workspace is a persistent clone used only by ProtoDock publishing. Never ask users or Agents to edit it manually, copy ad hoc files into it, or treat it as a second source of truth.
+
+For new Git-backed deliveries:
+
+1. One product has one long-lived branch named `project/<product>`.
+2. Each accepted release creates an immutable tag named `release/<product>/<version>`.
+3. A feature branch, when needed for collaboration, is short-lived and named `feat/<product>-<feature>`; merge it into the product branch and delete it after acceptance.
+4. A version must not be represented by a new permanent orphan branch. Do not use `product/version` branches for new deliveries.
+5. Never force-push the product branch and never move, delete, or overwrite a published release tag.
+6. Re-publishing the same version is allowed only when its files resolve to the same commit. Changed content requires a new version and a new changelog item.
+7. Before delivery, review the file-level Git diff produced from the final validated artifact. A release commit must contain the prototype, affected PRD files, and changelog entry together.
+8. Old version branches remain readable for compatibility. Migrating their history is an explicit later task; normal page edits or publishing must not rewrite them.
+
+### Function-scoped PRD updates
+
+Treat a feature change as a coherent documentation unit, even though the durable PRD source remains the page Markdown files.
+
+1. Identify the owning Canvas group or business module and list every affected page before editing.
+2. Update all affected `docs/<page-id>.md` files for the feature flow, including entry, result, failure, empty, permission, and return behavior where applicable.
+3. Keep unaffected page documents unchanged so Git diff expresses the real feature boundary.
+4. Ensure cross-page rules agree across the involved documents; do not describe a multi-page feature in only its entry page.
+5. Append one changelog item that names the feature and summarizes the user-visible behavior change.
+6. Deliver the feature only when the final Git diff contains the required page artifacts, PRD changes, and changelog together.
+
 ## Manifest Contract
 
 - `project.id` is the only source of truth for project identity.

@@ -27,6 +27,7 @@ from urllib.parse import quote, unquote, urlparse
 
 from pdf_service import PdfService
 from feishu_notifications import FeishuNotificationError, send_publish_card
+from github_delivery import GitDeliveryError, copy_project_to_workspace, publish_git_delivery
 from protodock_validation import validate_changelog, validate_cross_page_navigation, validate_product_documents
 
 
@@ -35,6 +36,10 @@ SHARES_DIR = ROOT / "shares"
 DOCS_EXPORT_DIR = ROOT / "docs-dist"
 SECRETS_DIR = ROOT / ".secrets"
 GITHUB_WORK_DIR = ROOT / ".github-work"
+GITHUB_DELIVERY_DIR = Path(os.environ.get(
+    "PROTODOCK_GITHUB_DELIVERY_DIR",
+    GITHUB_WORK_DIR / "delivery",
+)).expanduser()
 PDF_CACHE_DIR = Path(os.environ.get("PROTODOCK_PDF_CACHE_DIR", ROOT / ".pdf-cache")).expanduser()
 PDF_RENDERER_SCRIPT = ROOT / "pdf_renderer.py"
 PDF_RENDER_PYTHON = Path(os.environ.get(
@@ -89,6 +94,7 @@ PRIVATE_STATIC_FILES = {
     "pdf_service.py",
     "pdf_renderer.py",
     "feishu_notifications.py",
+    "github_delivery.py",
     "requirements-pdf.txt",
     "protodock.log",
     "protodock.pid",
@@ -910,26 +916,41 @@ def safe_branch_component(value: str, label: str) -> str:
     return text
 
 
-def github_branch_name(product_name: str, version: str) -> str:
+def publish_reference_name(product_name: str, version: str) -> str:
     product = safe_branch_component(product_name, "产品名")
     version_name = safe_branch_component(version, "版本号")
-    branch = f"{product}/{version_name}"
+    reference = f"{product}/{version_name}"
+    validate_git_ref(reference)
+    return reference
+
+
+def github_product_branch_name(product_name: str) -> str:
+    product = safe_branch_component(product_name, "产品名")
+    branch = f"project/{product}"
     validate_git_ref(branch)
     return branch
+
+
+def github_release_tag_name(product_name: str, version: str) -> str:
+    product = safe_branch_component(product_name, "产品名")
+    version_name = safe_branch_component(version, "版本号")
+    tag = f"release/{product}/{version_name}"
+    validate_git_ref(tag)
+    return tag
 
 
 def validate_github_open_branch(branch: str) -> str:
     ref_name = str(branch or "").strip()
     if not ref_name:
-        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请填写分支")
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请填写分支或 Tag")
     if len(ref_name) > 200:
-        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支名过长")
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支或 Tag 名称过长")
     if ref_name.startswith("-"):
-        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支名不能以中横线开头")
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支或 Tag 不能以中横线开头")
     try:
         run_command(["git", "check-ref-format", "--branch", ref_name], cwd=ROOT)
     except ProtoDockError as error:
-        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "分支名不是合法 Git 分支") from error
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "名称不是合法 Git 分支或 Tag") from error
     return ref_name
 
 
@@ -1026,7 +1047,9 @@ def github_config_payload() -> dict:
             "publicKey": "",
             "keyError": "" if key_ready else "服务器未找到 GitHub App PEM 私钥",
             "githubProxyConfigured": github_proxy_configured,
-            "branchPattern": "产品名/版本号",
+            "branchPattern": "project/产品名",
+            "tagPattern": "release/产品名/版本号",
+            "deliveryWorkspace": True,
         }
 
     public_key = ""
@@ -1045,7 +1068,9 @@ def github_config_payload() -> dict:
         "keyReady": bool(public_key),
         "keyError": key_error,
         "githubProxyConfigured": github_proxy_configured,
-        "branchPattern": "产品名/版本号",
+        "branchPattern": "project/产品名",
+        "tagPattern": "release/产品名/版本号",
+        "deliveryWorkspace": True,
     }
 
 
@@ -1280,26 +1305,6 @@ def github_web_url(repo_url: str) -> str:
     return f"https://github.com/{path.strip('/')}"
 
 
-def copy_project_to_repo(project_dir: Path, repo_dir: Path) -> None:
-    for child in repo_dir.iterdir():
-        if child.name == ".git":
-            continue
-        if child.is_dir():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
-
-    manifest = project_dir / MANIFEST_FILE
-    if not manifest.is_file():
-        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "项目包缺少 protodock.project.json")
-    shutil.copy2(manifest, repo_dir / MANIFEST_FILE)
-
-    for root_name in sorted(ALLOWED_ROOT_DIRS):
-        source = project_dir / root_name
-        if source.is_dir():
-            shutil.copytree(source, repo_dir / root_name)
-
-
 def copy_project_snapshot(source_dir: Path, destination: Path) -> None:
     manifest = source_dir / MANIFEST_FILE
     if not manifest.is_file() or manifest.is_symlink():
@@ -1411,55 +1416,34 @@ def push_project_to_github(project_dir: Path, product_name: str, version: str, c
     if not GITHUB_REPO_URL:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "服务器未配置 PROTODOCK_GITHUB_REPO")
 
-    branch = github_branch_name(product_name, version)
+    branch = github_product_branch_name(product_name)
+    tag = github_release_tag_name(product_name, version)
     message = safe_commit_message(commit_message)
     GITHUB_WORK_DIR.mkdir(parents=True, exist_ok=True)
-    work_dir = Path(tempfile.mkdtemp(prefix=".push-", dir=GITHUB_WORK_DIR))
-
     try:
-        run_command(["git", "init"], cwd=work_dir)
-        remote_url, git_env = github_git_context(work_dir)
-        run_command(["git", "remote", "add", "origin", remote_url], cwd=work_dir, env=git_env)
-        exists = run_command(
-            ["git", "ls-remote", "--exit-code", "--heads", "origin", branch],
-            cwd=work_dir,
-            env=git_env,
-            check=False,
-        ).returncode == 0
+        result = publish_git_delivery(
+            project_dir,
+            GITHUB_DELIVERY_DIR,
+            product_branch=branch,
+            release_tag=tag,
+            commit_message=message,
+            author_name=GITHUB_AUTHOR_NAME,
+            author_email=GITHUB_AUTHOR_EMAIL,
+            remote_context=github_git_context,
+            copy_project=copy_project_to_workspace,
+            timeout=GITHUB_PUSH_TIMEOUT_SECONDS,
+        )
+    except GitDeliveryError as error:
+        raise ProtoDockError(HTTPStatus.BAD_REQUEST, str(error), code="GIT_DELIVERY_FAILED") from error
 
-        if exists:
-            run_command(["git", "fetch", "--depth", "1", "origin", branch], cwd=work_dir, env=git_env)
-            run_command(["git", "checkout", "-B", branch, "FETCH_HEAD"], cwd=work_dir, env=git_env)
-        else:
-            run_command(["git", "checkout", "--orphan", branch], cwd=work_dir, env=git_env)
-
-        copy_project_to_repo(project_dir, work_dir)
-        run_command(["git", "config", "user.name", GITHUB_AUTHOR_NAME], cwd=work_dir, env=git_env)
-        run_command(["git", "config", "user.email", GITHUB_AUTHOR_EMAIL], cwd=work_dir, env=git_env)
-        run_command(["git", "add", "-A"], cwd=work_dir, env=git_env)
-
-        diff_result = run_command(["git", "diff", "--cached", "--quiet"], cwd=work_dir, env=git_env, check=False)
-        if diff_result.returncode == 0:
-            commit = run_command(["git", "rev-parse", "HEAD"], cwd=work_dir, env=git_env, check=False)
-            commit_hash = commit.stdout.strip() if commit.returncode == 0 else ""
-            action = "unchanged"
-        else:
-            run_command(["git", "commit", "-m", message], cwd=work_dir, env=git_env)
-            commit_hash = run_command(["git", "rev-parse", "HEAD"], cwd=work_dir, env=git_env).stdout.strip()
-            action = "pushed"
-
-        run_command(["git", "push", "--force-with-lease", "origin", branch], cwd=work_dir, env=git_env)
-        web_url = github_web_url(GITHUB_REPO_URL)
-        return {
-            "repo": GITHUB_REPO_URL,
-            "branch": branch,
-            "commit": commit_hash,
-            "action": action,
-            "branchUrl": f"{web_url}/tree/{quote(branch, safe='/')}" if web_url else "",
-            "commitUrl": f"{web_url}/commit/{commit_hash}" if web_url and commit_hash else "",
-        }
-    finally:
-        shutil.rmtree(work_dir, ignore_errors=True)
+    web_url = github_web_url(GITHUB_REPO_URL)
+    result.update({
+        "repo": GITHUB_REPO_URL,
+        "branchUrl": f"{web_url}/tree/{quote(branch, safe='/')}" if web_url else "",
+        "tagUrl": f"{web_url}/tree/{quote(tag, safe='/')}" if web_url else "",
+        "commitUrl": f"{web_url}/commit/{result['commit']}" if web_url and result.get("commit") else "",
+    })
+    return result
 
 
 def boolean_form_value(value: str) -> bool:
@@ -1473,9 +1457,9 @@ def publish_project_snapshot(
     commit_message: str,
     sync_github: bool,
 ) -> dict:
-    branch = github_branch_name(product_name, version)
-    product, version_name = branch.split("/", 1)
-    final_dir = share_directory_path(branch)
+    reference = publish_reference_name(product_name, version)
+    product, version_name = reference.split("/", 1)
+    final_dir = share_directory_path(reference)
     existed = final_dir.exists()
     backup_dir = SHARES_DIR / f".publish-{secrets.token_urlsafe(10)}"
     final_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -1504,10 +1488,10 @@ def publish_project_snapshot(
         if backup_dir.exists():
             shutil.rmtree(backup_dir, ignore_errors=True)
 
-    path = share_reference_path(branch)
+    path = share_reference_path(reference)
     return {
-        "id": branch,
-        "branch": branch,
+        "id": reference,
+        "branch": reference,
         "path": path,
         "latestPath": latest_share_path(product),
         "action": "updated" if existed else "created",

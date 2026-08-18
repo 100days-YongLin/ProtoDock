@@ -2752,6 +2752,30 @@ select {
   margin-bottom: 2px;
 }
 
+.github-diff-result {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.github-diff-result summary {
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.github-diff-result pre {
+  overflow: auto;
+  max-height: 144px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .github-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

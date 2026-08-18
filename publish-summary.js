@@ -10,6 +10,7 @@
     const shareUrl = clean(options.shareUrl);
     const latestShareUrl = clean(options.latestShareUrl);
     const branchUrl = clean(options.branchUrl);
+    const tagUrl = clean(options.tagUrl);
     const title = [projectName, version].filter(Boolean).join(' ');
     const lines = [
       `${title} 已更新`,
@@ -23,8 +24,11 @@
     if (latestShareUrl) {
       lines.push(`持续最新版PRD入口：${latestShareUrl}`);
     }
+    if (tagUrl) {
+      lines.push(`原型 GitHub 当前版本：${tagUrl}`);
+    }
     if (branchUrl) {
-      lines.push(`原型 GitHub 分支：${branchUrl}`);
+      lines.push(`${tagUrl ? '原型 GitHub 持续最新版' : '原型 GitHub 分支'}：${branchUrl}`);
     }
     return lines.join('\n');
   }

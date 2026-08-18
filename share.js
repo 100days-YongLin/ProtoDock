@@ -6,6 +6,7 @@
     product: document.getElementById('publishProductName'),
     version: document.getElementById('publishVersion'),
     branchPreview: document.getElementById('publishBranchPreview'),
+    gitPreview: document.getElementById('publishGitPreview'),
     urlPreview: document.getElementById('publishUrlPreview'),
     syncGithub: document.getElementById('publishSyncGithub'),
     commitField: document.getElementById('publishCommitField'),
@@ -38,8 +39,12 @@
     saveFeishuSettings: document.getElementById('saveFeishuSettings'),
     shareUrl: document.getElementById('shareUrl'),
     latestShareUrl: document.getElementById('latestShareUrl'),
+    tagUrl: document.getElementById('githubTagUrl'),
     branchUrl: document.getElementById('githubBranchUrl'),
     commitUrl: document.getElementById('githubCommitUrl'),
+    diffResult: document.getElementById('githubDiffResult'),
+    diffSummary: document.getElementById('githubDiffSummary'),
+    diffFiles: document.getElementById('githubDiffFiles'),
     fileName: document.getElementById('shareFileName')
   };
 
@@ -278,6 +283,13 @@
     if (els.branchPreview) {
       els.branchPreview.textContent = reference || '-';
     }
+    if (els.gitPreview) {
+      const product = String(els.product?.value || '').trim();
+      const version = String(els.version?.value || '').trim();
+      els.gitPreview.textContent = product && version
+        ? `Git：project/${product} · Tag：release/${product}/${version}`
+        : 'Git：填写产品名和版本号后生成';
+    }
     if (els.urlPreview) {
       const url = sharePath ? appUrl(sharePath) : '';
       els.urlPreview.href = url || '#';
@@ -415,7 +427,7 @@
       if (!githubConfig.configured) {
         setStatus(configStatusMessage());
       } else {
-        setStatus('发布将更新公开预览，并同步到 GitHub 同名分支');
+        setStatus('发布将更新公开预览，并提交到产品稳定分支与版本 Tag');
       }
     } catch (error) {
       githubConfig = null;
@@ -547,15 +559,35 @@
       els.latestShareUrl.textContent = latestShareUrl ? `最新版入口：${latestShareUrl}` : '';
     }
     const github = payload.github || null;
+    if (els.tagUrl) {
+      els.tagUrl.hidden = !github?.tagUrl;
+      els.tagUrl.href = github?.tagUrl || '#';
+      els.tagUrl.textContent = github?.tagUrl ? `GitHub 当前版本：${github.tag}` : '';
+    }
     if (els.branchUrl) {
       els.branchUrl.hidden = !github?.branchUrl;
       els.branchUrl.href = github?.branchUrl || '#';
-      els.branchUrl.textContent = github?.branchUrl ? `GitHub 分支：${github.branch}` : '';
+      els.branchUrl.textContent = github?.branchUrl ? `GitHub 持续最新版：${github.branch}` : '';
     }
     if (els.commitUrl) {
       els.commitUrl.hidden = !github?.commitUrl;
       els.commitUrl.href = github?.commitUrl || '#';
       els.commitUrl.textContent = github?.commitUrl ? `Commit：${github.commit}` : '';
+    }
+    if (els.diffResult) {
+      els.diffResult.hidden = !github;
+    }
+    if (els.diffSummary) {
+      const changeCount = Array.isArray(github?.changes) ? github.changes.length : 0;
+      els.diffSummary.textContent = github
+        ? (changeCount ? `Git Diff：${changeCount} 个文件发生变化` : 'Git Diff：没有文件变化')
+        : 'Git Diff';
+    }
+    if (els.diffFiles) {
+      const changes = Array.isArray(github?.changes) ? github.changes : [];
+      els.diffFiles.textContent = changes.length
+        ? changes.join('\n')
+        : '当前交付内容与稳定分支一致，复用已有提交。';
     }
     if (els.result) {
       els.result.hidden = false;
@@ -567,7 +599,8 @@
       updateContent: els.commitMessage?.value || state.currentChangeDescription,
       shareUrl,
       latestShareUrl,
-      branchUrl: github?.branchUrl || ''
+      branchUrl: github?.branchUrl || '',
+      tagUrl: github?.tagUrl || ''
     }) || '';
     latestPublishDetails = {
       webhook: feishuWebhook,
@@ -576,7 +609,8 @@
       updateContent: els.commitMessage?.value || state.currentChangeDescription || '',
       shareUrl,
       latestShareUrl,
-      branchUrl: github?.branchUrl || ''
+      branchUrl: github?.branchUrl || '',
+      tagUrl: github?.tagUrl || ''
     };
     if (els.copySummary) {
       els.copySummary.disabled = !latestPublishSummary;
@@ -726,7 +760,7 @@
       setProgress(100);
       renderResult(payload);
       const githubMessage = payload.github
-        ? (payload.github.action === 'unchanged' ? '，GitHub 分支内容无变化' : '，并已同步 GitHub')
+        ? (payload.github.action === 'unchanged' ? '，GitHub 内容无变化' : '，并已同步 GitHub 分支与版本 Tag')
         : '';
       const successMessage = payload.action === 'updated'
         ? `公开预览已更新${githubMessage}`
@@ -817,7 +851,7 @@
   els.syncGithub?.addEventListener('change', () => {
     syncPreferenceApplied = true;
     updateState();
-    setStatus(syncGithubEnabled() ? '发布将同步到 GitHub 同名分支' : '本次只发布公开预览');
+    setStatus(syncGithubEnabled() ? '发布将同步到产品稳定分支并创建版本 Tag' : '本次只发布公开预览');
   });
   els.refreshGithub?.addEventListener('click', loadGithubConfig);
   els.copyKey?.addEventListener('click', copyDeployKey);

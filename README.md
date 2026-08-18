@@ -196,9 +196,9 @@ http://<server-ip>:6080/index.html
 
 完整产品文档是运行时汇总视图，不会生成或覆盖新的总 Markdown 文件，也不会把截图写回项目目录。页面级 `docs/*.md` 仍然是产品文档的唯一来源；本地编辑器中尚未保存的文档内容也会进入本次阅读视图。
 
-发布时填写 `产品标识` 和 `版本`，两者共同形成唯一发布标识。例如产品标识 `pictale`、版本 `v1` 会得到 Git 分支 `pictale/v1` 和固定版本链接 `/s/pictale/v1`。每次成功发布还会更新产品级最新版入口 `/s/pictale/latest`，该入口使用 `302` 跳转到最后一次完整发布成功的版本；`/s/pictale/latest/canvas` 同样可直达最新版画布。再次发布同一标识会原位更新同一条固定版本链接，不需要区分“新建”和“更新”。GitHub 已配置时“同步到 GitHub”默认开启，也可以在发布前关闭。
+发布时填写 `产品标识` 和 `版本`，两者共同形成固定公开版本链接。例如产品标识 `pictale`、版本 `v1` 会得到 `/s/pictale/v1`。GitHub 同步使用另一套连续历史：产品稳定分支为 `project/pictale`，当前版本创建不可变 Tag `release/pictale/v1`。每次成功发布还会更新产品级最新版入口 `/s/pictale/latest`；`/s/pictale/latest/canvas` 同样可直达最新版画布。同版本相同内容可以重复发布，同版本内容发生变化时必须填写新版本，避免覆盖已经交付的 Tag。GitHub 已配置时“同步到 GitHub”默认开启，也可以在发布前关闭。
 
-发布成功后可以点击“复制更新文案”，一次复制项目与版本、本次更新内容、当前版本链接、最新版入口和 GitHub 分支链接；本次未同步 GitHub 时不会复制可能过期的仓库链接。
+发布成功后可以点击“复制更新文案”，一次复制项目与版本、本次更新内容、当前版本链接、最新版入口、GitHub 当前版本 Tag 和持续最新版分支；本次未同步 GitHub 时不会复制可能过期的仓库链接。发布结果中的 Git Diff 可以展开查看本次交付实际修改的文件。
 
 发布结果右侧还可以点击“发送到飞书机器人”。第一次使用时通过设置按钮填写飞书自定义机器人的 Webhook；ProtoDock 会把发布成功状态、更新内容、当前版本 PRD、持续最新版和 GitHub 分支组织为交互卡片。卡片正文直接显示三个完整链接，底部提供 PRD 跳转与“复制 GitHub 链接”入口，便于把原型分支交给 AI。Webhook 配置写入项目根目录的 `protodock.local.json`，保存时自动加入 `.gitignore`，并且不会进入自动发布 ZIP、公开项目、下载包或 GitHub 推送。不要把 Webhook 写入 `protodock.project.json`、页面源码或产品文档；Webhook 泄露后应立即在飞书群机器人设置中重新生成。
 
@@ -210,7 +210,7 @@ http://<server-ip>:6080/index.html
 
 - `打开本地项目`：点击选择或直接拖入包含 `protodock.project.json` 的项目文件夹，可编辑并保存。拖拽只接受一个文件夹，且清单必须位于文件夹根目录；浏览器不支持文件夹拖拽时，仍可点击选择目录。
 - `打开公开预览`：读取 `GET /api/shares`，列出当前服务上已经发布过的项目，点击后进入对应公开预览。
-- `从 GitHub 仓库打开`：填写 GitHub 仓库地址、分支和可选项目路径。服务端会下载指定分支中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 公开预览。分支为必填；项目路径留空时默认读取仓库根目录。浏览器会记住上一次成功打开时使用的这三项。
+- `从 GitHub 仓库打开`：填写 GitHub 仓库地址、稳定分支或版本 Tag，以及可选项目路径。服务端会下载指定 Git 引用中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 公开预览。分支或 Tag 必填；项目路径留空时默认读取仓库根目录。浏览器会记住上一次成功打开时使用的三项。
 
 进入公开链接后，顶部会提供“打开画布”和“下载项目包”两个操作；下载会拿到该只读项目对应的 zip 包。
 
@@ -247,7 +247,7 @@ export PROTODOCK_PDF_PLAYWRIGHT_PLATFORM=ubuntu24.04-x64
 
 ## GitHub 同步
 
-内置 Python 服务也可以把当前本地项目推送到公司内部固定私有 GitHub 仓库。这个能力复用浏览器端自动打包：只读取 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，不会把服务端密钥写入项目包。
+内置 Python 服务也可以把当前本地项目推送到公司内部固定私有 GitHub 仓库。这个能力复用浏览器端自动打包：只读取 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**`，不会把服务端密钥写入项目包。服务端使用持久 Git 交付工作区，默认位于 `.github-work/delivery/`；它只能由发布流程同步，不能作为人工编辑的第二份源码。
 
 服务端启动前配置固定仓库。默认认证方式是 Deploy Key：
 
@@ -255,6 +255,7 @@ export PROTODOCK_PDF_PLAYWRIGHT_PLATFORM=ubuntu24.04-x64
 export PROTODOCK_GITHUB_REPO=git@github.com:company/protodock-prototypes.git
 export PROTODOCK_GITHUB_AUTHOR_NAME=ProtoDock
 export PROTODOCK_GITHUB_AUTHOR_EMAIL=protodock@example.com
+export PROTODOCK_GITHUB_DELIVERY_DIR=/home/protodock/git-delivery/prototypes
 PROTODOCK_PORT=6080 python3 server.py
 ```
 
@@ -289,7 +290,9 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 - `版本号`：例如 `v1` 或 `report-h5`
 - `Commit message`：本次提交说明
 
-后端会组合分支名为 `产品名/版本号`，例如 `pictale/v1`，同时把公开链接固定为 `/s/pictale/v1`。每次发布都会更新该公开版本；开启 GitHub 同步时还会覆盖同名分支中的受控内容，再执行 commit 和 `git push --force-with-lease`。产品名和版本号只允许英文、数字、点、中横线和下划线，避免生成非法 Git 分支或 URL 路径。
+后端会把公开链接固定为 `/s/<产品名>/<版本号>`，把连续交付提交到 `project/<产品名>` 稳定分支，并把当前提交冻结为 `release/<产品名>/<版本号>` Tag。稳定分支只允许快进推送，不执行强推；发布Tag不可移动或覆盖。同版本Tag已存在但内容不同时发布会被阻止，用户需要填写新版本。产品名和版本号只允许英文、数字、点、中横线和下划线。
+
+发布响应同时返回本次逐文件 Git Diff、上次提交、当前提交、稳定分支和版本 Tag。GitHub 分支与 Tag 使用一次原子推送，失败时服务端会恢复发布前的公开版本。旧的 `产品名/版本号` 分支仍可从 GitHub 打开，但新发布不再创建这种永久版本分支。
 
 公开版本和 GitHub 推送是一个事务：ZIP 校验只执行一次；GitHub 推送失败时，服务端会恢复发布前的公开版本，避免链接内容与仓库分支不一致。
 

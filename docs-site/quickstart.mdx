@@ -31,9 +31,9 @@ http://localhost:4175/index.html
 
 - `打开本地项目`：点击选择或直接拖入包含 `protodock.project.json` 的项目文件夹。ProtoDock 会读取 manifest 中声明的页面入口，并在画布节点中用 iframe 渲染静态页面。这个模式可编辑、可保存。
 - `打开公开预览`：从当前服务已有发布项目中选择一个公开预览。新版链接使用 `/s/<product>/<version>`，历史随机 ID 链接仍可打开。
-- `从 GitHub 仓库打开`：输入仓库地址和分支，并可选填写项目路径。服务端会下载该分支中的 ProtoDock 项目，生成一个公开预览链接。
+- `从 GitHub 仓库打开`：输入仓库地址和稳定分支或版本 Tag，并可选填写项目路径。服务端会下载该 Git 引用中的 ProtoDock 项目，生成一个公开预览链接。
 
-从 GitHub 打开时，分支必填；项目路径留空表示从仓库根目录读取 `protodock.project.json`。
+从 GitHub 打开时，分支或 Tag 必填；项目路径留空表示从仓库根目录读取 `protodock.project.json`。
 
 拖入本地项目时只接受一个文件夹，且 `protodock.project.json` 必须位于文件夹根目录。若当前浏览器不支持文件夹拖拽，请点击 **打开本地项目** 选择目录。
 

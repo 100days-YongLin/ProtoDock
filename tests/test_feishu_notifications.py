@@ -20,7 +20,8 @@ def publish_payload():
         "updateContent": "补充发布通知与产品文档入口。",
         "shareUrl": "https://example.com/s/campus/v1.1-version7",
         "latestShareUrl": "https://example.com/s/campus/latest",
-        "branchUrl": "https://github.com/example/prototypes/tree/campus/v1.1-version7",
+        "tagUrl": "https://github.com/example/prototypes/tree/release/campus/v1.1-version7",
+        "branchUrl": "https://github.com/example/prototypes/tree/project/campus",
     }
 
 
@@ -62,7 +63,8 @@ class FeishuNotificationTests(unittest.TestCase):
         fields = message["card"]["elements"][-2]["fields"]
         self.assertIn(publish_payload()["shareUrl"], fields[0]["text"]["content"])
         self.assertIn(publish_payload()["latestShareUrl"], fields[1]["text"]["content"])
-        self.assertIn(publish_payload()["branchUrl"], fields[2]["text"]["content"])
+        self.assertIn(publish_payload()["tagUrl"], fields[2]["text"]["content"])
+        self.assertIn(publish_payload()["branchUrl"], fields[3]["text"]["content"])
         actions = message["card"]["elements"][-1]["actions"]
         self.assertEqual(len(actions), 3)
         self.assertEqual(actions[0]["url"], publish_payload()["shareUrl"])
@@ -70,7 +72,7 @@ class FeishuNotificationTests(unittest.TestCase):
         self.assertEqual(actions[2]["text"]["content"], "复制 GitHub 链接")
         self.assertEqual(
             actions[2]["url"],
-            f"https://example.com/copy-link.html?url={quote(publish_payload()['branchUrl'], safe='')}",
+            f"https://example.com/copy-link.html?url={quote(publish_payload()['tagUrl'], safe='')}",
         )
 
     def test_sends_interactive_card_without_echoing_webhook(self):

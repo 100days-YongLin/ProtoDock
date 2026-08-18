@@ -471,8 +471,8 @@
         </label>
         <div class="github-form-grid">
           <label>
-            <span>分支</span>
-            <input id="githubOpenBranch" type="text" autocomplete="off" placeholder="pictale/v1">
+            <span>分支或 Tag</span>
+            <input id="githubOpenBranch" type="text" autocomplete="off" placeholder="project/pictale">
           </label>
           <label>
             <span>项目路径</span>
@@ -503,7 +503,7 @@
       <header class="modal-head">
         <div>
           <strong id="shareModalTitle">发布原型项目</strong>
-          <span>公开预览与 GitHub 使用同一分支标识；再次发布同一分支会更新原链接。</span>
+          <span>公开版本保持固定链接；GitHub 使用产品稳定分支和不可变版本 Tag。</span>
         </div>
         <button class="tool-button" id="closeShareModal" title="关闭" aria-label="关闭">×</button>
       </header>
@@ -521,8 +521,9 @@
 
       <div class="github-branch-preview publish-route-preview">
         <div>
-          <span>统一发布路径</span>
+          <span>公开版本</span>
           <strong id="publishBranchPreview">-</strong>
+          <span id="publishGitPreview">Git：填写产品名和版本号后生成</span>
         </div>
         <a id="publishUrlPreview" href="#" target="_blank" rel="noreferrer">填写产品名和版本号后生成</a>
       </div>
@@ -610,8 +611,13 @@
         </div>
         <a id="shareUrl" href="#" target="_blank" rel="noreferrer"></a>
         <a id="latestShareUrl" href="#" target="_blank" rel="noreferrer"></a>
+        <a id="githubTagUrl" href="#" target="_blank" rel="noreferrer" hidden></a>
         <a id="githubBranchUrl" href="#" target="_blank" rel="noreferrer" hidden></a>
         <a id="githubCommitUrl" href="#" target="_blank" rel="noreferrer" hidden></a>
+        <details class="github-diff-result" id="githubDiffResult" hidden>
+          <summary id="githubDiffSummary">Git Diff</summary>
+          <pre id="githubDiffFiles"></pre>
+        </details>
       </div>
 
       <div class="action-row">
@@ -672,7 +678,7 @@
   <script src="./capture-options.js"></script>
   <script src="./github-preferences.js?v=2"></script>
   <script src="./share-reference.js?v=4"></script>
-  <script src="./publish-summary.js?v=3"></script>
+  <script src="./publish-summary.js?v=4"></script>
   <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=1"></script>
   <script src="./project-changelog.js?v=1"></script>
@@ -681,6 +687,6 @@
   <script src="./product-document.js?v=5"></script>
   <script src="./app.js?v=8"></script>
   <script src="./project-name.js"></script>
-  <script src="./share.js?v=6"></script>
+  <script src="./share.js?v=7"></script>
 </body>
 </html>

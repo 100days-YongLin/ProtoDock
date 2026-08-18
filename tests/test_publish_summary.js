@@ -10,7 +10,8 @@ assert.equal(summary.build({
   updateContent: '补充成长报告与返回流程。',
   shareUrl: 'https://example.com/s/pictale/v1.1',
   latestShareUrl: 'https://example.com/s/pictale/latest',
-  branchUrl: 'https://github.com/example/prototypes/tree/pictale/v1.1'
+  tagUrl: 'https://github.com/example/prototypes/tree/release/pictale/v1.1',
+  branchUrl: 'https://github.com/example/prototypes/tree/project/pictale'
 }), [
   'PicTale 家长端 v1.1 已更新',
   '',
@@ -19,7 +20,8 @@ assert.equal(summary.build({
   '',
   '当前版本PRD入口：https://example.com/s/pictale/v1.1',
   '持续最新版PRD入口：https://example.com/s/pictale/latest',
-  '原型 GitHub 分支：https://github.com/example/prototypes/tree/pictale/v1.1'
+  '原型 GitHub 当前版本：https://github.com/example/prototypes/tree/release/pictale/v1.1',
+  '原型 GitHub 持续最新版：https://github.com/example/prototypes/tree/project/pictale'
 ].join('\n'));
 
 assert.equal(summary.build({
@@ -35,7 +37,8 @@ assert.equal(summary.build({
   updateContent: '全量校正每日推送、周报日程、宝宝资料与请假状态逻辑，并补强必填校验、空候选推送、编辑保存和 ProtoDock 静态产物校验。',
   shareUrl: 'https://uurpvbrkemht.sealoshzh.site/s/highlight-moment-campus/v1.1-version7',
   latestShareUrl: 'https://uurpvbrkemht.sealoshzh.site/s/highlight-moment-campus/latest',
-  branchUrl: 'https://github.com/hzcxai/prototypes/tree/highlight-moment-campus/v1.1-version7'
+  tagUrl: 'https://github.com/hzcxai/prototypes/tree/release/highlight-moment-campus/v1.1-version7',
+  branchUrl: 'https://github.com/hzcxai/prototypes/tree/project/highlight-moment-campus'
 }), [
   '优儿嘉幼师版小程序v1.1 v1.1-version7 已更新',
   '',
@@ -44,7 +47,8 @@ assert.equal(summary.build({
   '',
   '当前版本PRD入口：https://uurpvbrkemht.sealoshzh.site/s/highlight-moment-campus/v1.1-version7',
   '持续最新版PRD入口：https://uurpvbrkemht.sealoshzh.site/s/highlight-moment-campus/latest',
-  '原型 GitHub 分支：https://github.com/hzcxai/prototypes/tree/highlight-moment-campus/v1.1-version7'
+  '原型 GitHub 当前版本：https://github.com/hzcxai/prototypes/tree/release/highlight-moment-campus/v1.1-version7',
+  '原型 GitHub 持续最新版：https://github.com/hzcxai/prototypes/tree/project/highlight-moment-campus'
 ].join('\n'));
 
 console.log('publish summary tests passed');
