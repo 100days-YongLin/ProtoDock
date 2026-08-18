@@ -17,6 +17,7 @@ def publish_payload():
     return {
         "projectName": "优儿嘉幼师版小程序",
         "version": "v1.1-version7",
+        "publishedAt": "2026-08-18T07:32:00.000Z",
         "updateContent": "补充发布通知与产品文档入口。",
         "shareUrl": "https://example.com/s/campus/v1.1-version7",
         "latestShareUrl": "https://example.com/s/campus/latest",
@@ -59,12 +60,20 @@ class FeishuNotificationTests(unittest.TestCase):
         message = build_publish_card(publish_payload())
         self.assertEqual(message["msg_type"], "interactive")
         self.assertEqual(message["card"]["header"]["template"], "green")
-        self.assertIn("发布成功", message["card"]["header"]["title"]["content"])
-        fields = message["card"]["elements"][-2]["fields"]
-        self.assertIn(publish_payload()["shareUrl"], fields[0]["text"]["content"])
-        self.assertIn(publish_payload()["latestShareUrl"], fields[1]["text"]["content"])
-        self.assertIn(publish_payload()["tagUrl"], fields[2]["text"]["content"])
-        self.assertIn(publish_payload()["branchUrl"], fields[3]["text"]["content"])
+        self.assertEqual(
+            message["card"]["header"]["title"]["content"],
+            "优儿嘉幼师版小程序 发布成功",
+        )
+        metadata = message["card"]["elements"][0]["fields"]
+        self.assertIn("v1.1-version7", metadata[0]["text"]["content"])
+        self.assertIn("2026年8月18日 15:32", metadata[1]["text"]["content"])
+        self.assertIn("更新内容", message["card"]["elements"][2]["text"]["content"])
+        prd_section = message["card"]["elements"][4]["text"]["content"]
+        github_section = message["card"]["elements"][5]["text"]["content"]
+        self.assertIn(publish_payload()["shareUrl"], prd_section)
+        self.assertIn(publish_payload()["latestShareUrl"], prd_section)
+        self.assertIn(publish_payload()["tagUrl"], github_section)
+        self.assertIn(publish_payload()["branchUrl"], github_section)
         actions = message["card"]["elements"][-1]["actions"]
         self.assertEqual(len(actions), 3)
         self.assertEqual(actions[0]["url"], publish_payload()["shareUrl"])
@@ -74,6 +83,12 @@ class FeishuNotificationTests(unittest.TestCase):
             actions[2]["url"],
             f"https://example.com/copy-link.html?url={quote(publish_payload()['tagUrl'], safe='')}",
         )
+
+    def test_rejects_invalid_publish_time(self):
+        payload = publish_payload()
+        payload["publishedAt"] = "tomorrow afternoon"
+        with self.assertRaisesRegex(FeishuNotificationError, "发布时间格式不正确"):
+            build_publish_card(payload)
 
     def test_sends_interactive_card_without_echoing_webhook(self):
         opener = FakeOpener()

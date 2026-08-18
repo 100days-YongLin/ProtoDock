@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 from urllib.parse import quote, urlparse
+from zoneinfo import ZoneInfo
 
 
 FEISHU_HOST = "open.feishu.cn"
 FEISHU_HOOK_PATH = re.compile(r"^/open-apis/bot/v2/hook/[A-Za-z0-9_-]{20,128}$")
+CHINA_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 class FeishuNotificationError(ValueError):
@@ -61,6 +64,34 @@ def build_copy_link_url(reference_url: str, target_url: str) -> str:
     return f"{origin}/copy-link.html?url={quote(target_url, safe='')}"
 
 
+def format_publish_time(value) -> str:
+    text = clean_text(value, "发布时间", maximum=80)
+    if not text:
+        instant = datetime.now(timezone.utc)
+    else:
+        try:
+            instant = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise FeishuNotificationError("发布时间格式不正确") from error
+        if instant.tzinfo is None:
+            instant = instant.replace(tzinfo=CHINA_TIMEZONE)
+    local = instant.astimezone(CHINA_TIMEZONE)
+    return f"{local.year}年{local.month}月{local.day}日 {local:%H:%M}"
+
+
+def escape_lark_markdown(value: str) -> str:
+    return re.sub(r"([\\`*_[\]()~])", r"\\\1", str(value or ""))
+
+
+def link_section(title: str, links: list[tuple[str, str]]) -> dict | None:
+    available = [(label, url) for label, url in links if url]
+    if not available:
+        return None
+    lines = [f"**{title}**"]
+    lines.extend(f"{label}：[{url}]({url})" for label, url in available)
+    return {"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines)}}
+
+
 def build_publish_card(payload: dict) -> dict:
     project_name = clean_text(payload.get("projectName"), "项目名称", maximum=160, required=True)
     version = clean_text(payload.get("version"), "版本号", maximum=80)
@@ -69,27 +100,13 @@ def build_publish_card(payload: dict) -> dict:
     latest_url = clean_url(payload.get("latestShareUrl"), "最新版地址")
     tag_url = clean_url(payload.get("tagUrl"), "GitHub 当前版本地址")
     branch_url = clean_url(payload.get("branchUrl"), "GitHub 分支地址")
-    title = f"{project_name}{f' {version}' if version else ''} 发布成功"
+    published_at = format_publish_time(payload.get("publishedAt"))
+    title = f"{project_name} 发布成功"
 
-    fields = [{
-        "is_short": False,
-        "text": {"tag": "lark_md", "content": f"**当前版本 PRD**\n[{share_url}]({share_url})"},
-    }]
-    if latest_url:
-        fields.append({
-            "is_short": False,
-            "text": {"tag": "lark_md", "content": f"**持续最新版 PRD**\n[{latest_url}]({latest_url})"},
-        })
-    if tag_url:
-        fields.append({
-            "is_short": False,
-            "text": {"tag": "lark_md", "content": f"**GitHub 当前版本**\n[{tag_url}]({tag_url})"},
-        })
-    if branch_url:
-        fields.append({
-            "is_short": False,
-            "text": {"tag": "lark_md", "content": f"**GitHub 持续最新版**\n[{branch_url}]({branch_url})"},
-        })
+    link_sections = [
+        link_section("PRD 入口", [("当前版本", share_url), ("持续最新版", latest_url)]),
+        link_section("GitHub 交付", [("当前版本", tag_url), ("持续最新版", branch_url)]),
+    ]
 
     actions = [{
         "tag": "button",
@@ -122,10 +139,23 @@ def build_publish_card(payload: dict) -> dict:
                 "title": {"tag": "plain_text", "content": title},
             },
             "elements": [
-                {"tag": "div", "text": {"tag": "lark_md", "content": "**更新内容**"}},
-                {"tag": "div", "text": {"tag": "plain_text", "content": update_content}},
+                {"tag": "div", "fields": [
+                    {
+                        "is_short": True,
+                        "text": {"tag": "lark_md", "content": f"**版本号**\n{escape_lark_markdown(version or '未设置')}"},
+                    },
+                    {
+                        "is_short": True,
+                        "text": {"tag": "lark_md", "content": f"**发布时间**\n{published_at}"},
+                    },
+                ]},
                 {"tag": "hr"},
-                {"tag": "div", "fields": fields},
+                {
+                    "tag": "div",
+                    "text": {"tag": "lark_md", "content": f"**更新内容**\n{escape_lark_markdown(update_content)}"},
+                },
+                {"tag": "hr"},
+                *[section for section in link_sections if section],
                 {"tag": "action", "actions": actions},
             ],
         },

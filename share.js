@@ -630,6 +630,7 @@
       webhook: feishuWebhook,
       projectName: state.projectName || els.product?.value || '',
       version: els.version?.value || '',
+      publishedAt: new Date().toISOString(),
       updateContent: els.commitMessage?.value || state.currentChangeDescription || '',
       shareUrl,
       latestShareUrl,
