@@ -63,6 +63,16 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 45. Resolve HTML resources relative to their page entry and CSS resources relative to the stylesheet that declares them. Root-absolute `/assets/...` paths and guessed source-directory traversal are forbidden.
 46. Do not generate project-local image/media URLs at runtime through `.src = "./..."`, generated `<img src>`, inline `background-image`, `document.currentScript.src`, or `import.meta.url`. Declare finite prototype assets in original HTML/CSS, switch them with CSS classes, or embed data/blob URLs so local Player and public Share use the same resource identity.
 47. ProtoDock may rewrite dynamically inserted local media in legacy previews. New and modified pages must still pass the static runtime-path gate; runtime recovery is not delivery evidence.
+48. Every icon-like UI control or status mark must use a mature SVG from the existing design system or an established library such as Lucide, Material Symbols SVG, or Heroicons. Do not substitute emoji, Unicode glyphs, punctuation, letters, icon-font characters, or CSS approximations such as `←`, `×`, `+`, `⋯`, `⚙`, `✓`, or emoji. Bundle SVGs under project assets, keep one consistent icon family, add accessible names to icon-only controls, and reserve custom SVG drawing for brand or domain-specific concepts that have no standard icon.
+
+## Icon Asset Quality
+
+- Prefer the product's existing SVG icon set. If none exists, select one established library and use it consistently throughout the affected flow.
+- Use original library SVG path data rather than redrawing familiar actions by hand or approximating them with CSS.
+- Store file-based icons under `assets/icons/` or another documented project asset directory. Remote icon CDNs, operating-system emoji, and runtime-only icon packages are not valid delivery dependencies.
+- Character content is allowed when it is genuinely text or punctuation. It is rejected when styled or clicked as the graphical representation of an action, navigation item, status, or decoration.
+- Icon-only buttons need `aria-label`; decorative SVGs use `aria-hidden="true"`, and image icons inside labelled controls use `alt=""`.
+- Visually inspect all new or modified pages at the manifest viewport before delivery. Missing SVGs, mixed icon styles, blank controls, pseudo-icons, inconsistent stroke weight, and misaligned active or disabled states block handoff.
 
 ## Product Documentation Contract
 

@@ -150,6 +150,34 @@ Treat a feature change as a coherent documentation unit, even though the durable
 - Keep local integration secrets, including Feishu custom-bot Webhooks, only in optional `protodock.local.json`. Ensure it is ignored by Git and excluded from upload ZIPs, public shares, downloads, pages, docs, assets, and the manifest.
 - “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
 
+## Icon Asset Quality Contract
+
+Iconography is part of the prototype deliverable and must not be replaced with convenient text glyphs.
+
+1. Every UI element whose visual meaning is an icon must use a mature SVG icon from the project's existing design system or an established library such as Lucide, Material Symbols SVG, or Heroicons.
+2. Do not use emoji, Unicode symbols, punctuation, letters, icon-font characters, or CSS-drawn approximations as substitutes for UI icons. Forbidden examples include `←`, `→`, `×`, `+`, `⋯`, `⚙`, `⌕`, `✓`, `★`, emoji, or a letter such as `i` when they visually represent back, next, close, add, more, settings, search, success, favorite, or info controls.
+3. Textual operators or punctuation used as actual content are not icons. The rule applies when a character is styled, positioned, labelled, or clicked as a graphical control or status mark.
+4. Prefer the icon set already used by the product. When none exists, choose one established SVG library and use it consistently across the project; do not mix unrelated stroke styles within one flow.
+5. Use the library's original SVG path data. Do not redraw familiar icons by hand, approximate them with CSS borders, or invent a new symbol when a standard icon exists. Custom SVG is reserved for brand marks, product-specific objects, and domain concepts that established libraries do not provide.
+6. Bundle SVG files inside the project, normally under `assets/icons/`, or inline trusted library SVG markup. Do not depend on emoji rendering, operating-system fonts, remote icon CDNs, or unavailable icon packages at runtime. All file references must satisfy the local static resource gate.
+7. Icon-only controls require an accessible name through `aria-label` or equivalent. Decorative SVGs use `aria-hidden="true"`; `<img>` icons inside already-labelled controls use empty `alt` text.
+8. Before delivery, visually inspect every new or modified page at the manifest viewport. Replace character-based pseudo-icons, verify missing SVGs do not leave blank controls, and confirm icon size, stroke weight, alignment, active state, and disabled state are consistent.
+
+Acceptable:
+
+```html
+<button type="button" aria-label="返回" data-protodock-back="home">
+  <img src="../../assets/icons/arrow-left.svg" alt="">
+</button>
+```
+
+Rejected:
+
+```html
+<button type="button" aria-label="返回">←</button>
+<button type="button" aria-label="设置">⚙</button>
+```
+
 ## Product Documentation Contract
 
 Treat every `docs/<page-id>.md` as a product alignment artifact for product, design, engineering, and Agents. It must explain user intent, deterministic behavior, business rules, states, and observable acceptance results. It is not an export report or source-code inventory.
@@ -363,6 +391,7 @@ After packaging, extract the final ZIP into a new temporary directory and valida
 - `changelog` contains exactly one new merged release item for this publish, and its final version exactly matches the version entered in ProtoDock, with a valid timestamp and non-empty description;
 - every cross-page control has an explicit, valid manifest target and no unresolved script-only or root-absolute navigation remains;
 - every visible back control uses the ProtoDock back protocol; no `history.back()`, `history.go(-1)`, or unbound back icon remains;
+- every icon-like control or status mark uses a bundled mature SVG; no emoji, Unicode glyph, punctuation, letter, icon-font character, or CSS approximation is used as a pseudo-icon;
 - every page has exactly one node, all edge endpoints exist, and no nodes overlap;
 - edge crossings, paths through unrelated nodes, and tight spacing are surfaced as layout warnings.
 
