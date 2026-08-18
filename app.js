@@ -973,12 +973,11 @@ function safePngFileName(page, captureMode = 'frame') {
 
 function captureFrameSizeForPreset(preset) {
   const safeArea = configuredSafeAreaInsets();
-  const top = safeAreaEnabled() ? safeArea.top : 0;
-  const bottom = safeAreaEnabled() ? safeArea.bottom : 0;
-  return {
-    width: preset.width,
-    height: Math.max(1, preset.height - top - bottom)
-  };
+  return window.ProtoDockCapture.captureViewportSize(preset, {
+    safeAreaEnabled: safeAreaEnabled(),
+    safeAreaTop: safeArea.top,
+    safeAreaBottom: safeArea.bottom
+  });
 }
 
 function waitForPreviewImages(documentRef) {
@@ -1132,7 +1131,18 @@ function loadedCanvasPreviewIframe(nodeId) {
 
 async function acquireCaptureIframe(node) {
   const existingIframe = loadedCanvasPreviewIframe(node.id);
-  if (existingIframe) {
+  const preset = presetFor();
+  const safeArea = configuredSafeAreaInsets(preset);
+  const canReuse = existingIframe && window.ProtoDockCapture.iframeMatchesCaptureViewport(
+    existingIframe,
+    preset,
+    {
+      safeAreaEnabled: safeAreaEnabled(),
+      safeAreaTop: safeArea.top,
+      safeAreaBottom: safeArea.bottom
+    }
+  );
+  if (canReuse) {
     if (existingIframe.contentDocument?.fonts?.ready) {
       await existingIframe.contentDocument.fonts.ready.catch(() => {});
     }
@@ -1234,7 +1244,7 @@ async function openFullProductDocument() {
       safeAreaBottom: safeArea.bottom,
       includeFrame: true,
       fullPage: true,
-      rendererVersion: 5
+      rendererVersion: 6
     };
     const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
       projectId: state.manifest.project?.id || '',

@@ -347,7 +347,17 @@
 
   async function acquirePrintFrame(page, preset) {
     const existing = state.frameByPageId.get(page.id);
-    if (existing) {
+    const safeArea = configuredSafeArea(preset);
+    const canReuse = existing && window.ProtoDockCapture?.iframeMatchesCaptureViewport?.(
+      existing,
+      preset,
+      {
+        safeAreaEnabled: safeArea.enabled,
+        safeAreaTop: safeArea.top,
+        safeAreaBottom: safeArea.bottom
+      }
+    );
+    if (canReuse) {
       try {
         await waitForFrameReady(existing);
         return { frame: existing, temporary: false };
@@ -358,8 +368,13 @@
     const frame = document.createElement('iframe');
     frame.className = 'print-capture-frame';
     frame.title = `${page.title}打印截图`;
-    frame.style.width = `${preset.width}px`;
-    frame.style.height = `${preset.height}px`;
+    const viewport = window.ProtoDockCapture.captureViewportSize(preset, {
+      safeAreaEnabled: safeArea.enabled,
+      safeAreaTop: safeArea.top,
+      safeAreaBottom: safeArea.bottom
+    });
+    frame.style.width = `${viewport.width}px`;
+    frame.style.height = `${viewport.height}px`;
     document.body.append(frame);
     frame.src = projectFileUrl(page.entry);
     try {
@@ -425,7 +440,7 @@
       fullPage: true,
       mimeType: 'image/jpeg',
       quality: 0.88,
-      rendererVersion: 7
+      rendererVersion: 8
     };
     const revisionSession = window.ProtoDockProductDocumentCache.createProjectRevisionSession({
       projectId: state.manifest.project?.id || '',
@@ -595,9 +610,11 @@
   function browserMarkup(page) {
     return `
       <div class="prototype-live-stage">
-        <div class="prototype-live-browser">
-          <div class="prototype-live-browser-bar"><i></i><i></i><i></i></div>
-          ${frameMarkup(page)}
+        <div class="prototype-live-browser-viewport">
+          <div class="prototype-live-browser">
+            <div class="prototype-live-browser-bar"><i></i><i></i><i></i></div>
+            ${frameMarkup(page)}
+          </div>
         </div>
       </div>
     `;
@@ -623,6 +640,34 @@
       device.style.setProperty('--prototype-height', `${preset.height}px`);
       device.style.setProperty('--safe-top', `${safeArea.top}px`);
       device.style.setProperty('--safe-bottom', `${safeArea.bottom}px`);
+    };
+    fit();
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(fit);
+      observer.observe(stage);
+    }
+  }
+
+  function fitBrowser(mount, preset) {
+    const stage = mount.querySelector('.prototype-live-stage');
+    const viewport = mount.querySelector('.prototype-live-browser-viewport');
+    const browser = mount.querySelector('.prototype-live-browser');
+    if (!stage || !viewport || !browser) {
+      return;
+    }
+    const fit = () => {
+      const geometry = window.ProtoDockCapture.scaledViewportGeometry(
+        preset,
+        Math.max(220, stage.clientWidth || preset.width),
+        { chromeHeight: 30, maxScale: 1 }
+      );
+      viewport.style.setProperty('--prototype-browser-scaled-width', `${geometry.scaledWidth}px`);
+      viewport.style.setProperty('--prototype-browser-scaled-height', `${geometry.scaledHeight}px`);
+      browser.style.setProperty('--prototype-browser-scale', geometry.scale.toFixed(5));
+      browser.style.setProperty('--prototype-browser-width', `${geometry.width}px`);
+      browser.style.setProperty('--prototype-browser-height', `${geometry.height + geometry.chromeHeight}px`);
+      browser.style.setProperty('--prototype-width', `${geometry.width}px`);
+      browser.style.setProperty('--prototype-height', `${geometry.height}px`);
     };
     fit();
     if (typeof ResizeObserver === 'function') {
@@ -756,6 +801,8 @@
     mount.innerHTML = preset.deviceClass ? deviceMarkup(page, preset) : browserMarkup(page);
     if (preset.deviceClass) {
       fitDevice(mount, preset);
+    } else {
+      fitBrowser(mount, preset);
     }
     const frame = mount.querySelector('.prototype-live-frame');
     if (!frame) {

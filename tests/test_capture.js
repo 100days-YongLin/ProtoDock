@@ -5,6 +5,43 @@ require('../capture.js');
 
 assert.equal(typeof ProtoDockCapture.capturePageImage, 'function');
 
+assert.deepEqual(
+  ProtoDockCapture.captureViewportSize({ width: 1440, height: 900 }),
+  { width: 1440, height: 900 }
+);
+assert.deepEqual(
+  ProtoDockCapture.captureViewportSize({ width: 390, height: 830 }, {
+    safeAreaEnabled: true,
+    safeAreaTop: 59,
+    safeAreaBottom: 34
+  }),
+  { width: 390, height: 737 }
+);
+assert.equal(ProtoDockCapture.iframeMatchesCaptureViewport({
+  contentWindow: { innerWidth: 1095, innerHeight: 685 }
+}, { width: 1440, height: 900 }), false);
+assert.equal(ProtoDockCapture.iframeMatchesCaptureViewport({
+  contentWindow: { innerWidth: 1440, innerHeight: 900 }
+}, { width: 1440, height: 900 }), true);
+assert.equal(ProtoDockCapture.iframeMatchesCaptureViewport({
+  contentWindow: { innerWidth: 390, innerHeight: 737 }
+}, { width: 390, height: 830 }, {
+  safeAreaEnabled: true,
+  safeAreaTop: 59,
+  safeAreaBottom: 34
+}), true);
+
+const webPreview = ProtoDockCapture.scaledViewportGeometry(
+  { width: 1440, height: 900 },
+  1095,
+  { chromeHeight: 30 }
+);
+assert.equal(webPreview.width, 1440);
+assert.equal(webPreview.height, 900);
+assert.equal(webPreview.scaledWidth, 1095);
+assert.equal(webPreview.scaledHeight, 707.1875);
+assert.equal(webPreview.scale, 0.7604166666666666);
+
 function element({ scrollHeight, clientHeight, offsetHeight = clientHeight, top = 0, overflowY = 'visible' }) {
   return {
     scrollHeight,

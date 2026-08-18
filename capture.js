@@ -395,6 +395,39 @@
     return { canvas, ctx };
   }
 
+  function captureViewportSize(preset, options = {}) {
+    const safeTop = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaTop || 0)) : 0;
+    const safeBottom = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaBottom || 0)) : 0;
+    return {
+      width: Math.max(1, Number(preset?.width || 390)),
+      height: Math.max(1, Number(preset?.height || 830) - safeTop - safeBottom)
+    };
+  }
+
+  function iframeMatchesCaptureViewport(iframe, preset, options = {}) {
+    const expected = captureViewportSize(preset, options);
+    const actualWidth = Number(iframe?.contentWindow?.innerWidth || 0);
+    const actualHeight = Number(iframe?.contentWindow?.innerHeight || 0);
+    return Math.abs(actualWidth - expected.width) <= 1
+      && Math.abs(actualHeight - expected.height) <= 1;
+  }
+
+  function scaledViewportGeometry(preset, availableWidth, options = {}) {
+    const width = Math.max(1, Number(preset?.width || 390));
+    const height = Math.max(1, Number(preset?.height || 830));
+    const chromeHeight = Math.max(0, Number(options.chromeHeight || 0));
+    const maxScale = Math.max(0.01, Number(options.maxScale || 1));
+    const scale = Math.min(maxScale, Math.max(1, Number(availableWidth || width)) / width);
+    return {
+      width,
+      height,
+      chromeHeight,
+      scale,
+      scaledWidth: width * scale,
+      scaledHeight: (height + chromeHeight) * scale
+    };
+  }
+
   function captureGeometry(preset, options = {}, measuredPageHeight = 0) {
     const safeTop = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaTop || 0)) : 0;
     const safeBottom = options.safeAreaEnabled ? Math.max(0, Number(options.safeAreaBottom || 0)) : 0;
@@ -537,6 +570,9 @@
     capturePageImage,
     capturePagePng,
     copyPngBlob,
+    captureViewportSize,
+    iframeMatchesCaptureViewport,
+    scaledViewportGeometry,
     captureGeometry,
     measureFullPageHeight,
     expandScrollableClones
