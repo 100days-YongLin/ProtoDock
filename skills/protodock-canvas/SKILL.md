@@ -43,6 +43,25 @@ Before editing, read:
 9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
 10. After completing a batch of project edits, append one `changelog` item with the version, ISO 8601 timestamp, and concise change description. The final item is the current version; never rewrite prior history.
 
+## Local Project Root Contract
+
+The editable project root is the only directory a user should open in ProtoDock and the only source directory an Agent should hand back for continued editing.
+
+1. The directory opened by `打开本地项目` must directly contain `protodock.project.json`, `pages/`, `docs/`, and `assets/` when assets exist.
+2. Every manifest `pages.*.entry` and `pages.*.doc` path must resolve relative to that same directory. A directory with a manifest but missing those declared files is invalid.
+3. Keep the complete editable project at its stable source path. Do not create or recommend a partial `dist/`, `build/`, `release/`, `完整交付`, or `ProtoDock上传包` directory as the local project.
+4. Do not generate `dist/` or a second nested ProtoDock project inside the editable project root. Release ZIPs are temporary publishing artifacts and must be created outside the project root or in an operating-system temporary directory.
+5. Do not copy `protodock.project.json` into an outer delivery directory unless that directory also contains every declared page and document and is intentionally becoming the new complete editable project.
+6. In the final response, label the exact path as `ProtoDock 本地打开目录` and point it to the editable project root. Label ZIPs separately as `发布 ZIP`; never describe a ZIP extraction parent or full delivery wrapper as a directory to open.
+7. Before handing off a local directory, validate the directory itself and open one representative page from it. Before publishing, separately validate the final ZIP.
+
+Required handoff wording:
+
+```text
+ProtoDock 本地打开目录：/absolute/path/to/complete-project
+发布 ZIP：/outside/project/campus-prototype-v1.1-protodock-upload.zip
+```
+
 ## Git Delivery Contract
 
 ProtoDock may use two directories with different ownership:
@@ -225,9 +244,9 @@ Treat the final upload ZIP as a release artifact with a strict root contract.
 
 1. The ZIP root must directly contain `protodock.project.json`, `pages/`, `docs/`, and `assets/` when assets exist.
 2. Never wrap those files in a project-name, version, delivery, or `ProtoDock上传包` directory.
-3. Generate the ProtoDock upload package separately from the full delivery package.
+3. Generate the ProtoDock upload package separately from any full delivery package, outside the editable project root. Do not create a project-local `dist/` tree.
 4. Use explicit names such as `campus-prototype-v1.1-protodock-upload.zip` and `campus-prototype-v1.1-full-release.zip`.
-5. Never recommend the full delivery package for ProtoDock upload.
+5. Never recommend the full delivery package for ProtoDock upload or local project opening.
 
 Correct archive root:
 

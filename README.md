@@ -176,7 +176,7 @@ PROTODOCK_PORT=6080 python3 server.py
 http://<server-ip>:6080/index.html
 ```
 
-右上角“发布”按钮会把公开预览与可选的 GitHub 推送合并为一次操作。打开本地项目目录后，ProtoDock 会优先在浏览器内自动打包当前项目，不需要手动压缩；如果没有本地目录权限，也可以手动选择 `.zip` 项目包。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，禁止额外套项目名、版本号或交付目录。ProtoDock 专用上传包必须与完整交付包分开生成。
+右上角“发布”按钮会把公开预览与可选的 GitHub 推送合并为一次操作。打开本地项目目录后，ProtoDock 会优先在浏览器内自动打包当前项目，不需要手动压缩；如果没有本地目录权限，也可以手动选择 `.zip` 项目包。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，禁止额外套项目名、版本号或交付目录。发布 ZIP 是独立的临时产物，不应在可编辑项目内生成 `dist/` 或第二份 ProtoDock 项目。
 
 服务端会在导入前按 manifest 一次性校验所有 `pages.*.entry` 和 `pages.*.doc`。路径不是 ZIP 根目录相对路径、文件缺失，或清单被放在外层目录时，上传会直接失败并返回具体路径，不会等进入画布后再逐页报 `NotFoundError`。
 
@@ -208,7 +208,7 @@ http://<server-ip>:6080/index.html
 
 首页的“打开项目”会提供三种来源：
 
-- `打开本地项目`：点击选择或直接拖入包含 `protodock.project.json` 的项目文件夹，可编辑并保存。拖拽只接受一个文件夹，且清单必须位于文件夹根目录；浏览器不支持文件夹拖拽时，仍可点击选择目录。
+- `打开本地项目`：点击选择或直接拖入完整的可编辑项目根目录。该目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，且清单声明的每个入口与文档都必须存在。ProtoDock 会在载入画布前完成全量预检；选到 `dist`、完整交付外层或不完整副本时会直接阻止打开并列出缺失路径。拖拽只接受一个文件夹；浏览器不支持文件夹拖拽时，仍可点击选择目录。
 - `打开公开预览`：读取 `GET /api/shares`，列出当前服务上已经发布过的项目，点击后进入对应公开预览。
 - `从 GitHub 仓库打开`：填写 GitHub 仓库地址、稳定分支或版本 Tag，以及可选项目路径。服务端会下载指定 Git 引用中的 ProtoDock 项目，复制 `protodock.project.json`、`pages/**`、`docs/**` 和 `assets/**` 到 `shares/<share-id>/`，再生成 `/s/<share-id>` 公开预览。分支或 Tag 必填；项目路径留空时默认读取仓库根目录。浏览器会记住上一次成功打开时使用的三项。
 

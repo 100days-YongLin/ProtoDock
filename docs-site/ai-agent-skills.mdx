@@ -151,7 +151,9 @@ docs/
 assets/（如有）
 ```
 
-不能在外层再套项目名、版本号、“完整交付包”或“ProtoDock上传包”目录。完整交付包与 ProtoDock 专用上传包必须分别生成，不要让用户拿完整交付包上传 ProtoDock。
+不能在 ZIP 外层再套项目名、版本号、“完整交付包”或“ProtoDock上传包”目录。可编辑项目根目录是唯一的本地工作副本，必须直接包含 manifest、pages、docs 和 assets；禁止在项目内生成 `dist/` 或第二份嵌套项目。发布 ZIP 放在项目之外，不要让用户把 ZIP 解压外层或完整交付外层作为 ProtoDock 本地打开目录。
+
+Agent 交付时必须把两种路径分开写清楚：`ProtoDock 本地打开目录` 指向完整可编辑项目根，`发布 ZIP` 指向项目外的临时归档。不得只给出 `dist`、build、release 或完整交付目录。
 
 Agent 必须重新解压最终 ZIP，并按其中的 manifest 验证每个 `pages.*.entry` 和 `pages.*.doc` 都存在且相对于 ZIP 根目录。只校验打包前的源码目录，不算完成交付。
 

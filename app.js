@@ -3452,6 +3452,18 @@ async function loadLocalProjectHandle(handle) {
   }
   const manifestHandle = await handle.getFileHandle(MANIFEST_FILE);
   const text = await (await manifestHandle.getFile()).text();
+  const parsedManifest = JSON.parse(text);
+  const directoryValidation = await window.ProtoDockProjectDrop?.validateProjectDirectory?.(handle, parsedManifest);
+  if (directoryValidation?.missingPaths.length) {
+    const examples = directoryValidation.missingPaths.slice(0, 3).join('、');
+    const remaining = directoryValidation.missingPaths.length - Math.min(directoryValidation.missingPaths.length, 3);
+    const error = new Error(
+      `所选目录不是完整的 ProtoDock 项目根目录，缺少 ${examples}${remaining ? ` 等 ${directoryValidation.missingPaths.length} 个文件` : ''}。`
+      + `请打开直接包含 ${MANIFEST_FILE}、pages、docs 和所需 assets 的可编辑项目根目录，不要打开 dist 或完整交付外层目录。`
+    );
+    error.name = 'InvalidProjectRootError';
+    throw error;
+  }
   await loadManifestText(text, {
     projectHandle: handle,
     manifestHandle,
@@ -3534,7 +3546,7 @@ function openProjectMenuModal() {
     els.githubOpenStatus.textContent = '等待填写仓库地址和分支';
   }
   if (els.openLocalProjectStatus) {
-    els.openLocalProjectStatus.textContent = `选择或拖入包含 ${MANIFEST_FILE} 的项目文件夹，可编辑并保存。`;
+    els.openLocalProjectStatus.textContent = '选择或拖入完整项目根目录，根下须直接包含清单、pages 和 docs。';
   }
   buttons.openLocalProjectFromMenu?.classList.remove('is-drag-over', 'is-loading', 'is-error');
   els.openProjectModal.hidden = false;
@@ -3570,7 +3582,7 @@ function updateLocalProjectDropState(status, message = '') {
   } else if (status === 'error') {
     els.openLocalProjectStatus.textContent = `打开失败：${message}`;
   } else if (status === 'idle') {
-    els.openLocalProjectStatus.textContent = `选择或拖入包含 ${MANIFEST_FILE} 的项目文件夹，可编辑并保存。`;
+    els.openLocalProjectStatus.textContent = '选择或拖入完整项目根目录，根下须直接包含清单、pages 和 docs。';
   }
 }
 

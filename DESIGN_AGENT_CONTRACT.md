@@ -50,6 +50,9 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 32. Scope PRD changes by feature: identify the owning Canvas group and every affected page, update the related page artifacts and documents together, and leave unrelated docs untouched so Git Diff reflects the true feature boundary.
 33. New Git-backed deliveries use one long-lived `project/<product>` branch and immutable `release/<product>/<version>` tags. Do not create one permanent orphan branch per version, force-push a product branch, or move a published release tag.
 34. The editable project directory is the source of truth. A ProtoDock server Git delivery workspace is generated and managed by publishing only; Agents must not edit it directly or use it as a second project source.
+35. The editable project root is the only directory to recommend for `打开本地项目`. It must directly contain the manifest and every declared `pages.*.entry` and `pages.*.doc`; do not recommend `dist`, build output, a full-delivery wrapper, or a ZIP extraction parent.
+36. Do not create `dist/` or a nested ProtoDock delivery copy inside the editable project. Generate temporary release ZIPs outside the project root, and keep continued editing, PRD updates, changelog history, and Git diffs in the complete source root.
+37. Final handoff must state the absolute `ProtoDock 本地打开目录` separately from any `发布 ZIP`. Validate and open the directory itself before delivery, then validate the final ZIP as an independent release artifact.
 
 ## Product Documentation Contract
 

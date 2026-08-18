@@ -2,7 +2,35 @@ const assert = require('node:assert/strict');
 
 require('../project-drop.js');
 
-const { directoryHandleFromDataTransfer, ensureReadWritePermission, isFileDrag } = globalThis.ProtoDockProjectDrop;
+const {
+  directoryHandleFromDataTransfer,
+  ensureReadWritePermission,
+  isFileDrag,
+  validateProjectDirectory
+} = globalThis.ProtoDockProjectDrop;
+
+function directoryTree(tree) {
+  return {
+    kind: 'directory',
+    async getDirectoryHandle(name) {
+      const value = tree[name];
+      if (!value || typeof value !== 'object') {
+        const error = new Error('missing');
+        error.name = 'NotFoundError';
+        throw error;
+      }
+      return directoryTree(value);
+    },
+    async getFileHandle(name) {
+      if (tree[name] !== 'file') {
+        const error = new Error('missing');
+        error.name = 'NotFoundError';
+        throw error;
+      }
+      return { kind: 'file', name };
+    }
+  };
+}
 
 function transferFor(handles) {
   return {
@@ -43,6 +71,22 @@ function transferFor(handles) {
     async queryPermission() { return 'denied'; },
     async requestPermission() { return 'denied'; }
   }), false);
+
+  const manifest = {
+    pages: {
+      login: { entry: 'pages/login/index.html', doc: 'docs/login.md' }
+    }
+  };
+  const complete = await validateProjectDirectory(directoryTree({
+    pages: { login: { 'index.html': 'file' } },
+    docs: { 'login.md': 'file' }
+  }), manifest);
+  assert.deepEqual(complete, { checkedCount: 2, missingPaths: [] });
+
+  const incomplete = await validateProjectDirectory(directoryTree({
+    'protodock.project.json': 'file'
+  }), manifest);
+  assert.deepEqual(incomplete.missingPaths, ['pages/login/index.html', 'docs/login.md']);
 
   console.log('project folder drop tests passed');
 })().catch((error) => {

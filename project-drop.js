@@ -50,6 +50,47 @@
     return await handle.requestPermission(options) === 'granted';
   }
 
+  function projectFilePaths(manifest) {
+    return Object.values(manifest?.pages || {}).flatMap((page) => [page?.entry, page?.doc])
+      .filter((path) => typeof path === 'string' && path.trim())
+      .map((path) => path.trim());
+  }
+
+  async function projectFileExists(rootHandle, path) {
+    if (path.startsWith('/') || path.split('/').includes('..') || /^[a-z]+:/i.test(path)) {
+      return false;
+    }
+    const parts = path.split('/').filter(Boolean);
+    if (!parts.length) {
+      return false;
+    }
+    try {
+      let handle = rootHandle;
+      for (const part of parts.slice(0, -1)) {
+        handle = await handle.getDirectoryHandle(part);
+      }
+      await handle.getFileHandle(parts.at(-1));
+      return true;
+    } catch (error) {
+      if (error?.name === 'NotFoundError' || error?.name === 'TypeMismatchError') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  async function validateProjectDirectory(rootHandle, manifest) {
+    const paths = [...new Set(projectFilePaths(manifest))];
+    const results = await Promise.all(paths.map(async (path) => ({
+      path,
+      exists: await projectFileExists(rootHandle, path)
+    })));
+    return {
+      checkedCount: results.length,
+      missingPaths: results.filter((result) => !result.exists).map((result) => result.path)
+    };
+  }
+
   function bindDirectoryDropTarget(target, options = {}) {
     if (!target) {
       return () => {};
@@ -124,6 +165,7 @@
     bindDirectoryDropTarget,
     directoryHandleFromDataTransfer,
     ensureReadWritePermission,
-    isFileDrag
+    isFileDrag,
+    validateProjectDirectory
   };
 })(typeof window !== 'undefined' ? window : globalThis);

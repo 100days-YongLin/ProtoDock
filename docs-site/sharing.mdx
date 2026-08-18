@@ -36,7 +36,7 @@ Webhook 只保存在项目根目录的 `protodock.local.json`。ProtoDock 会自
 
 打开本地项目后，ProtoDock 会自动打包当前目录；没有目录权限时，也可以拖入或选择项目 ZIP。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，不能再套项目名、版本号或交付目录。
 
-ProtoDock 上传包应与完整交付包分开生成。建议使用 `<project>-<version>-protodock-upload.zip` 与 `<project>-<version>-full-release.zip` 区分两类产物，完整交付包不要用于 ProtoDock 发布。
+ProtoDock 上传 ZIP 是独立的临时发布产物，应生成在完整项目根目录之外。不要在可编辑项目内创建 `dist/`、`完整交付` 或嵌套的 `ProtoDock上传包` 目录，也不要把这些外层目录交给用户作为本地打开目录。用户持续编辑时始终打开原来的完整项目根目录。
 
 服务端会在写入前一次性检查 manifest 中全部 `entry`、`doc`、Canvas、跨页导航、返回桥接和变更历史。缺失文件、错误的归档根目录、重复节点、悬空连线、节点重叠或无效页面目标会显示具体问题并停止发布。
 
