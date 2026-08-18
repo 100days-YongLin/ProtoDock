@@ -22,6 +22,10 @@
     return normalized[normalized.length - 1] || null;
   }
 
+  function newestFirst(entries) {
+    return normalize(entries).reverse();
+  }
+
   function normalizePending(entries) {
     if (!Array.isArray(entries)) {
       return [];
@@ -141,6 +145,7 @@
     normalize,
     normalizePending,
     latest,
+    newestFirst,
     inferredVersion,
     suggestedVersion,
     append,

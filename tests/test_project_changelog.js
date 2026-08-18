@@ -14,6 +14,16 @@ assert.equal(ProtoDockChangeLog.inferredVersion({ project: { name: '优儿嘉幼
 assert.deepEqual(ProtoDockChangeLog.normalize(null), []);
 assert.deepEqual(ProtoDockChangeLog.normalizePending(null), []);
 
+const chronologicalEntries = [
+  { version: 'v1.0', changedAt: '2026-08-16T08:00:00.000Z', description: '首次发布。' },
+  { version: 'v1.1', changedAt: '2026-08-17T08:00:00.000Z', description: '更新流程。' }
+];
+assert.deepEqual(
+  ProtoDockChangeLog.newestFirst(chronologicalEntries).map((entry) => entry.version),
+  ['v1.1', 'v1.0']
+);
+assert.equal(chronologicalEntries[0].version, 'v1.0');
+
 ProtoDockChangeLog.appendPending(manifest, {
   changedAt: '2026-08-17T08:00:00.000Z',
   description: '补充登录页空状态。'

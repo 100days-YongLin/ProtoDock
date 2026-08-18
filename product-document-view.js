@@ -128,19 +128,20 @@
 
   function renderChangeLog(entries, project) {
     const items = window.ProtoDockChangeLog?.normalize(entries) || [];
+    const displayedItems = window.ProtoDockChangeLog?.newestFirst(items) || [...items].reverse();
     const current = items[items.length - 1] || null;
     const currentVersion = current?.version || window.ProtoDockChangeLog?.inferredVersion({ project }) || '';
     els.coverCurrentVersion.hidden = !currentVersion;
     els.coverCurrentVersion.textContent = currentVersion ? `当前版本 ${currentVersion}` : '';
-    els.coverChangeLogList.innerHTML = items.length
-      ? items.map((entry, index) => `
-        <li class="${index === items.length - 1 ? 'is-current' : ''}">
+    els.coverChangeLogList.innerHTML = displayedItems.length
+      ? displayedItems.map((entry, index) => `
+        <li class="${index === 0 ? 'is-current' : ''}">
           <div>
             <time datetime="${escapeHtml(entry.changedAt)}">${escapeHtml(window.ProtoDockChangeLog.formatDate(entry.changedAt))}</time>
             <strong>${escapeHtml(entry.version)}</strong>
           </div>
           <p>${escapeHtml(entry.description)}</p>
-          ${index === items.length - 1 ? '<span>当前</span>' : ''}
+          ${index === 0 ? '<span>当前</span>' : ''}
         </li>
       `).join('')
       : '<li class="is-empty">尚无正式发布记录，下一次在 ProtoDock 发布项目后生成。</li>';
