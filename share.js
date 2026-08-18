@@ -30,6 +30,12 @@
     progressText: document.getElementById('shareProgressText'),
     result: document.getElementById('shareResult'),
     copySummary: document.getElementById('copyPublishSummary'),
+    sendFeishu: document.getElementById('sendPublishToFeishu'),
+    openFeishuSettings: document.getElementById('openFeishuSettings'),
+    feishuSettings: document.getElementById('feishuSettings'),
+    feishuWebhook: document.getElementById('feishuWebhook'),
+    feishuSettingsHint: document.getElementById('feishuSettingsHint'),
+    saveFeishuSettings: document.getElementById('saveFeishuSettings'),
     shareUrl: document.getElementById('shareUrl'),
     latestShareUrl: document.getElementById('latestShareUrl'),
     branchUrl: document.getElementById('githubBranchUrl'),
@@ -44,6 +50,13 @@
   let formProjectId;
   let syncPreferenceApplied = false;
   let latestPublishSummary = '';
+  let latestPublishDetails = null;
+  let feishuWebhook = '';
+  let localSettingsText = '';
+  let localSettingsAvailable = false;
+  let isLoadingFeishuSettings = false;
+  let isSavingFeishuSettings = false;
+  let isSendingFeishu = false;
   let uploadEndpointPromise = null;
   const activeShareReference = window.ProtoDockShareReference?.fromLocation?.() || '';
 
@@ -294,6 +307,91 @@
     if (els.dropzone) {
       els.dropzone.setAttribute('aria-disabled', String(isPublishing));
     }
+    renderFeishuState();
+  }
+
+  function renderFeishuState() {
+    if (els.sendFeishu) {
+      els.sendFeishu.disabled = !latestPublishDetails || isSendingFeishu || isPublishing;
+      const label = els.sendFeishu.querySelector('span');
+      if (label) {
+        label.textContent = isSendingFeishu ? '正在发送' : '发送到飞书机器人';
+      }
+    }
+    if (els.openFeishuSettings) {
+      els.openFeishuSettings.disabled = isLoadingFeishuSettings || isSavingFeishuSettings || isSendingFeishu;
+    }
+    if (els.feishuWebhook && document.activeElement !== els.feishuWebhook) {
+      els.feishuWebhook.value = feishuWebhook;
+    }
+    if (els.saveFeishuSettings) {
+      els.saveFeishuSettings.disabled = !localSettingsAvailable || isSavingFeishuSettings;
+      els.saveFeishuSettings.textContent = isSavingFeishuSettings ? '保存中' : '保存设置';
+    }
+    if (els.feishuSettingsHint) {
+      els.feishuSettingsHint.textContent = localSettingsAvailable
+        ? '仅保存在当前项目的 protodock.local.json，不会发布或推送到 GitHub。'
+        : '请先打开本地项目目录，才能保存跟随项目的 Webhook 配置。';
+    }
+  }
+
+  async function loadFeishuSettings() {
+    if (isLoadingFeishuSettings) {
+      return;
+    }
+    isLoadingFeishuSettings = true;
+    localSettingsText = '';
+    localSettingsAvailable = false;
+    feishuWebhook = '';
+    renderFeishuState();
+    try {
+      const result = await window.ProtoDock?.readProjectLocalSettings?.();
+      localSettingsAvailable = !!result?.available;
+      localSettingsText = String(result?.text || '');
+      feishuWebhook = window.ProtoDockProjectNotifications?.webhookFromText?.(localSettingsText) || '';
+    } catch (error) {
+      localSettingsText = '';
+      feishuWebhook = '';
+      setStatus(`飞书机器人配置读取失败：${error.message || '无法读取本地配置'}`);
+    } finally {
+      isLoadingFeishuSettings = false;
+      renderFeishuState();
+    }
+  }
+
+  function openFeishuSettings() {
+    if (!els.feishuSettings) {
+      return;
+    }
+    els.feishuSettings.hidden = !els.feishuSettings.hidden;
+    if (!els.feishuSettings.hidden) {
+      els.feishuWebhook?.focus();
+    }
+  }
+
+  async function saveFeishuSettings() {
+    if (!localSettingsAvailable || isSavingFeishuSettings) {
+      setStatus('请先打开本地项目目录，再保存飞书机器人设置');
+      return;
+    }
+    try {
+      const value = window.ProtoDockProjectNotifications?.normalizeWebhook?.(els.feishuWebhook?.value) || '';
+      const nextText = window.ProtoDockProjectNotifications?.withWebhook?.(localSettingsText, value) || '';
+      isSavingFeishuSettings = true;
+      renderFeishuState();
+      await window.ProtoDock.writeProjectLocalSettings(nextText);
+      localSettingsText = nextText;
+      feishuWebhook = value;
+      setStatus(value ? '飞书机器人 Webhook 已保存到当前项目' : '飞书机器人 Webhook 已移除');
+      if (els.feishuSettings) {
+        els.feishuSettings.hidden = true;
+      }
+    } catch (error) {
+      setStatus(`飞书机器人设置保存失败：${error.message || '无法保存'}`);
+    } finally {
+      isSavingFeishuSettings = false;
+      renderFeishuState();
+    }
   }
 
   async function loadGithubConfig() {
@@ -471,6 +569,15 @@
       latestShareUrl,
       branchUrl: github?.branchUrl || ''
     }) || '';
+    latestPublishDetails = {
+      webhook: feishuWebhook,
+      projectName: state.projectName || els.product?.value || '',
+      version: els.version?.value || '',
+      updateContent: els.commitMessage?.value || state.currentChangeDescription || '',
+      shareUrl,
+      latestShareUrl,
+      branchUrl: github?.branchUrl || ''
+    };
     if (els.copySummary) {
       els.copySummary.disabled = !latestPublishSummary;
     }
@@ -511,6 +618,41 @@
     }
   }
 
+  async function sendPublishToFeishu() {
+    if (!latestPublishDetails || isSendingFeishu) {
+      return;
+    }
+    if (!feishuWebhook) {
+      if (els.feishuSettings) {
+        els.feishuSettings.hidden = false;
+      }
+      els.feishuWebhook?.focus();
+      setStatus('请先填写并保存飞书机器人 Webhook');
+      return;
+    }
+    isSendingFeishu = true;
+    renderFeishuState();
+    setStatus('正在发送发布卡片到飞书机器人...');
+    try {
+      const response = await fetch('/api/notifications/feishu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...latestPublishDetails, webhook: feishuWebhook })
+      });
+      const responseText = await response.text();
+      const payload = parseJsonResponse(responseText);
+      if (!response.ok) {
+        throw new Error(responseError(payload, responseText, '飞书机器人发送失败'));
+      }
+      setStatus('发布卡片已发送到飞书机器人');
+    } catch (error) {
+      setStatus(`发送到飞书机器人失败：${error.message || '网络连接失败'}`);
+    } finally {
+      isSendingFeishu = false;
+      renderFeishuState();
+    }
+  }
+
   function selectFile(file) {
     if (isPublishing) {
       return;
@@ -523,6 +665,7 @@
       els.result.hidden = true;
     }
     latestPublishSummary = '';
+    latestPublishDetails = null;
     resetProgress();
     updateState();
     setStatus(selectedFile ? '已选择项目包，可以发布' : '请选择 .zip 项目压缩包');
@@ -547,6 +690,7 @@
       els.result.hidden = true;
     }
     latestPublishSummary = '';
+    latestPublishDetails = null;
     setProgress(0);
     setStatus(source === 'auto' ? '准备打包当前项目...' : '准备上传项目包...');
 
@@ -647,6 +791,7 @@
       els.result.hidden = true;
     }
     latestPublishSummary = '';
+    latestPublishDetails = null;
     preparePublishTarget();
     fillDefaults();
     resetProgress();
@@ -655,6 +800,7 @@
     renderGithubConfig();
     updateState();
     loadGithubConfig();
+    loadFeishuSettings();
     window.lucide?.createIcons();
   }
 
@@ -676,6 +822,9 @@
   els.refreshGithub?.addEventListener('click', loadGithubConfig);
   els.copyKey?.addEventListener('click', copyDeployKey);
   els.copySummary?.addEventListener('click', copyPublishSummary);
+  els.sendFeishu?.addEventListener('click', sendPublishToFeishu);
+  els.openFeishuSettings?.addEventListener('click', openFeishuSettings);
+  els.saveFeishuSettings?.addEventListener('click', saveFeishuSettings);
   els.close?.addEventListener('click', closeModal);
   els.choose?.addEventListener('click', () => els.input?.click());
   els.input?.addEventListener('change', () => selectFile(els.input.files?.[0] || null));

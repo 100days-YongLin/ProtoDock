@@ -52,6 +52,7 @@ Before editing, read:
 - Do not use localhost URLs, local absolute paths, dev-server-only routes, or unavailable external runtime dependencies.
 - React, Vue, Svelte, and other framework pages must be built into static artifacts before delivery.
 - Top-level `changelog` is append-only. Each entry requires `version`, `changedAt`, and `description`; every Agent-authored delivery must add one entry describing that batch.
+- Keep local integration secrets, including Feishu custom-bot Webhooks, only in optional `protodock.local.json`. Ensure it is ignored by Git and excluded from upload ZIPs, public shares, downloads, pages, docs, assets, and the manifest.
 - “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
 
 ## Product Documentation Contract

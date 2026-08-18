@@ -26,6 +26,7 @@ from urllib import request as urllib_request
 from urllib.parse import quote, unquote, urlparse
 
 from pdf_service import PdfService
+from feishu_notifications import FeishuNotificationError, send_publish_card
 from protodock_validation import validate_changelog, validate_cross_page_navigation, validate_product_documents
 
 
@@ -87,6 +88,7 @@ PRIVATE_STATIC_FILES = {
     "server.py",
     "pdf_service.py",
     "pdf_renderer.py",
+    "feishu_notifications.py",
     "requirements-pdf.txt",
     "protodock.log",
     "protodock.pid",
@@ -1691,6 +1693,9 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/github/push":
                 self.handle_github_push()
                 return
+            if parsed.path == "/api/notifications/feishu":
+                self.handle_feishu_notification()
+                return
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "接口不存在")
         except ProtoDockError as error:
             self.send_error_json(error)
@@ -1837,6 +1842,18 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             shutil.rmtree(temp_dir, ignore_errors=True)
 
         self.send_json(HTTPStatus.OK, result)
+
+    def handle_feishu_notification(self) -> None:
+        payload = self.read_json_body(max_bytes=16 * 1024)
+        webhook = payload.pop("webhook", "")
+        try:
+            result = send_publish_card(webhook, payload)
+        except FeishuNotificationError as error:
+            raise ProtoDockError(HTTPStatus.BAD_REQUEST, str(error), code="FEISHU_NOTIFICATION_FAILED") from error
+        self.send_json(HTTPStatus.OK, {
+            "sent": True,
+            "message": result.get("msg") or result.get("StatusMessage") or "success",
+        })
 
     def handle_share_list(self) -> None:
         SHARES_DIR.mkdir(parents=True, exist_ok=True)

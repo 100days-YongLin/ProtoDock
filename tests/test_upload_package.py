@@ -58,6 +58,19 @@ class UploadPackageTests(unittest.TestCase):
         self.assertTrue((destination / "pages/login/index.html").is_file())
         self.assertTrue((destination / "docs/login.md").is_file())
 
+    def test_discards_local_notification_settings_from_upload(self):
+        temporary, destination = self.extract({
+            server.MANIFEST_FILE: json.dumps(project_manifest()),
+            "protodock.local.json": json.dumps({
+                "notifications": {"feishuBot": {"webhook": "https://open.feishu.cn/example"}}
+            }),
+            "pages/login/index.html": "<!doctype html><title>Login</title>",
+            "docs/login.md": "# Login",
+        })
+        self.addCleanup(temporary.cleanup)
+
+        self.assertFalse((destination / "protodock.local.json").exists())
+
     def test_rejects_extra_outer_directory_with_manifest_location(self):
         files = {
             "full-release/protodock-upload/protodock.project.json": json.dumps(project_manifest()),

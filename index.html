@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="./vendor/devices.css">
-  <link rel="stylesheet" href="./styles.css?v=9">
+  <link rel="stylesheet" href="./styles.css?v=10">
   <link rel="stylesheet" href="./canvas-groups.css">
   <link rel="stylesheet" href="./canvas-minimap.css">
 </head>
@@ -584,10 +584,29 @@
       <div class="share-result" id="shareResult" hidden>
         <div class="share-result-head">
           <span>发布结果</span>
-          <button class="secondary compact" id="copyPublishSummary" type="button">
-            <i data-lucide="copy"></i>
-            <span>复制更新文案</span>
-          </button>
+          <div class="share-result-actions">
+            <button class="secondary compact" id="copyPublishSummary" type="button">
+              <i data-lucide="copy"></i>
+              <span>复制文案</span>
+            </button>
+            <button class="secondary compact" id="sendPublishToFeishu" type="button">
+              <i data-lucide="send"></i>
+              <span>发送到飞书机器人</span>
+            </button>
+            <button class="tool-button" id="openFeishuSettings" type="button" title="飞书机器人设置" aria-label="飞书机器人设置">
+              <i data-lucide="settings-2"></i>
+            </button>
+          </div>
+        </div>
+        <div class="feishu-settings" id="feishuSettings" hidden>
+          <label for="feishuWebhook">
+            <span>飞书机器人 Webhook</span>
+            <input id="feishuWebhook" type="password" autocomplete="off" spellcheck="false" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">
+          </label>
+          <div>
+            <span id="feishuSettingsHint">仅保存在当前项目的 protodock.local.json，不会发布或推送到 GitHub。</span>
+            <button class="secondary compact" id="saveFeishuSettings" type="button">保存设置</button>
+          </div>
         </div>
         <a id="shareUrl" href="#" target="_blank" rel="noreferrer"></a>
         <a id="latestShareUrl" href="#" target="_blank" rel="noreferrer"></a>
@@ -654,13 +673,14 @@
   <script src="./github-preferences.js?v=2"></script>
   <script src="./share-reference.js?v=4"></script>
   <script src="./publish-summary.js?v=3"></script>
+  <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=1"></script>
   <script src="./project-changelog.js?v=1"></script>
   <script src="./project-changelog-dialog.js?v=1"></script>
   <script src="./product-document-cache.js?v=4"></script>
   <script src="./product-document.js?v=5"></script>
-  <script src="./app.js?v=7"></script>
+  <script src="./app.js?v=8"></script>
   <script src="./project-name.js"></script>
-  <script src="./share.js?v=5"></script>
+  <script src="./share.js?v=6"></script>
 </body>
 </html>

@@ -793,6 +793,44 @@ async function writeTextFile(path, text) {
   await writable.close();
 }
 
+async function readProjectLocalSettings() {
+  if (!state.projectHandle || state.readOnly || state.shareId) {
+    return { available: false, text: '' };
+  }
+  try {
+    return {
+      available: true,
+      text: await readTextFile(window.ProtoDockProjectNotifications?.fileName || 'protodock.local.json')
+    };
+  } catch (error) {
+    if (error?.name === 'NotFoundError') {
+      return { available: true, text: '' };
+    }
+    throw error;
+  }
+}
+
+async function writeProjectLocalSettings(text) {
+  if (!state.projectHandle || state.readOnly || state.shareId) {
+    throw new Error('当前项目没有本地配置写入权限');
+  }
+  const fileName = window.ProtoDockProjectNotifications?.fileName || 'protodock.local.json';
+  let gitignore = '';
+  try {
+    gitignore = await readTextFile('.gitignore');
+  } catch (error) {
+    if (error?.name !== 'NotFoundError') {
+      throw error;
+    }
+  }
+  const lines = gitignore.split(/\r?\n/);
+  if (!lines.some((line) => line.trim() === fileName)) {
+    const prefix = gitignore && !gitignore.endsWith('\n') ? `${gitignore}\n` : gitignore;
+    await writeTextFile('.gitignore', `${prefix}${fileName}\n`);
+  }
+  await writeTextFile(fileName, text);
+}
+
 function canCreateShareArchive() {
   return !!state.manifest && !!state.projectHandle && !state.readOnly && !state.shareId;
 }
@@ -3759,7 +3797,9 @@ function starterProjectReadme(manifest) {
 
 \`\`\`text
 .
+├── .gitignore
 ├── ${MANIFEST_FILE}
+├── protodock.local.json        # 可选，本地集成配置，不提交
 ├── pages/
 ├── docs/
 ├── assets/
@@ -3780,6 +3820,7 @@ ${pages}
 - 产品验收统一使用“前提 / 操作 / 预期”，源码路径和技术实现不要写入 PRD 主体。
 - 可以更新 \`${MANIFEST_FILE}\` 中的 \`pages\` 字段，但不要改 \`canvas.nodes[].x\`、\`canvas.nodes[].y\`、\`canvas.edges\` 或 \`canvas.groups\`，除非用户要求调整 flow 或页面组。
 - 每次完成一批修改后，向 \`${MANIFEST_FILE}\` 的 \`changelog\` 末尾追加版本号、ISO 8601 时间和变更内容；末条代表当前版本，不得改写历史项。
+- 飞书机器人 Webhook 等本地密钥只放在 \`protodock.local.json\`，不得写入 manifest、页面、文档、发布包或 GitHub。
 `;
 }
 
@@ -3795,6 +3836,7 @@ async function createProject() {
     const root = state.selectedProjectDirectoryHandle;
     await writeInitialFile(root, MANIFEST_FILE, text);
     await writeInitialFile(root, 'README.md', starterProjectReadme(manifest));
+    await writeInitialFile(root, '.gitignore', 'protodock.local.json\n');
     await writeInitialFile(root, 'pages/home/index.html', starterHtml(name));
     await writeInitialFile(root, 'docs/home.md', buildDefaultDoc('home', manifest.pages.home));
     const manifestHandle = await root.getFileHandle(MANIFEST_FILE);
@@ -4833,6 +4875,8 @@ window.ProtoDock = {
   saveProject,
   reloadProject,
   checkExternalManifestChange,
+  readProjectLocalSettings,
+  writeProjectLocalSettings,
   createShareArchive,
   copySelectedPagePng,
   openFullProductDocument,

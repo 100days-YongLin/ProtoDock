@@ -25,6 +25,12 @@ Git 分支：pictale/v1
 
 发布成功后点击 **复制更新文案**，可以一次复制项目与版本、本次更新内容、当前版本链接、最新版入口和 GitHub 分支链接。本次未同步 GitHub 时不会带出旧的仓库链接。
 
+## 发送到飞书机器人
+
+发布结果区提供 **发送到飞书机器人** 按钮。点击右侧设置按钮，填写飞书群自定义机器人的 Webhook 并保存；之后每次发布完成，都可以把更新内容、当前版本 PRD、持续最新版和 GitHub 分支作为交互卡片发送到群聊。
+
+Webhook 只保存在项目根目录的 `protodock.local.json`。ProtoDock 会自动把它加入 `.gitignore`，并从发布 ZIP、公开预览、下载包和 GitHub 推送中排除。不要把 Webhook 写进 `protodock.project.json`、页面源码或产品文档。
+
 ## 项目包
 
 打开本地项目后，ProtoDock 会自动打包当前目录；没有目录权限时，也可以拖入或选择项目 ZIP。ZIP 根目录必须直接包含 `protodock.project.json`、`pages/`、`docs/` 和可选的 `assets/`，不能再套项目名、版本号或交付目录。
