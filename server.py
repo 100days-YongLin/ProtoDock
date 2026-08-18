@@ -1465,6 +1465,37 @@ def boolean_form_value(value: str) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def validate_publish_release(project_dir: Path, version: str) -> dict:
+    version_name = safe_branch_component(version, "版本号")
+    manifest_path = project_dir / MANIFEST_FILE
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ProtoDockError(
+            HTTPStatus.BAD_REQUEST,
+            "无法读取发布包中的项目清单",
+            code="PUBLISH_CHANGELOG_INVALID",
+        ) from error
+
+    pending = manifest.get("pendingChanges") or []
+    if pending:
+        raise ProtoDockError(
+            HTTPStatus.BAD_REQUEST,
+            "发布包仍包含待发布变更；请通过 ProtoDock 发布，或先将它们合并为正式 changelog",
+            code="PUBLISH_CHANGELOG_PENDING",
+        )
+    entries = manifest.get("changelog") or []
+    latest = entries[-1] if isinstance(entries, list) and entries else {}
+    latest_version = str(latest.get("version") or "").strip() if isinstance(latest, dict) else ""
+    if latest_version != version_name:
+        raise ProtoDockError(
+            HTTPStatus.BAD_REQUEST,
+            f"发布版本 {version_name} 与 changelog 当前版本 {latest_version or '未记录'} 不一致",
+            code="PUBLISH_VERSION_MISMATCH",
+        )
+    return latest
+
+
 def publish_project_snapshot(
     project_dir: Path,
     product_name: str,
@@ -1754,6 +1785,7 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         temp_dir = Path(tempfile.mkdtemp(prefix=".publish-upload-", dir=SHARES_DIR))
         try:
             validation = safe_extract_project_zip(archive, temp_dir)
+            validate_publish_release(temp_dir, fields.get("version", ""))
             result = publish_project_snapshot(
                 temp_dir,
                 fields.get("productName", ""),

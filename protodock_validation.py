@@ -98,21 +98,41 @@ SCRIPT_RELATIVE_BASE_PATTERN = re.compile(
 
 def validate_changelog(manifest: dict) -> dict:
     entries = manifest.get("changelog") if isinstance(manifest, dict) else None
+    pending_entries = manifest.get("pendingChanges") if isinstance(manifest, dict) else None
     issues = []
     warnings = []
+
+    if pending_entries is None:
+        pending_entries = []
+    elif not isinstance(pending_entries, list):
+        issues.append("pendingChanges 必须是数组")
+        pending_entries = []
+
+    for index, entry in enumerate(pending_entries):
+        label = f"pendingChanges[{index}]"
+        if not isinstance(entry, dict):
+            issues.append(f"{label} 必须是对象")
+            continue
+        changed_at = str(entry.get("changedAt") or "").strip()
+        description = str(entry.get("description") or "").strip()
+        if not description:
+            issues.append(f"{label}.description 不能为空")
+        if not changed_at:
+            issues.append(f"{label}.changedAt 不能为空")
+        else:
+            try:
+                parsed_time = datetime.fromisoformat(changed_at.replace("Z", "+00:00"))
+                if parsed_time.tzinfo is None:
+                    issues.append(f"{label}.changedAt 必须包含时区")
+            except ValueError:
+                issues.append(f"{label}.changedAt 必须是 ISO 8601 日期时间")
+
     if entries is None or entries == []:
-        warnings.append("项目尚未记录 changelog；下一次修改应追加版本、时间和变更内容")
-        return {
-            "issues": issues,
-            "warnings": warnings,
-            "stats": {"changeLogCount": 0, "currentVersion": ""},
-        }
-    if not isinstance(entries, list):
-        return {
-            "issues": ["changelog 必须是数组"],
-            "warnings": warnings,
-            "stats": {"changeLogCount": 0, "currentVersion": ""},
-        }
+        warnings.append("项目尚未正式发布；发布时会使用发布版本号生成首条 changelog")
+        entries = []
+    elif not isinstance(entries, list):
+        issues.append("changelog 必须是数组")
+        entries = []
 
     previous_time = None
     current_version = ""
@@ -152,6 +172,7 @@ def validate_changelog(manifest: dict) -> dict:
         "stats": {
             "changeLogCount": len(entries),
             "currentVersion": current_version,
+            "pendingChangeCount": len(pending_entries),
         },
     }
 

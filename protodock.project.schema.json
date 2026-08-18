@@ -36,13 +36,26 @@
     },
     "changelog": {
       "type": "array",
-      "description": "Append-only project change history. The final item is the current version.",
+      "description": "Append-only release history. The final item is the current published version.",
       "items": {
         "type": "object",
         "required": ["version", "changedAt", "description"],
         "additionalProperties": false,
         "properties": {
           "version": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "changedAt": { "type": "string", "format": "date-time" },
+          "description": { "type": "string", "minLength": 1, "maxLength": 1200 }
+        }
+      }
+    },
+    "pendingChanges": {
+      "type": "array",
+      "description": "Unreleased edits accumulated by local saves and cleared by a successful publish.",
+      "items": {
+        "type": "object",
+        "required": ["changedAt", "description"],
+        "additionalProperties": false,
+        "properties": {
           "changedAt": { "type": "string", "format": "date-time" },
           "description": { "type": "string", "minLength": 1, "maxLength": 1200 }
         }

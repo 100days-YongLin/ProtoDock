@@ -605,6 +605,7 @@ function normalizeManifest(input) {
   };
   manifest.pages = manifest.pages || {};
   manifest.changelog = window.ProtoDockChangeLog?.normalize(manifest.changelog) || [];
+  manifest.pendingChanges = window.ProtoDockChangeLog?.normalizePending(manifest.pendingChanges) || [];
   manifest.canvas = manifest.canvas || {};
   manifest.canvas.nodes = Array.isArray(manifest.canvas.nodes) ? manifest.canvas.nodes : [];
   manifest.canvas.edges = Array.isArray(manifest.canvas.edges) ? manifest.canvas.edges : [];
@@ -900,6 +901,10 @@ async function createShareArchive(options = {}) {
 
   await checkExternalManifestChange('manual');
 
+  const archiveManifest = options.release
+    ? window.ProtoDockChangeLog.releaseSnapshot(state.manifest, options.release).manifest
+    : state.manifest;
+
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : () => {};
   const diskFiles = [];
   onProgress({ phase: 'collecting', current: 0, total: 0 });
@@ -918,7 +923,7 @@ async function createShareArchive(options = {}) {
 
   const entries = [{
     path: MANIFEST_FILE,
-    data: manifestText(state.manifest),
+    data: manifestText(archiveManifest),
     lastModified: Date.now()
   }];
   const dirtyDocs = dirtyDocArchiveEntries();
@@ -959,6 +964,29 @@ async function createShareArchive(options = {}) {
   return window.ProtoDockZip.createZipFile(entries, safeShareArchiveFileName(), {
     onProgress: (progress) => onProgress({ phase: 'compressing', ...progress })
   });
+}
+
+async function finalizePublishedVersion(release) {
+  if (!state.manifest || state.readOnly || !state.manifestHandle) {
+    throw new Error('当前项目没有本地清单写入权限');
+  }
+  const diskSnapshot = await manifestFileSnapshot();
+  if (state.manifestHash && diskSnapshot.hash !== state.manifestHash) {
+    throw new Error('发布期间本地清单被其他工具修改，请读取本地变更后再处理版本记录');
+  }
+  const result = window.ProtoDockChangeLog.releaseSnapshot(state.manifest, release);
+  if (!result.changed) {
+    return result.entry;
+  }
+  const text = manifestText(result.manifest);
+  const writable = await state.manifestHandle.createWritable();
+  await writable.write(text);
+  await writable.close();
+  state.manifest = result.manifest;
+  state.manifestHash = await hashText(text);
+  state.ignoredExternalManifestHash = null;
+  renderProjectActions();
+  return result.entry;
 }
 
 function safePngFileName(page, captureMode = 'frame') {
@@ -3776,6 +3804,7 @@ function starterManifest(name, devicePreset) {
       safeAreaBottom: safeAreaDefaults.bottom
     },
     changelog: [],
+    pendingChanges: [],
     pages: {
       home: {
         title: '起始页面',
@@ -3879,7 +3908,7 @@ ${pages}
 - 产品文档放在 \`docs/<page-id>.md\`，必须覆盖页面定位、场景、规则、状态、数据影响和产品验收。
 - 产品验收统一使用“前提 / 操作 / 预期”，源码路径和技术实现不要写入 PRD 主体。
 - 可以更新 \`${MANIFEST_FILE}\` 中的 \`pages\` 字段，但不要改 \`canvas.nodes[].x\`、\`canvas.nodes[].y\`、\`canvas.edges\` 或 \`canvas.groups\`，除非用户要求调整 flow 或页面组。
-- 每次完成一批修改后，向 \`${MANIFEST_FILE}\` 的 \`changelog\` 末尾追加版本号、ISO 8601 时间和变更内容；末条代表当前版本，不得改写历史项。
+- 每次完成一批修改后，向 \`${MANIFEST_FILE}\` 的 \`pendingChanges\` 追加时间和变更内容，不要自行生成版本号。ProtoDock 发布时会把累计内容合并为一条正式 \`changelog\`，并以发布版本号为准。
 - 飞书机器人 Webhook 等本地密钥只放在 \`protodock.local.json\`，不得写入 manifest、页面、文档、发布包或 GitHub。
 `;
 }
@@ -4186,10 +4215,10 @@ async function saveProject() {
       }
     }
 
-    let changeLogEntry = null;
+    let pendingChange = null;
     if (state.dirty || state.docDirty.size) {
-      changeLogEntry = await window.ProtoDockChangeLogDialog.open(state.manifest);
-      if (!changeLogEntry) {
+      pendingChange = await window.ProtoDockChangeLogDialog.open(state.manifest);
+      if (!pendingChange) {
         setStatus('已取消保存');
         return { ok: false, message: '已取消保存' };
       }
@@ -4201,8 +4230,8 @@ async function saveProject() {
         await writeTextFile(page.doc, state.docCache.get(pageId) || '');
       }
     }
-    if (changeLogEntry) {
-      window.ProtoDockChangeLog.append(state.manifest, changeLogEntry);
+    if (pendingChange) {
+      window.ProtoDockChangeLog.appendPending(state.manifest, pendingChange);
     }
     const text = manifestText(state.manifest);
     const writable = await state.manifestHandle.createWritable();
@@ -4212,7 +4241,8 @@ async function saveProject() {
     state.ignoredExternalManifestHash = null;
     state.dirty = false;
     state.docDirty.clear();
-    setStatus('已保存到本地文件');
+    const pendingCount = state.manifest.pendingChanges.length;
+    setStatus(`已保存到本地文件，累计 ${pendingCount} 条待发布变更`);
     renderProjectActions();
     return { ok: true };
   } catch (error) {
@@ -4895,11 +4925,14 @@ window.ProtoDock = {
     const safeArea = state.manifest ? configuredSafeAreaInsets() : { top: null, bottom: null };
     const changeLog = Array.isArray(state.manifest?.changelog) ? state.manifest.changelog : [];
     const currentChange = changeLog[changeLog.length - 1] || null;
+    const pendingChanges = window.ProtoDockChangeLog?.normalizePending?.(state.manifest?.pendingChanges) || [];
     return {
       projectId: state.manifest?.project?.id || null,
       projectName: state.manifest?.project?.name || null,
       currentVersion: currentChange?.version || window.ProtoDockChangeLog?.inferredVersion?.(state.manifest) || null,
       currentChangeDescription: currentChange?.description || null,
+      pendingChangeCount: pendingChanges.length,
+      pendingChangeDescription: window.ProtoDockChangeLog?.pendingDescription?.(state.manifest) || null,
       shareId: state.shareId,
       selectedNodeId: state.selectedNodeId,
       selectedEdgeId: state.selectedEdgeId,
@@ -4938,6 +4971,7 @@ window.ProtoDock = {
   readProjectLocalSettings,
   writeProjectLocalSettings,
   createShareArchive,
+  finalizePublishedVersion,
   copySelectedPagePng,
   openFullProductDocument,
   loadSharedProject,

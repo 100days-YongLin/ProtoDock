@@ -1,7 +1,6 @@
 (() => {
   const els = {
     modal: document.getElementById('changeLogModal'),
-    version: document.getElementById('changeLogVersion'),
     description: document.getElementById('changeLogDescription'),
     message: document.getElementById('changeLogMessage'),
     close: document.getElementById('closeChangeLogModal'),
@@ -24,24 +23,21 @@
         resolve(entry);
       };
       const submit = () => {
-        const version = els.version.value.trim();
         const description = els.description.value.trim();
-        if (!version || !description) {
-          els.message.textContent = '请填写版本号和变更内容';
-          (!version ? els.version : els.description).focus();
+        if (!description) {
+          els.message.textContent = '请填写本次变更内容';
+          els.description.focus();
           return;
         }
-        close({ version, description, changedAt: new Date().toISOString() });
+        close({ description, changedAt: new Date().toISOString() });
       };
 
       closeActive = () => close(null);
-      els.version.value = window.ProtoDockChangeLog.suggestedVersion(manifest);
       els.description.value = '';
       els.message.textContent = '';
       els.close.onclick = closeActive;
       els.cancel.onclick = closeActive;
       els.confirm.onclick = submit;
-      els.version.oninput = () => { els.message.textContent = ''; };
       els.description.oninput = () => { els.message.textContent = ''; };
       els.description.onkeydown = (event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {

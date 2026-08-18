@@ -159,9 +159,6 @@
     if (!uploadSource() || !publishReference() || isPublishing || isLoadingConfig) {
       return false;
     }
-    if (!syncGithubEnabled()) {
-      return true;
-    }
     return !!String(els.commitMessage?.value || '').trim();
   }
 
@@ -204,11 +201,18 @@
     if (els.product && !els.product.value) {
       els.product.value = initialBranchValue(state.projectName || state.projectId, 'prototype');
     }
-    if (els.version && !els.version.value) {
+    if (els.version && state.pendingChangeCount && els.version.value === state.currentVersion) {
+      els.version.value = '';
+    }
+    if (els.version && !els.version.value && !state.pendingChangeCount) {
       els.version.value = initialBranchValue(state.currentVersion, 'v1');
     }
-    if (els.commitMessage && !els.commitMessage.value) {
-      els.commitMessage.value = state.currentChangeDescription || `publish ${els.product?.value || 'prototype'} ${els.version?.value || 'v1'}`;
+    if (els.commitMessage && state.pendingChangeCount && state.pendingChangeDescription) {
+      els.commitMessage.value = state.pendingChangeDescription;
+    } else if (els.commitMessage && !els.commitMessage.value) {
+      els.commitMessage.value = state.pendingChangeDescription
+        || state.currentChangeDescription
+        || `publish ${els.product?.value || 'prototype'} ${els.version?.value || 'v1'}`;
     }
   }
 
@@ -274,7 +278,10 @@
     if (els.autoDescription && usingAuto) {
       const state = protoDockState();
       const dirtyText = state.dirty ? '发布前会先要求保存当前改动。' : '只读取清单、页面、文档和发布素材。';
-      els.autoDescription.textContent = `${state.projectDirectoryName || '本地项目'}：${dirtyText}`;
+      const pendingText = state.pendingChangeCount
+        ? `已累计 ${state.pendingChangeCount} 条待发布变更。`
+        : '当前没有待发布变更。';
+      els.autoDescription.textContent = `${state.projectDirectoryName || '本地项目'}：${dirtyText}${pendingText}`;
     }
     if (els.manualUpload && !autoAvailable) {
       els.manualUpload.open = true;
@@ -740,10 +747,17 @@
       setStatus(!source ? '请先打开本地项目或选择 zip' : '请检查产品名和版本号');
       return;
     }
-    if (syncGithubEnabled() && !String(els.commitMessage?.value || '').trim()) {
-      setStatus('同步到 GitHub 时必须填写更新内容');
+    const updateDescription = String(els.commitMessage?.value || '').trim();
+    if (!updateDescription) {
+      setStatus('每次发布都必须填写更新内容');
       return;
     }
+
+    const release = {
+      version: String(els.version.value || '').trim(),
+      changedAt: new Date().toISOString(),
+      description: updateDescription
+    };
 
     isPublishing = true;
     updateState();
@@ -758,14 +772,14 @@
 
     try {
       const archiveFile = source === 'auto'
-        ? await window.ProtoDock.createShareArchive({ onProgress: setArchiveProgress })
+        ? await window.ProtoDock.createShareArchive({ onProgress: setArchiveProgress, release })
         : selectedFile;
       const body = new FormData();
       body.append('archive', archiveFile, archiveFile.name || 'protodock-project.zip');
       body.append('productName', String(els.product.value || '').trim());
-      body.append('version', String(els.version.value || '').trim());
+      body.append('version', release.version);
       body.append('syncGithub', String(syncGithubEnabled()));
-      body.append('commitMessage', String(els.commitMessage.value || '').trim());
+      body.append('commitMessage', release.description);
       setProgress(0);
       setStatus('正在上传发布包...');
       const uploadEndpoint = await loadUploadEndpoint();
@@ -787,6 +801,15 @@
       });
       setProgress(100);
       renderResult(payload);
+      let localFinalizeWarning = '';
+      if (source === 'auto') {
+        try {
+          await window.ProtoDock.finalizePublishedVersion(release);
+        } catch (error) {
+          localFinalizeWarning = `；公开版本已成功，但本地版本记录未写回：${error.message || '无法写入项目清单'}`;
+          console.warn('ProtoDock: published snapshot could not be finalized locally', error);
+        }
+      }
       const githubMessage = payload.github
         ? (payload.github.action === 'unchanged' ? '，GitHub 内容无变化' : '，并已同步 GitHub 分支与版本 Tag')
         : '';
@@ -797,7 +820,7 @@
       if (warnings.length) {
         console.warn('ProtoDock publish validation warnings:', warnings);
       }
-      setStatus(validationStatus(successMessage, warnings));
+      setStatus(validationStatus(`${successMessage}${localFinalizeWarning}`, warnings));
     } catch (error) {
       setStatus(`发布失败：${error.message || '服务器无法处理发布包'}`);
     } finally {

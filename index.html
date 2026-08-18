@@ -379,17 +379,13 @@
     <section class="project-modal change-log-modal" role="dialog" aria-modal="true" aria-labelledby="changeLogModalTitle">
       <header class="modal-head">
         <div>
-          <strong id="changeLogModalTitle">记录本次变更</strong>
-          <span>保存项目时会把这一批修改追加到同一份变更历史中。</span>
+          <strong id="changeLogModalTitle">记录待发布变更</strong>
+          <span>可以多次保存；正式发布时统一使用发布版本号写入变更历史。</span>
         </div>
         <button class="tool-button" id="closeChangeLogModal" type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
       </header>
 
       <div class="change-log-form">
-        <label class="field">
-          <span>版本号</span>
-          <input id="changeLogVersion" maxlength="40" autocomplete="off" placeholder="例如：v1.1">
-        </label>
         <label class="field">
           <span>变更内容</span>
           <textarea id="changeLogDescription" maxlength="1200" rows="5" placeholder="说明本次新增、调整或修复了什么"></textarea>
@@ -398,7 +394,7 @@
       </div>
 
       <div class="action-row">
-        <button class="primary" id="confirmChangeLog" type="button">记录并保存</button>
+        <button class="primary" id="confirmChangeLog" type="button">累计并保存</button>
         <button class="secondary" id="cancelChangeLog" type="button">取消</button>
       </div>
     </section>
@@ -503,7 +499,7 @@
       <header class="modal-head">
         <div>
           <strong id="shareModalTitle">发布原型项目</strong>
-          <span>一次发布更新当前版本与持续最新版，并可同步产品稳定分支和版本 Tag。</span>
+          <span>发布版本是产品文档、公开链接和 Git Tag 的唯一版本号；多次保存的变更会合并到本次发布。</span>
         </div>
         <button class="tool-button" id="closeShareModal" title="关闭" aria-label="关闭">×</button>
       </header>
@@ -564,7 +560,7 @@
 
       <label class="github-message-field" id="publishCommitField">
         <span>更新内容</span>
-        <textarea id="publishCommitMessage" rows="3" placeholder="说明本次发布的主要变化"></textarea>
+        <textarea id="publishCommitMessage" maxlength="1200" rows="5" placeholder="会自动汇总多次保存的待发布变更，也可以在发布前统一整理"></textarea>
       </label>
 
       <details class="github-key-panel publish-github-settings">
@@ -706,14 +702,14 @@
   <script src="./publish-summary.js?v=4"></script>
   <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=2"></script>
-  <script src="./project-changelog.js?v=1"></script>
-  <script src="./project-changelog-dialog.js?v=1"></script>
+  <script src="./project-changelog.js?v=2"></script>
+  <script src="./project-changelog-dialog.js?v=2"></script>
   <script src="./local-resource-paths.js?v=1"></script>
   <script src="./local-preview-assets.js?v=1"></script>
   <script src="./product-document-cache.js?v=4"></script>
   <script src="./product-document.js?v=6"></script>
-  <script src="./app.js?v=12"></script>
+  <script src="./app.js?v=13"></script>
   <script src="./project-name.js"></script>
-  <script src="./share.js?v=9"></script>
+  <script src="./share.js?v=10"></script>
 </body>
 </html>

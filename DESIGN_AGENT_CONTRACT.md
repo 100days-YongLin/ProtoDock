@@ -45,7 +45,7 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 27. Run `scripts/protodock-validate <final-upload.zip>` after packaging. A non-zero exit code blocks delivery; source-directory checks and prose reviews do not satisfy this gate.
 28. Back controls must use `data-protodock-back[="<fallbackPageId>"]` and ship an executable click bridge that prefers `ProtoDockPreview.back()` and falls back to the `protodock:back` message. The attribute alone is not an implementation. Do not use iframe `history.back()` or rely on host auto-interception; click-test history return and direct-entry fallback in both player and Share.
 29. Every new or modified `docs/<page-id>.md` must follow the Product Documentation Contract below. Acceptance scenarios use the Chinese labels `前提 / 操作 / 预期`; source paths and implementation details belong in manifest metadata, not the PRD body.
-30. Every completed batch of Agent edits must append one item to top-level `changelog` with `version`, ISO 8601 `changedAt`, and a concise `description`. The final array item is the current version. Never rewrite, reorder, or delete earlier entries; creating or refreshing a ZIP without logging its changes is not a complete delivery.
+30. Every completed batch of Agent edits must append one item to top-level `pendingChanges` with ISO 8601 `changedAt` and a concise `description`; it must not invent or reuse a release version. ProtoDock publishing merges all pending items into one append-only `changelog` entry whose version is exactly the publish version, then clears `pendingChanges`. Never rewrite, reorder, or delete earlier release history.
 31. Local integration secrets such as a Feishu custom-bot Webhook belong only in optional `protodock.local.json`. Add that file to `.gitignore`; never copy it into `protodock.project.json`, pages, docs, assets, upload ZIPs, public shares, downloads, or GitHub branches.
 32. Scope PRD changes by feature: identify the owning Canvas group and every affected page, update the related page artifacts and documents together, and leave unrelated docs untouched so Git Diff reflects the true feature boundary.
 33. New Git-backed deliveries use one long-lived `project/<product>` branch and immutable `release/<product>/<version>` tags. Do not create one permanent orphan branch per version, force-push a product branch, or move a published release tag.
@@ -119,7 +119,8 @@ Before delivery, produce a route table containing source page, visible control, 
 
 Design agents may update:
 
-- `changelog` by appending exactly one entry for the completed edit batch
+- `pendingChanges` by appending one versionless item for the completed edit batch
+- `changelog` only when preparing a final release artifact, using the exact publish version and merged pending descriptions
 - `pages.<pageId>.title`
 - `pages.<pageId>.kind`
 - `pages.<pageId>.tag`

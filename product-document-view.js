@@ -143,7 +143,7 @@
           ${index === items.length - 1 ? '<span>当前</span>' : ''}
         </li>
       `).join('')
-      : '<li class="is-empty">尚无变更记录，下一次在 ProtoDock 保存项目后生成。</li>';
+      : '<li class="is-empty">尚无正式发布记录，下一次在 ProtoDock 发布项目后生成。</li>';
   }
 
   function showImage(url, title) {

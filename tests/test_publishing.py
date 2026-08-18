@@ -18,6 +18,48 @@ def write_snapshot(root: Path, name: str):
 
 
 class PublishingTests(unittest.TestCase):
+    def test_publish_release_requires_matching_final_changelog_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_snapshot(root, "Release")
+            manifest_path = root / server.MANIFEST_FILE
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["changelog"] = [{
+                "version": "v2",
+                "changedAt": "2026-08-18T10:30:00+08:00",
+                "description": "发布 v2。",
+            }]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            latest = server.validate_publish_release(root, "v2")
+            self.assertEqual(latest["version"], "v2")
+            with self.assertRaises(server.ProtoDockError) as mismatch:
+                server.validate_publish_release(root, "v3")
+
+        self.assertEqual(mismatch.exception.code, "PUBLISH_VERSION_MISMATCH")
+
+    def test_publish_release_rejects_pending_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_snapshot(root, "Release")
+            manifest_path = root / server.MANIFEST_FILE
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["changelog"] = [{
+                "version": "v2",
+                "changedAt": "2026-08-18T10:30:00+08:00",
+                "description": "发布 v2。",
+            }]
+            manifest["pendingChanges"] = [{
+                "changedAt": "2026-08-18T11:00:00+08:00",
+                "description": "尚未发布。",
+            }]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with self.assertRaises(server.ProtoDockError) as pending:
+                server.validate_publish_release(root, "v2")
+
+        self.assertEqual(pending.exception.code, "PUBLISH_CHANGELOG_PENDING")
+
     def test_branch_reference_paths_match_public_routes(self):
         self.assertEqual(server.normalize_share_reference("pictale/v1"), "pictale/v1")
         self.assertEqual(server.share_reference_path("pictale/v1"), "/s/pictale/v1")
