@@ -18,6 +18,15 @@ def write_snapshot(root: Path, name: str):
 
 
 class PublishingTests(unittest.TestCase):
+    def test_git_commit_message_keeps_release_identity_and_truncates_long_copy(self):
+        full_copy = "完整产品更新说明。" * 100
+        message = server.build_release_commit_message("highlight-moment-web", "v1.0", full_copy)
+
+        self.assertTrue(message.startswith("release: highlight-moment-web v1.0 - "))
+        self.assertTrue(message.endswith("…"))
+        self.assertLessEqual(len(message), 200)
+        self.assertEqual(full_copy, "完整产品更新说明。" * 100)
+
     def test_publish_release_requires_matching_final_changelog_version(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -211,6 +220,10 @@ class PublishingTests(unittest.TestCase):
         self.assertEqual(result["branchUrl"], "https://github.com/example/prototypes/tree/project/pictale")
         self.assertEqual(result["tagUrl"], "https://github.com/example/prototypes/tree/release/pictale/v2")
         publish.assert_called_once()
+        self.assertEqual(
+            publish.call_args.kwargs["commit_message"],
+            "release: pictale v2 - release v2",
+        )
 
 
 if __name__ == "__main__":

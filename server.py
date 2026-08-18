@@ -976,13 +976,17 @@ def validate_git_ref(ref_name: str) -> None:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "产品名和版本号组合后不是合法 Git 分支名") from error
 
 
-def safe_commit_message(value: str) -> str:
-    message = str(value or "").strip()
-    if not message:
+def build_release_commit_message(product_name: str, version: str, update_content: str) -> str:
+    description = re.sub(r"\s+", " ", str(update_content or "")).strip()
+    if not description:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "请填写提交说明")
-    if len(message) > 200:
-        raise ProtoDockError(HTTPStatus.BAD_REQUEST, "提交说明过长")
-    return message
+    prefix = f"release: {product_name} {version}"
+    available = 200 - len(prefix) - 3
+    if available <= 0:
+        return prefix[:200]
+    if len(description) > available:
+        description = f"{description[:available - 1].rstrip(' ,，。;；:：-')}…"
+    return f"{prefix} - {description}"
 
 
 def run_command(
@@ -1433,7 +1437,7 @@ def push_project_to_github(project_dir: Path, product_name: str, version: str, c
 
     branch = github_product_branch_name(product_name)
     tag = github_release_tag_name(product_name, version)
-    message = safe_commit_message(commit_message)
+    message = build_release_commit_message(product_name, version, commit_message)
     GITHUB_WORK_DIR.mkdir(parents=True, exist_ok=True)
     try:
         result = publish_git_delivery(
