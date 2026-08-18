@@ -21,6 +21,9 @@ ProtoDock 是一个本地静态原型工作台。它不负责替设计 Agent 生
 prototype-project/
 ├── protodock.project.json
 ├── protodock.local.json        # 可选，仅保存本地集成密钥
+├── README.md
+├── CHANGELOG.md                # 可选的人类可读副本
+├── .gitignore
 ├── pages/
 │   ├── home/
 │   │   └── index.html
@@ -33,8 +36,16 @@ prototype-project/
 │   ├── clips.md
 │   └── report.md
 ├── assets/
-└── exports/
+├── source/                     # 可选，或使用唯一的 miniprogram/src/app 原生源码目录
+├── scripts/
+├── tests/
+├── references/
+├── qa/
+├── protodock/backups/
+└── temps/                      # 本地临时层，必须忽略且不参与发布
 ```
+
+只有 manifest、`pages`、`docs` 和 `assets` 属于发布层。源码、脚本、测试、有效参考资料和当前 QA 证据属于工作层；`temps`、备份、本地密钥、缓存和日志属于本地临时层。工具要求的 `package.json`、锁文件和平台配置可以保留在根目录，除此之外不要在根目录散放截图、ZIP、实验目录或重复源码。
 
 ## Agent 写入边界
 
@@ -215,6 +226,8 @@ http://<server-ip>:6080/index.html
 进入公开链接后，顶部会提供“打开画布”和“下载项目包”两个操作；下载会拿到该只读项目对应的 zip 包。
 
 默认使用 `6080` 是为了避开 Chrome 会拦截的保留端口，例如 `6000` 和 `6666`。
+
+项目目录分为三层：`protodock.project.json + pages + docs + assets` 是发布层；唯一源码目录、`scripts`、`tests`、`references` 和 `qa` 是持续开发工作层；`temps`、`protodock/backups`、本地密钥、缓存和日志是忽略的本地临时层。项目内不生成 `dist`、`build`、`exports` 或嵌套交付副本。完整规则与旧项目整理流程见 [项目目录](./docs-site/project-structure.mdx)。
 
 如果服务通过 FRP 或反向代理暴露，发布结果会按当前访问地址生成链接。也就是说，从哪个域名或端口打开 ProtoDock，公开预览列表里就显示对应入口的 `/s/<product>/<version>`。
 

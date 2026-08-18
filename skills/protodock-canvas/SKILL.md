@@ -1,6 +1,6 @@
 ---
 name: protodock-canvas
-description: "Use when creating, updating, packaging, or troubleshooting a ProtoDock prototype project, including manifest pages, docs, assets, canvas state, legacy Canvas Groups migration, ZIP uploads, and Agent collaboration."
+description: "Use when creating, updating, organizing, packaging, or troubleshooting a ProtoDock prototype project, including project-directory cleanup, manifest pages, docs, assets, canvas state, legacy Canvas Groups migration, ZIP uploads, and Agent collaboration."
 ---
 
 # ProtoDock Canvas
@@ -61,6 +61,51 @@ Required handoff wording:
 ProtoDock 本地打开目录：/absolute/path/to/complete-project
 发布 ZIP：/outside/project/campus-prototype-v1.1-protodock-upload.zip
 ```
+
+## Project Directory Standard
+
+Keep one canonical copy of each artifact and separate published files, editable working files, and local scratch data:
+
+```text
+project-root/
+├── protodock.project.json       # required, manifest and changelog authority
+├── README.md                    # project-specific commands and source/output mapping
+├── CHANGELOG.md                 # optional human-readable mirror
+├── .gitignore
+├── pages/                       # required published static entries
+├── docs/                        # required published page PRDs
+├── assets/                      # optional published shared assets
+├── source/                      # optional editable source; may instead use one native root such as miniprogram/
+├── scripts/                     # repeatable build, migration, and validation commands
+├── tests/                       # automated tests
+├── references/                  # active product/design references used for future edits
+├── qa/                          # current acceptance evidence and reports
+├── protodock/backups/           # local manifest safety backups
+└── temps/                       # local-only legacy, experiments, and disposable artifacts
+```
+
+Native tool configuration such as `package.json`, lockfiles, `project.config.json`, `vite.config.*`, `.agents/`, or `.claude/` may remain at the root when its tool requires that location. Do not keep loose screenshots, dated backups, ZIPs, design experiments, or duplicate source trees at the root.
+
+Directory rules:
+
+1. `pages`, `docs`, `assets`, and `protodock.project.json` are the only ProtoDock publishing inputs. Working directories remain in Git when they are needed to continue editing but are not copied into the published project.
+2. Use either `source/` or one ecosystem-native source root such as `src/`, `app/`, or `miniprogram/`. Never keep equivalent editable implementations in multiple roots without a documented generator relationship.
+3. Put active visual references under `references/`; keep only current, reproducible acceptance evidence under `qa/`. Historical QA runs and superseded references belong in `temps/`.
+4. Put timestamped manifest backups only under `protodock/backups/`; do not leave `.bak`, `.backup`, or dated manifest copies at the root.
+5. `temps/` must be ignored by Git and excluded from build, validation, ZIP, public share, and GitHub delivery. No manifest path, HTML/CSS/JS import, package script, or tool configuration may reference it.
+6. Add at least `protodock.local.json`, `temps/`, `protodock/backups/`, `.DS_Store`, `node_modules/`, caches, and logs to `.gitignore` when applicable.
+7. Do not create `dist/`, `build/`, `exports/`, `release/`, or nested full-delivery trees inside the project. Publishing uses temporary storage outside the root.
+
+### Legacy directory cleanup
+
+When asked to organize an existing project, do not move files immediately:
+
+1. Inventory root files and directory sizes, inspect Git status, and read manifest paths, package scripts, build configuration, HTML/CSS/JS references, and project documentation.
+2. Produce a dry-run classification: `keep`, `move to standard directory`, `move to temps`, and `needs owner decision`. Explain every root-level move.
+3. Treat a file as active when it is referenced by the manifest, source, build scripts, tests, configuration, README workflow, or current QA process. Never classify it as unused only because ProtoDock does not publish it.
+4. After approval, preserve relative paths when moving disposable material into `temps/<YYYYMMDD>-cleanup/<original-path>` so recovery is straightforward.
+5. Do not move tracked obsolete files into ignored `temps/` as a substitute for Git deletion. Confirm they are obsolete, then remove them in a normal reviewable commit; Git history is the archive.
+6. Re-run the project build, directory validation, representative browser interactions, and final ZIP validation after cleanup. Compare manifest page/node/edge/group counts before and after.
 
 ## Git Delivery Contract
 

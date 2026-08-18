@@ -3,11 +3,14 @@ title: 项目目录
 description: ProtoDock 推荐的本地项目组织方式。
 ---
 
-每个原型项目必须包含 `protodock.project.json`。页面源码由设计 Agent 维护，ProtoDock 只读取 manifest 中声明的静态入口。
+每个原型项目只有一个完整、可编辑的项目根目录。页面源码由设计 Agent 维护，ProtoDock 只发布 manifest 中声明的静态入口、页面 PRD 和公共素材。
 
 ```text
 prototype-project/
 ├── protodock.project.json
+├── README.md
+├── CHANGELOG.md                 # 可选的人类可读副本
+├── .gitignore
 ├── pages/
 │   ├── home/
 │   │   └── index.html
@@ -20,8 +23,25 @@ prototype-project/
 │   ├── clips.md
 │   └── report.md
 ├── assets/
-└── exports/
+├── source/                      # 可选，也可以使用 miniprogram/ 等唯一原生源码目录
+├── scripts/
+├── tests/
+├── references/
+├── qa/
+├── protodock/
+│   └── backups/
+└── temps/                       # 仅本地使用，不进入 Git 和发布
 ```
+
+`package.json`、锁文件、`project.config.json`、`vite.config.*`、`.agents/` 和 `.claude/` 等工具要求放在根目录的配置可以保留。根目录不应散落截图、ZIP、日期备份、实验目录或重复源码。
+
+## 三层目录
+
+**发布层**：`protodock.project.json`、`pages/`、`docs/`、`assets/`。ProtoDock 公开预览、PDF 和 GitHub 发布只读取这些内容。
+
+**工作层**：`source/` 或唯一的原生源码目录、`scripts/`、`tests/`、`references/`、`qa/`。这些内容可以进入项目 Git，用于继续设计、构建和验收，但不会进入 ProtoDock 发布包。
+
+**本地临时层**：`temps/`、`protodock/backups/`、`protodock.local.json`、缓存和日志。它们必须加入 `.gitignore`，不能被页面或构建流程引用。
 
 ## Manifest
 
@@ -42,3 +62,38 @@ prototype-project/
 ## Assets
 
 原型页面自己的图标、图片和素材建议放进项目 `assets/` 或页面目录中，通过相对路径引用。
+
+## Source 与构建
+
+需要框架源码时，优先使用 `source/`；微信小程序等生态也可以保留 `miniprogram/`、`src/` 或 `app/` 这类工具原生目录，但只能有一个权威源码。`README.md` 和 `scripts/` 必须写清楚源码如何生成 `pages/`，禁止保留多套作用相同却无法判断新旧的实现。
+
+## References 与 QA
+
+仍用于后续设计的需求截图、品牌参考和视觉基准放在 `references/`。当前版本的可复现验收报告与对比图放在 `qa/`。已经过期的探索稿、历史 QA 批次和被替代的参考资料移入 `temps/`，不要继续散落在根目录。
+
+## Temps
+
+`temps/` 只用于本地暂存旧归档、一次性实验、待确认材料和可丢弃产物。任何 manifest 路径、页面资源、源码导入、构建脚本或配置都不得引用它。建议结构为 `temps/<YYYYMMDD>-cleanup/<原相对路径>`，方便短期恢复。
+
+推荐 `.gitignore`：
+
+```gitignore
+protodock.local.json
+temps/
+protodock/backups/
+.DS_Store
+node_modules/
+*.log
+```
+
+项目内禁止再生成 `dist/`、`build/`、`exports/`、`release/` 或嵌套的完整交付目录。发布 ZIP 由 ProtoDock 临时生成，或输出到项目根目录之外。
+
+## 整理旧项目
+
+Agent 必须先输出 dry-run 分类表，再移动文件：
+
+1. 读取 Git 状态、manifest、构建脚本、配置、README 和页面资源引用。
+2. 将内容分为“保留”“归入标准目录”“移入 temps”“需要老板确认”。
+3. 不能因为某个目录不进入 ProtoDock 发布包，就认定它没用；框架源码、生成脚本和验收基准仍可能是持续开发资产。
+4. 获得确认后再整理，并在整理后重新执行构建、目录校验、代表性交互验收和最终 ZIP 校验。
+5. 已被 Git 跟踪且确认废弃的文件应通过正常提交删除，由 Git 历史留档，不要移动进被忽略的 `temps/` 冒充归档。

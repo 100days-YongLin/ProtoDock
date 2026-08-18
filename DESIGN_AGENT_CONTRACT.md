@@ -53,6 +53,10 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 35. The editable project root is the only directory to recommend for `打开本地项目`. It must directly contain the manifest and every declared `pages.*.entry` and `pages.*.doc`; do not recommend `dist`, build output, a full-delivery wrapper, or a ZIP extraction parent.
 36. Do not create `dist/` or a nested ProtoDock delivery copy inside the editable project. Generate temporary release ZIPs outside the project root, and keep continued editing, PRD updates, changelog history, and Git diffs in the complete source root.
 37. Final handoff must state the absolute `ProtoDock 本地打开目录` separately from any `发布 ZIP`. Validate and open the directory itself before delivery, then validate the final ZIP as an independent release artifact.
+38. Keep the project root clean. Formal ProtoDock inputs are `protodock.project.json`, `pages/`, `docs/`, and optional `assets/`; editable source, scripts, tests, active references, and current QA evidence use dedicated directories rather than loose root files.
+39. Local-only legacy files, experiments, old ZIPs, superseded screenshots, and historical QA artifacts belong under ignored `temps/`. Nothing active or referenced may depend on `temps/`, and it must never enter publishing or Git delivery.
+40. Before reorganizing a legacy project, inventory references and Git state and present a dry-run classification. Do not move files merely because they are outside the ProtoDock publishing set; framework source and build inputs may still be required.
+41. Do not leave root-level manifest backups or duplicate source trees. Store safety backups under ignored `protodock/backups/`, retain one canonical editable source root, and document its mapping to `pages/` in README and build scripts.
 
 ## Product Documentation Contract
 

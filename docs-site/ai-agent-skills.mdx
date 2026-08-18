@@ -108,6 +108,24 @@ Agent 能说出 ZIP 根目录必须直接包含 `protodock.project.json`、`page
   不要只说“升级旧版原型”。这可能被理解为重建整个 manifest。明确要求“只新增 canvas.groups，不重排画布”，才能保护产品经理已经整理好的节点和连线。
 </Warning>
 
+### 整理旧项目目录
+
+目录整理必须分两次让 Agent 执行。第一次只分析，不移动：
+
+```text
+请使用最新版 protodock-canvas Skill 检查当前 ProtoDock 项目目录，按“发布层 / 工作层 / 本地临时层”给出 dry-run 整理方案，暂时不要移动、删除或改写任何文件。
+请检查 Git 状态、protodock.project.json、package scripts、构建配置、README、HTML/CSS/JS 资源引用和当前 QA 流程，并把每项分为：保留、归入标准目录、移入 temps、需要老板确认。逐项说明判断依据。
+```
+
+确认分类后再执行：
+
+```text
+请使用 protodock-canvas Skill 按已确认的 dry-run 方案整理目录。
+保持完整项目根目录不变；不要创建 dist、build、exports 或嵌套交付目录；temps 必须加入 .gitignore 且不能被任何正式文件引用。整理后重新运行构建、目录完整性校验、代表性交互测试和最终 ZIP 校验，并报告整理前后的 manifest 页面、节点、连线和分组数量。
+```
+
+已被 Git 跟踪且确认废弃的文件应通过正常提交删除，由 Git 历史保留；不要把它们移动进被忽略的 `temps/` 假装归档。完整标准见 [项目目录](/project-structure)。
+
 ## Skill 解决什么问题
 
 在 ProtoDock 场景里，Skill 会告诉 Agent：
