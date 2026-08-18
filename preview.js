@@ -221,6 +221,7 @@
   function renderStructure() {
     const project = state.manifest.project || {};
     const groupedCount = state.sections.filter((section) => !section.ungrouped).length;
+    window.ProtoDockProductDocument?.applyDocumentLayout?.(document.body, project);
     document.title = `${project.name || '公开预览'} · ProtoDock`;
     els.projectName.textContent = project.name || '未命名项目';
     els.coverTitle.textContent = project.name || '未命名项目';

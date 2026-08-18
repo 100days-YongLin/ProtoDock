@@ -165,6 +165,7 @@
     const project = payload.project || {};
     const sections = Array.isArray(payload.sections) ? payload.sections : [];
     const pages = sections.flatMap((section) => section.pages || []);
+    window.ProtoDockProductDocument?.applyDocumentLayout?.(document.body, project);
     document.title = `${project.name || '完整产品文档'} · ProtoDock`;
     els.projectName.textContent = project.name || '未命名项目';
     els.coverTitle.textContent = project.name || '未命名项目';

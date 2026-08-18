@@ -551,6 +551,32 @@ button {
   gap: clamp(34px, 6vw, 72px);
 }
 
+.is-web-document .product-page-body {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 34px;
+}
+
+.is-web-document .prototype-shot {
+  min-height: 0;
+}
+
+.is-web-document .prototype-shot-button {
+  overflow: hidden;
+  border: 1px solid #d9dce1;
+  border-radius: 8px;
+  background: #f7f8fa;
+}
+
+.is-web-document .prototype-shot img {
+  width: 100%;
+  max-height: none;
+}
+
+.is-web-document .product-markdown {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
 .prototype-shot {
   min-height: 360px;
   margin: 0;
@@ -1088,5 +1114,31 @@ button {
 
   .product-group > .product-page:first-of-type .prototype-shot img {
     max-height: 112mm;
+  }
+
+  .is-web-document .product-page-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5mm;
+  }
+
+  .is-web-document .prototype-shot,
+  .is-web-document .product-group > .product-page:first-of-type .prototype-shot {
+    width: 100%;
+  }
+
+  .is-web-document .prototype-shot-button {
+    border: 0;
+    background: transparent;
+  }
+
+  .is-web-document .prototype-shot img,
+  .is-web-document .product-group > .product-page:first-of-type .prototype-shot img {
+    width: auto;
+    max-width: 100%;
+    max-height: 105mm;
+  }
+
+  .is-web-document .product-markdown {
+    width: 100%;
   }
 }

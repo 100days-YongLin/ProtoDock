@@ -49,6 +49,25 @@ assert.deepEqual(
 
 assert.deepEqual(ProtoDockProductDocument.buildDocumentOutline(null), []);
 
+assert.equal(ProtoDockProductDocument.documentLayoutMode('web-landscape'), 'web');
+assert.equal(ProtoDockProductDocument.documentLayoutMode({ devicePreset: 'web-portrait' }), 'web');
+assert.equal(ProtoDockProductDocument.documentLayoutMode('iphone-portrait'), 'device');
+const layoutRoot = {
+  classList: {
+    values: new Set(),
+    toggle(name, enabled) {
+      if (enabled) this.values.add(name);
+      else this.values.delete(name);
+    }
+  },
+  dataset: {}
+};
+assert.equal(ProtoDockProductDocument.applyDocumentLayout(layoutRoot, 'web-landscape'), 'web');
+assert.equal(layoutRoot.classList.values.has('is-web-document'), true);
+assert.equal(layoutRoot.dataset.prototypePreset, 'web-landscape');
+assert.equal(ProtoDockProductDocument.applyDocumentLayout(layoutRoot, 'iphone-portrait'), 'device');
+assert.equal(layoutRoot.classList.values.has('is-web-document'), false);
+
 const hierarchy = ProtoDockProductDocument.buildOutlineHierarchy({
   pages: [
     { id: 'home', title: '每日推送/首页' },
@@ -125,6 +144,7 @@ const fakeController = {
   assert.equal(maxActiveBuilds, 2);
   assert.equal(sentMessages[0].action, 'start');
   assert.deepEqual(sentMessages[0].payload.project.changelog, manifest.changelog);
+  assert.equal(sentMessages[0].payload.project.devicePreset, 'iphone-portrait');
   const pageMessages = sentMessages.filter((message) => message.action === 'page');
   assert.equal(pageMessages.length, 8);
   assert.equal(pageMessages.filter((message) => message.payload.capturePending).length, 4);

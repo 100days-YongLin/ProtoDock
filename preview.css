@@ -27,6 +27,11 @@
   gap: clamp(36px, 5vw, 68px);
 }
 
+.share-document.is-web-document .product-page-body {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 34px;
+}
+
 .prototype-live {
   min-width: 0;
   margin: 0;
@@ -127,6 +132,23 @@
 .prototype-live-browser .prototype-live-frame {
   width: 100%;
   height: min(660px, 62vw);
+}
+
+.share-document.is-web-document .prototype-live-stage {
+  min-height: 0;
+}
+
+.share-document.is-web-document .prototype-live-browser {
+  max-width: none;
+}
+
+.share-document.is-web-document[data-prototype-preset="web-landscape"] .prototype-live-browser .prototype-live-frame {
+  height: auto;
+  aspect-ratio: 1440 / 900;
+}
+
+.share-document.is-web-document[data-prototype-preset="web-portrait"] .prototype-live-browser .prototype-live-frame {
+  height: min(780px, 76vh);
 }
 
 .prototype-live-placeholder,
@@ -270,5 +292,22 @@
     padding: 8mm;
     font-size: 10pt;
     text-align: center;
+  }
+
+  .share-document.is-web-document .product-page-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5mm;
+  }
+
+  .share-document.is-web-document .prototype-live,
+  .share-document.is-web-document .product-group > .product-page:first-of-type .prototype-live {
+    width: 100%;
+  }
+
+  .share-document.is-web-document .prototype-print-shot,
+  .share-document.is-web-document .product-group > .product-page:first-of-type .prototype-print-shot {
+    width: auto;
+    max-width: 100%;
+    max-height: 105mm;
   }
 }

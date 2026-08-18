@@ -2,6 +2,28 @@
   const READY_EVENT = 'protodock:product-document-ready';
   const MESSAGE_EVENT = 'protodock:product-document-message';
   const READY_TIMEOUT_MS = 20000;
+  const WEB_DEVICE_PRESETS = new Set(['web-landscape', 'web-portrait']);
+
+  function documentLayoutMode(projectOrPreset) {
+    const preset = typeof projectOrPreset === 'string'
+      ? projectOrPreset
+      : projectOrPreset?.devicePreset;
+    return WEB_DEVICE_PRESETS.has(String(preset || '').trim()) ? 'web' : 'device';
+  }
+
+  function applyDocumentLayout(root, projectOrPreset) {
+    if (!root?.classList) {
+      return documentLayoutMode(projectOrPreset);
+    }
+    const preset = typeof projectOrPreset === 'string'
+      ? projectOrPreset
+      : projectOrPreset?.devicePreset;
+    const mode = documentLayoutMode(preset);
+    root.classList.toggle('is-web-document', mode === 'web');
+    root.dataset.prototypeLayout = mode;
+    root.dataset.prototypePreset = String(preset || 'iphone-portrait');
+    return mode;
+  }
 
   function uniqueId(prefix = 'document') {
     const random = global.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -281,6 +303,7 @@
           id: manifest.project?.id || '',
           name: manifest.project?.name || '未命名项目',
           description: manifest.project?.description || '',
+          devicePreset: manifest.project?.devicePreset || 'iphone-portrait',
           changelog: global.ProtoDockChangeLog?.normalize(manifest.changelog) || []
         },
         generatedAt: new Date().toISOString(),
@@ -368,6 +391,8 @@
     buildDocumentOutline,
     buildOutlineHierarchy,
     buildViewerUrl,
+    documentLayoutMode,
+    applyDocumentLayout,
     openViewer,
     generate
   };
