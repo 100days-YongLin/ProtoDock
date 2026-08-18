@@ -58,6 +58,7 @@ LATEST_POINTER_FILE = ".latest.json"
 MAX_UPLOAD_BYTES = int(os.environ.get("PROTODOCK_MAX_UPLOAD_BYTES", 100 * 1024 * 1024))
 MAX_EXTRACTED_BYTES = int(os.environ.get("PROTODOCK_MAX_EXTRACTED_BYTES", 250 * 1024 * 1024))
 MAX_FILE_BYTES = int(os.environ.get("PROTODOCK_MAX_FILE_BYTES", 80 * 1024 * 1024))
+HTTP_REQUEST_QUEUE_SIZE = max(64, int(os.environ.get("PROTODOCK_HTTP_REQUEST_QUEUE_SIZE", "256")))
 GITHUB_REPO_URL = os.environ.get("PROTODOCK_GITHUB_REPO", "").strip()
 GITHUB_AUTH_MODE = os.environ.get("PROTODOCK_GITHUB_AUTH", "").strip().lower()
 GITHUB_KEY_PATH = Path(os.environ.get("PROTODOCK_GITHUB_KEY_PATH", SECRETS_DIR / "github-deploy-key")).expanduser()
@@ -1591,6 +1592,7 @@ def configured_upload_url(origin: str = UPLOAD_ORIGIN) -> str:
 
 class ProtoDockHandler(BaseHTTPRequestHandler):
     server_version = "ProtoDockShare/1.0"
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt: str, *args) -> None:
         print("%s - - [%s] %s" % (self.address_string(), self.log_date_time_string(), fmt % args))
@@ -1602,7 +1604,8 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_upload_cors_headers()
         self.end_headers()
-        self.wfile.write(data)
+        if self.command != "HEAD":
+            self.wfile.write(data)
 
     def send_upload_cors_headers(self) -> None:
         if urlparse(self.path).path not in {"/api/shares", "/api/publish"}:
@@ -1658,6 +1661,8 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             if path == "/docs" or path.startswith("/docs/"):
                 raise ProtoDockError(HTTPStatus.NOT_FOUND, "文档还未构建")
             self.serve_static_asset(path)
+        except (BrokenPipeError, ConnectionResetError):
+            return
         except ProtoDockError as error:
             self.send_error_json(error)
         except Exception as error:
@@ -1961,7 +1966,12 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         if not allowed_project_path(relative):
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
         file_path = safe_target_path(directory, relative)
-        self.serve_file(file_path)
+        cache_control = (
+            "public, max-age=31536000, immutable"
+            if len(reference.split("/")) == 2
+            else "public, max-age=0, must-revalidate"
+        )
+        self.serve_file(file_path, cache_control=cache_control)
 
     def serve_static_asset(self, path: str) -> None:
         file_path = request_path_to_file(ROOT, path)
@@ -1972,13 +1982,31 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
         self.serve_file(file_path)
 
-    def serve_file(self, file_path: Path, content_type: str | None = None, download_name: str | None = None) -> None:
+    def serve_file(
+        self,
+        file_path: Path,
+        content_type: str | None = None,
+        download_name: str | None = None,
+        cache_control: str | None = None,
+    ) -> None:
         if not file_path.is_file():
             raise ProtoDockError(HTTPStatus.NOT_FOUND, "文件不存在")
+        file_stat = file_path.stat()
+        etag = f'"{file_stat.st_mtime_ns:x}-{file_stat.st_size:x}"'
+        if cache_control and self.headers.get("If-None-Match", "").strip() == etag:
+            self.send_response(HTTPStatus.NOT_MODIFIED)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", cache_control)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         content_type = content_type or mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(file_path.stat().st_size))
+        self.send_header("Content-Length", str(file_stat.st_size))
+        if cache_control:
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", cache_control)
         if download_name:
             fallback_name = "protodock-document.pdf" if download_name.lower().endswith(".pdf") else "protodock-project.zip"
             self.send_header(
@@ -1991,11 +2019,17 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
                 shutil.copyfileobj(file, self.wfile)
 
 
+class ProtoDockHTTPServer(ThreadingHTTPServer):
+    request_queue_size = HTTP_REQUEST_QUEUE_SIZE
+    daemon_threads = True
+    block_on_close = False
+
+
 def main() -> None:
     host = os.environ.get("PROTODOCK_HOST", "0.0.0.0")
     port = int(os.environ.get("PROTODOCK_PORT", "6080"))
     SHARES_DIR.mkdir(parents=True, exist_ok=True)
-    httpd = ThreadingHTTPServer((host, port), ProtoDockHandler)
+    httpd = ProtoDockHTTPServer((host, port), ProtoDockHandler)
     print(f"ProtoDock server listening on http://{host}:{port}")
     httpd.serve_forever()
 
