@@ -1,5 +1,6 @@
 import json
 import unittest
+from urllib.parse import quote
 
 from feishu_notifications import (
     FeishuNotificationError,
@@ -58,9 +59,19 @@ class FeishuNotificationTests(unittest.TestCase):
         self.assertEqual(message["msg_type"], "interactive")
         self.assertEqual(message["card"]["header"]["template"], "green")
         self.assertIn("发布成功", message["card"]["header"]["title"]["content"])
+        fields = message["card"]["elements"][-2]["fields"]
+        self.assertIn(publish_payload()["shareUrl"], fields[0]["text"]["content"])
+        self.assertIn(publish_payload()["latestShareUrl"], fields[1]["text"]["content"])
+        self.assertIn(publish_payload()["branchUrl"], fields[2]["text"]["content"])
         actions = message["card"]["elements"][-1]["actions"]
+        self.assertEqual(len(actions), 3)
         self.assertEqual(actions[0]["url"], publish_payload()["shareUrl"])
         self.assertEqual(actions[1]["url"], publish_payload()["latestShareUrl"])
+        self.assertEqual(actions[2]["text"]["content"], "复制 GitHub 链接")
+        self.assertEqual(
+            actions[2]["url"],
+            f"https://example.com/copy-link.html?url={quote(publish_payload()['branchUrl'], safe='')}",
+        )
 
     def test_sends_interactive_card_without_echoing_webhook(self):
         opener = FakeOpener()

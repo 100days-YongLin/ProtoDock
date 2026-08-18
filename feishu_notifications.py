@@ -4,7 +4,7 @@ import json
 import re
 from urllib import error as urllib_error
 from urllib import request as urllib_request
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 
 FEISHU_HOST = "open.feishu.cn"
@@ -55,6 +55,12 @@ def clean_url(value, label: str, *, required: bool = False) -> str:
     return text
 
 
+def build_copy_link_url(reference_url: str, target_url: str) -> str:
+    parsed = urlparse(reference_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    return f"{origin}/copy-link.html?url={quote(target_url, safe='')}"
+
+
 def build_publish_card(payload: dict) -> dict:
     project_name = clean_text(payload.get("projectName"), "项目名称", maximum=160, required=True)
     version = clean_text(payload.get("version"), "版本号", maximum=80)
@@ -66,17 +72,17 @@ def build_publish_card(payload: dict) -> dict:
 
     fields = [{
         "is_short": False,
-        "text": {"tag": "lark_md", "content": f"**当前版本 PRD**\n[打开当前版本]({share_url})"},
+        "text": {"tag": "lark_md", "content": f"**当前版本 PRD**\n[{share_url}]({share_url})"},
     }]
     if latest_url:
         fields.append({
             "is_short": False,
-            "text": {"tag": "lark_md", "content": f"**持续最新版 PRD**\n[打开最新版]({latest_url})"},
+            "text": {"tag": "lark_md", "content": f"**持续最新版 PRD**\n[{latest_url}]({latest_url})"},
         })
     if branch_url:
         fields.append({
             "is_short": False,
-            "text": {"tag": "lark_md", "content": f"**GitHub 分支**\n[查看原型分支]({branch_url})"},
+            "text": {"tag": "lark_md", "content": f"**GitHub 分支**\n[{branch_url}]({branch_url})"},
         })
 
     actions = [{
@@ -91,6 +97,13 @@ def build_publish_card(payload: dict) -> dict:
             "text": {"tag": "plain_text", "content": "查看持续最新版"},
             "type": "default",
             "url": latest_url,
+        })
+    if branch_url:
+        actions.append({
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": "复制 GitHub 链接"},
+            "type": "default",
+            "url": build_copy_link_url(share_url, branch_url),
         })
 
     return {
