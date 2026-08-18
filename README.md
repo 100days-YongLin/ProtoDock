@@ -143,7 +143,7 @@ http://localhost:4175/index.html
 
 打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json` 与 `docs/*.md`。
 
-本地项目预览读取资源前会自动剥离 URL 的 query/hash，兼容历史页面中的 `admin.js?v=1.1.2`。新交付仍必须使用纯项目相对路径；上传校验会扫描脚本、样式、图片、媒体、iframe、`srcset` 及 CSS `url()`/`@import`，查询串、片段、越界路径和缺失文件都会阻止发布。需要缓存失效时使用内容哈希文件名，不要依赖查询串。
+本地项目预览读取资源前会自动剥离 URL 的 query/hash，并补充重写运行时插入的图片、媒体、内联背景、`srcset` 和 SVG 图片，兼容历史页面。新交付仍必须使用无歧义的纯项目相对路径：HTML 资源相对页面入口，CSS `url()`/`@import` 相对声明它的 CSS 文件。不要使用根路径、猜测源码目录层级，也不要通过 `.src = "./..."`、动态 `<img>`、`document.currentScript.src` 或 `import.meta.url` 生成项目本地图片地址；本地预览中的脚本会转换为 blob URL，与公开 Share 的基准不同。上传校验会阻止这些写法以及查询串、片段、越界路径和缺失文件。
 
 打开项目后，可以点击顶部显示的当前项目名称进行重命名。点击“保存名称”后需要填写版本号和变更内容，再把名称与本次记录一并写回 `protodock.project.json`；公开预览等只读项目不允许重命名。
 

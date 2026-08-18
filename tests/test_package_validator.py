@@ -314,6 +314,28 @@ class PackageValidatorTests(unittest.TestCase):
         self.assertEqual(result["resources"]["staticResourceCompatibilityIssueCount"], 0)
         self.assertEqual(result["resources"]["missingStaticResourceCount"], 0)
 
+    def test_rejects_dynamic_relative_image_paths_in_scripts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_project(root, '<script src="./gallery.js"></script>')
+            (root / "pages/home/gallery.js").write_text(
+                """
+                const image = document.createElement('img');
+                image.src = './photos/cover.png';
+                const base = new URL('.', document.currentScript.src);
+                """,
+                encoding="utf-8",
+            )
+            (root / "pages/home/photos").mkdir()
+            (root / "pages/home/photos/cover.png").write_bytes(b"png")
+
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.validate_project_manifest_files(root)
+
+        self.assertEqual(context.exception.code, "STATIC_RESOURCES_INVALID")
+        self.assertTrue(any("运行时生成本地图片" in issue for issue in context.exception.details))
+        self.assertTrue(any("document.currentScript.src" in issue for issue in context.exception.details))
+
     def test_rejects_query_string_in_final_zip(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "project"

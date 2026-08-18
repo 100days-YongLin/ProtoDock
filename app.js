@@ -1353,6 +1353,42 @@ async function rewriteCssUrls(cssText, cssDir, nodeId) {
   return rewritten;
 }
 
+async function resolveLocalPreviewAttribute(element, attribute, value, entryDir, nodeId) {
+  const resolved = resolvePath(entryDir, value);
+  const tagName = element.tagName?.toLowerCase() || '';
+  if (tagName === 'script' && attribute === 'src') {
+    const jsText = await readTextFile(resolved);
+    const blobUrl = URL.createObjectURL(new Blob([jsText], { type: 'text/javascript' }));
+    rememberPreviewUrl(nodeId, blobUrl);
+    return blobUrl;
+  }
+  if (tagName === 'link'
+    && attribute === 'href'
+    && (element.getAttribute('rel') || '').toLowerCase().includes('stylesheet')) {
+    const cssText = await readTextFile(resolved);
+    const rewritten = await rewriteCssUrls(cssText, dirname(resolved), nodeId);
+    const blobUrl = URL.createObjectURL(new Blob([rewritten], { type: 'text/css' }));
+    rememberPreviewUrl(nodeId, blobUrl);
+    return blobUrl;
+  }
+  const { url } = await createBlobUrlFromFile(value, entryDir);
+  rememberPreviewUrl(nodeId, url);
+  return url;
+}
+
+function bindLocalPreviewAssets(iframe, entryPath, nodeId) {
+  const entryDir = dirname(entryPath);
+  window.ProtoDockLocalPreviewAssets?.bindFrame?.(iframe, {
+    resolveAttribute: (element, attribute, value) => (
+      resolveLocalPreviewAttribute(element, attribute, value, entryDir, nodeId)
+    ),
+    rewriteCss: (cssText) => rewriteCssUrls(cssText, entryDir, nodeId),
+    onError(error) {
+      console.warn('ProtoDock: dynamic local asset missing', error);
+    }
+  });
+}
+
 function normalizedNavigationSuffix(value) {
   const normalized = String(value || '').trim();
   if (!normalized) {
@@ -1474,6 +1510,7 @@ async function buildPreviewIframe(node, className = 'prototype-frame', options =
   } else {
     const html = await readTextFile(page.entry);
     iframe.srcdoc = await rewriteHtmlForLocalPreview(html, page.entry, node.id, options);
+    bindLocalPreviewAssets(iframe, page.entry, node.id);
   }
 
   return iframe;

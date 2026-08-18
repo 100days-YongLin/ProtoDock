@@ -60,6 +60,9 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 42. Final local static resources must use plain project-relative paths. Do not append `?v=`, other query strings, or `#hash` fragments to `script[src]`, stylesheet links, image/media resources, iframe resources, `srcset`, CSS `url()`, or CSS `@import`; use content-hashed filenames when cache invalidation is required.
 43. Validate the editable directory and the re-extracted final ZIP with the same static-resource scan. Then open the directory in ProtoDock and exercise representative JavaScript, CSS, image, navigation-bridge, and back-bridge resources before checking the public Share surface.
 44. ProtoDock may strip query/hash suffixes while reading legacy local projects. That behavior is compatibility recovery only and cannot be cited as delivery compliance.
+45. Resolve HTML resources relative to their page entry and CSS resources relative to the stylesheet that declares them. Root-absolute `/assets/...` paths and guessed source-directory traversal are forbidden.
+46. Do not generate project-local image/media URLs at runtime through `.src = "./..."`, generated `<img src>`, inline `background-image`, `document.currentScript.src`, or `import.meta.url`. Declare finite prototype assets in original HTML/CSS, switch them with CSS classes, or embed data/blob URLs so local Player and public Share use the same resource identity.
+47. ProtoDock may rewrite dynamically inserted local media in legacy previews. New and modified pages must still pass the static runtime-path gate; runtime recovery is not delivery evidence.
 
 ## Product Documentation Contract
 

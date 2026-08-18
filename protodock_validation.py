@@ -78,6 +78,22 @@ STATIC_RESOURCE_ATTRIBUTES = {
 }
 CSS_URL_PATTERN = re.compile(r"url\(\s*(['\"]?)([^'\")]+)\1\s*\)", re.IGNORECASE)
 CSS_IMPORT_PATTERN = re.compile(r"@import\s+(?:url\(\s*)?(['\"])([^'\"]+)\1", re.IGNORECASE)
+DYNAMIC_RESOURCE_ASSIGNMENT_PATTERN = re.compile(
+    r"(?:\.\s*(?:src|poster)\s*=|"
+    r"setAttribute\s*\(\s*['\"](?:src|poster|href|xlink:href)['\"]\s*,|"
+    r"\.\s*(?:backgroundImage|background)\s*=)\s*"
+    r"(?P<quote>['\"`])(?P<value>.*?)(?P=quote)",
+    re.IGNORECASE | re.DOTALL,
+)
+EMBEDDED_HTML_RESOURCE_PATTERN = re.compile(
+    r"<(?:img|source|video|audio|track|image)\b[^>]*\b(?:src|poster|href)\s*=\s*"
+    r"(?P<quote>['\"])(?P<value>.*?)(?P=quote)",
+    re.IGNORECASE | re.DOTALL,
+)
+SCRIPT_RELATIVE_BASE_PATTERN = re.compile(
+    r"new\s+URL\s*\([^)]*,\s*(?:document\s*\.\s*currentScript\s*\.\s*src|import\s*\.\s*meta\s*\.\s*url)",
+    re.IGNORECASE,
+)
 
 
 def validate_changelog(manifest: dict) -> dict:
@@ -425,9 +441,11 @@ def validate_static_resource_references(project_dir: Path, manifest: dict) -> di
     issues = []
     warnings = []
     scanned_files = set()
+    scanned_dynamic_scripts = set()
     reference_count = 0
     incompatible_count = 0
     missing_count = 0
+    dynamic_issue_count = 0
 
     def inspect_reference(page_id: str, source_path: Path, source_label: str, line: int, reference: str):
         nonlocal reference_count, incompatible_count, missing_count
@@ -478,6 +496,40 @@ def validate_static_resource_references(project_dir: Path, manifest: dict) -> di
             if target and target.suffix.lower() == ".css":
                 inspect_css(page_id, target)
 
+    def inspect_script(page_id: str, entry_path: Path, source_label: str, first_line: int, source: str):
+        nonlocal dynamic_issue_count
+        matches = []
+        matches.extend(
+            (match.group("value").strip(), match.start())
+            for match in DYNAMIC_RESOURCE_ASSIGNMENT_PATTERN.finditer(source)
+        )
+        matches.extend(
+            (match.group("value").strip(), match.start())
+            for match in EMBEDDED_HTML_RESOURCE_PATTERN.finditer(source)
+        )
+        for raw_value, start in matches:
+            css_match = CSS_URL_PATTERN.search(raw_value)
+            reference = css_match.group(2).strip() if css_match else raw_value
+            if not reference or reference.startswith(("#", "data:", "blob:")):
+                continue
+            parsed = urlsplit(reference.replace("${", "dynamic-").replace("}", ""))
+            if parsed.scheme or parsed.netloc:
+                continue
+            dynamic_issue_count += 1
+            line = first_line + source.count("\n", 0, start)
+            issues.append(
+                f"{page_id} · {source_label}:{line} 在运行时生成本地图片/媒体相对路径：{reference}；"
+                "本地 srcdoc/blob 与公开 Share 的 URL 基准不同，请把资源声明移到原始 HTML/CSS，"
+                "或改成内嵌 data/blob 资源"
+            )
+        for match in SCRIPT_RELATIVE_BASE_PATTERN.finditer(source):
+            dynamic_issue_count += 1
+            line = first_line + source.count("\n", 0, match.start())
+            issues.append(
+                f"{page_id} · {source_label}:{line} 使用脚本 URL 作为本地资源基准；"
+                "ProtoDock 本地预览会把脚本转换为 blob URL，请勿依赖 document.currentScript.src 或 import.meta.url"
+            )
+
     for page_id, page in pages.items():
         if not isinstance(page, dict):
             continue
@@ -497,6 +549,33 @@ def validate_static_resource_references(project_dir: Path, manifest: dict) -> di
         except Exception as error:
             issues.append(f"{page_id} · {entry} 无法解析 HTML 资源引用：{error}")
             continue
+        for inline_script in parser.inline_scripts:
+            inspect_script(
+                page_id,
+                entry_path,
+                entry,
+                inline_script["line"],
+                "".join(inline_script["text"]),
+            )
+        for script_source, source_line in parser.script_sources:
+            script_target, path_issue = static_resource_target(entry_path, script_source, project_root)
+            if (path_issue
+                or not script_target
+                or not script_target.is_file()
+                or script_target in scanned_dynamic_scripts):
+                continue
+            scanned_dynamic_scripts.add(script_target)
+            try:
+                script_text = script_target.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            inspect_script(
+                page_id,
+                entry_path,
+                script_target.relative_to(project_root).as_posix(),
+                1,
+                script_text,
+            )
         for resource in parser.resource_references:
             target = inspect_reference(
                 page_id,
@@ -517,6 +596,7 @@ def validate_static_resource_references(project_dir: Path, manifest: dict) -> di
             "staticResourceFileCount": len(scanned_files),
             "staticResourceCompatibilityIssueCount": incompatible_count,
             "missingStaticResourceCount": missing_count,
+            "dynamicStaticResourceIssueCount": dynamic_issue_count,
         },
     }
 

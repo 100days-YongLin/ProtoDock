@@ -225,10 +225,12 @@ The same final artifact must run when opened as a local project and when served 
 1. Scan every page entry for local `script[src]`, `link[href]`, image/source/media URLs, `srcset`, iframe resources, and stylesheet `url()`/`@import` references.
 2. Local resource references must be project-relative and must resolve inside the final project root after URL decoding.
 3. Do not use `?v=`, other query strings, or appended `#hash` fragments for cache invalidation in final build output. Use content-hashed filenames when cache invalidation is necessary.
-4. Validate both the editable source directory and the re-extracted final ZIP with `scripts/protodock-validate`. A missing resource or query/hash compatibility issue is release-blocking.
-5. Open the directory through ProtoDock's `打开本地项目` and confirm representative JavaScript, CSS, images, navigation bridge, and back bridge load without 404. Then repeat a representative interaction in public Share.
+4. Resolve HTML resource paths relative to the HTML entry and CSS `url()`/`@import` paths relative to the CSS file that declares them. Never use root-absolute `/assets/...` paths or guess `../` depth from a source/build directory.
+5. Do not create project-local image/media URLs at runtime with `.src = "./..."`, generated `<img src>`, inline `background-image`, `document.currentScript.src`, or `import.meta.url`. Local previews execute rewritten scripts from blob URLs, so script-based URL bases differ from public Share. Put finite prototype assets in the original HTML/CSS, use CSS classes for dynamic states, or embed a data/blob URL.
+6. Validate both the editable source directory and the re-extracted final ZIP with `scripts/protodock-validate`. Missing resources, query/hash suffixes, ambiguous runtime-generated paths, and script-URL bases are release-blocking.
+7. Open the directory through ProtoDock's `打开本地项目` and confirm representative JavaScript, CSS, images, navigation bridge, and back bridge load without 404. Then repeat a representative interaction in public Share.
 
-ProtoDock strips URL query/hash suffixes before legacy File System Access reads so old projects remain previewable. This runtime tolerance does not make a new package compliant.
+ProtoDock strips URL query/hash suffixes and observes dynamically inserted local media for legacy File System Access previews. This runtime tolerance does not make a new package compliant.
 
 ## Canvas Rules
 

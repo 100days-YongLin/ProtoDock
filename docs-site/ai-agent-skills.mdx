@@ -208,7 +208,9 @@ Agent 必须在 Player 和 Share 中真实点击按钮完成两条验收：从�
 
 同一份最终产物必须同时兼容 ProtoDock“打开本地项目”和公开 Share。最终 HTML/CSS 中的本地脚本、样式、图片、媒体、iframe、`srcset`、CSS `url()` 与 `@import` 必须使用纯项目相对路径，不得使用 `admin.js?v=1.1.2` 或追加 `#hash` 的方式做缓存失效；需要缓存版本时使用内容哈希文件名。
 
-校验器会按浏览器 URL 规则剥离 query/hash 后定位真实文件，同时把这类引用报告为阻断错误，并检查越界路径和缺失文件。Agent 必须先校验可编辑目录，再校验重新解压的最终 ZIP；之后分别在本地项目 Player 和公开 Share 中实际加载代表性的 JavaScript、CSS、图片、导航桥接与返回桥接。ProtoDock 对旧项目自动剥离 query/hash 的运行时兼容不能替代交付门禁。
+HTML 资源路径以页面入口为基准，CSS `url()`/`@import` 以声明它的 CSS 文件为基准。禁止根路径和从源码目录猜测 `../` 层级。Agent 也不得通过 `.src = "./..."`、动态 `<img src>`、内联 `background-image`、`document.currentScript.src` 或 `import.meta.url` 生成项目本地图片地址；本地 Player 的脚本会转换为 blob URL，与公开 Share 的 URL 基准不同。有限的原型素材应写入原始 HTML/CSS，并通过 CSS class 切换状态，或直接使用 data/blob URL。
+
+校验器会按浏览器 URL 规则剥离 query/hash 后定位真实文件，同时把查询串、动态相对图片地址、脚本 URL 基准、越界路径和缺失文件报告为阻断错误。Agent 必须先校验可编辑目录，再校验重新解压的最终 ZIP；之后分别在本地项目 Player 和公开 Share 中实际加载代表性的 JavaScript、CSS、图片、导航桥接与返回桥接。ProtoDock 对旧项目自动剥离 query/hash、重写动态媒体的运行时兼容不能替代交付门禁。
 
 ## 运行交付校验器
 
