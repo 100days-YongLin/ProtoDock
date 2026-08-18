@@ -204,6 +204,12 @@ ProtoDock 会尽量恢复旧原型的脚本跳转，方便历史文件继续预�
 
 Agent 必须在 Player 和 Share 中真实点击按钮完成两条验收：从来源页进入二级页后返回实际来源并恢复 query/hash；直接打开二级页时返回声明的 fallback。只检查 DOM、属性或直接调用函数都不算完成。
 
+## 本地静态资源验收
+
+同一份最终产物必须同时兼容 ProtoDock“打开本地项目”和公开 Share。最终 HTML/CSS 中的本地脚本、样式、图片、媒体、iframe、`srcset`、CSS `url()` 与 `@import` 必须使用纯项目相对路径，不得使用 `admin.js?v=1.1.2` 或追加 `#hash` 的方式做缓存失效；需要缓存版本时使用内容哈希文件名。
+
+校验器会按浏览器 URL 规则剥离 query/hash 后定位真实文件，同时把这类引用报告为阻断错误，并检查越界路径和缺失文件。Agent 必须先校验可编辑目录，再校验重新解压的最终 ZIP；之后分别在本地项目 Player 和公开 Share 中实际加载代表性的 JavaScript、CSS、图片、导航桥接与返回桥接。ProtoDock 对旧项目自动剥离 query/hash 的运行时兼容不能替代交付门禁。
+
 ## 运行交付校验器
 
 Rule 需要由代码执行，不能只让 Agent 按文字自查。使用安装脚本安装 Skill 后，Skill 目录中会同时提供校验入口；在 ProtoDock 仓库中也可以直接运行：

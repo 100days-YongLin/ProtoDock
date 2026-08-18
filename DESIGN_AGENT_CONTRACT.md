@@ -57,6 +57,9 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 39. Local-only legacy files, experiments, old ZIPs, superseded screenshots, and historical QA artifacts belong under ignored `temps/`. Nothing active or referenced may depend on `temps/`, and it must never enter publishing or Git delivery.
 40. Before reorganizing a legacy project, inventory references and Git state and present a dry-run classification. Do not move files merely because they are outside the ProtoDock publishing set; framework source and build inputs may still be required.
 41. Do not leave root-level manifest backups or duplicate source trees. Store safety backups under ignored `protodock/backups/`, retain one canonical editable source root, and document its mapping to `pages/` in README and build scripts.
+42. Final local static resources must use plain project-relative paths. Do not append `?v=`, other query strings, or `#hash` fragments to `script[src]`, stylesheet links, image/media resources, iframe resources, `srcset`, CSS `url()`, or CSS `@import`; use content-hashed filenames when cache invalidation is required.
+43. Validate the editable directory and the re-extracted final ZIP with the same static-resource scan. Then open the directory in ProtoDock and exercise representative JavaScript, CSS, image, navigation-bridge, and back-bridge resources before checking the public Share surface.
+44. ProtoDock may strip query/hash suffixes while reading legacy local projects. That behavior is compatibility recovery only and cannot be cited as delivery compliance.
 
 ## Product Documentation Contract
 
@@ -91,6 +94,8 @@ pages/home/
 ```
 
 For maximum reliability in v1, prefer bundling each page with no dynamic chunk imports. Inline or local relative assets are best.
+
+Use plain file paths in final HTML and CSS, for example `./admin.js` and `./assets/app.4f83c1.css`. Do not use `./admin.js?v=1.1.2`; browser query strings do not identify files in File System Access mode.
 
 The build output must include the JavaScript required by the prototype. `renderToStaticMarkup`, copied `outerHTML`, screenshots, or HTML-only exports are insufficient when the source page contains interactions.
 

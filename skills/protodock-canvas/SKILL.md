@@ -142,6 +142,7 @@ Treat a feature change as a coherent documentation unit, even though the durable
 - Every `pages.<pageId>` record must declare a browser-readable static `entry` under `pages/`.
 - Every page must declare a `doc` under `docs/`.
 - Page resources must be self-contained or use project-relative assets.
+- Final static resource references must use plain project-relative paths. Do not append cache-busting query strings or fragments such as `admin.js?v=1.1.2`, `app.css?build=7`, or `icon.svg#preview`; ProtoDock's File System Access mode resolves real files, not URL variants.
 - Do not use localhost URLs, local absolute paths, dev-server-only routes, or unavailable external runtime dependencies.
 - React, Vue, Svelte, and other framework pages must be built into static artifacts before delivery.
 - Top-level `changelog` is append-only. Each entry requires `version`, `changedAt`, and `description`; every Agent-authored delivery must add one entry describing that batch.
@@ -216,6 +217,18 @@ Treat navigation validation as a release-blocking check on the extracted final Z
 11. Actually click a back control in the player and public Share preview. Test both history behavior (`source page -> second-level page -> back` returns to the real source with query/hash restored) and fallback behavior (direct entry to the second-level page returns to its declared fallback). DOM inspection or calling the back function directly is not an acceptance test.
 
 ProtoDock's runtime recovery for legacy pages is compatibility behavior only. It must not be used as evidence that a new delivery satisfies this gate.
+
+### Local static resource gate
+
+The same final artifact must run when opened as a local project and when served by public Share.
+
+1. Scan every page entry for local `script[src]`, `link[href]`, image/source/media URLs, `srcset`, iframe resources, and stylesheet `url()`/`@import` references.
+2. Local resource references must be project-relative and must resolve inside the final project root after URL decoding.
+3. Do not use `?v=`, other query strings, or appended `#hash` fragments for cache invalidation in final build output. Use content-hashed filenames when cache invalidation is necessary.
+4. Validate both the editable source directory and the re-extracted final ZIP with `scripts/protodock-validate`. A missing resource or query/hash compatibility issue is release-blocking.
+5. Open the directory through ProtoDock's `打开本地项目` and confirm representative JavaScript, CSS, images, navigation bridge, and back bridge load without 404. Then repeat a representative interaction in public Share.
+
+ProtoDock strips URL query/hash suffixes before legacy File System Access reads so old projects remain previewable. This runtime tolerance does not make a new package compliant.
 
 ## Canvas Rules
 

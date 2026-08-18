@@ -13,7 +13,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import server  # noqa: E402
-from protodock_validation import validate_changelog, validate_cross_page_navigation, validate_product_documents  # noqa: E402
+from protodock_validation import (  # noqa: E402
+    validate_changelog,
+    validate_cross_page_navigation,
+    validate_product_documents,
+    validate_static_resource_references,
+)
 
 
 def parse_args():
@@ -55,6 +60,10 @@ def inspect_target(target: Path) -> dict:
     navigation = validate_cross_page_navigation(project_dir, manifest) if isinstance(manifest, dict) else {
         "issues": [], "warnings": [], "routes": [], "stats": {}
     }
+    resources = validate_static_resource_references(project_dir, manifest) if isinstance(manifest, dict) else {
+        "issues": [], "warnings": [], "stats": {}
+    }
+    errors.extend(issue for issue in resources["issues"] if issue not in errors)
     errors.extend(issue for issue in navigation["issues"] if issue not in errors)
     canvas_validation = server.validate_canvas_layout(manifest) if isinstance(manifest, dict) else {
         "stats": {}, "warnings": []
@@ -69,6 +78,7 @@ def inspect_target(target: Path) -> dict:
     canvas = result.get("canvas", {}) if result else canvas_validation["stats"]
     warnings = list(result.get("warnings", [])) if result else list(canvas_validation["warnings"])
     warnings.extend(warning for warning in navigation["warnings"] if warning not in warnings)
+    warnings.extend(warning for warning in resources["warnings"] if warning not in warnings)
     warnings.extend(warning for warning in product_docs["warnings"] if warning not in warnings)
     warnings.extend(warning for warning in changelog["warnings"] if warning not in warnings)
     pages = manifest.get("pages", {}) if isinstance(manifest, dict) else {}
@@ -93,6 +103,7 @@ def inspect_target(target: Path) -> dict:
             "docCount": result.get("docCount", doc_count) if result else doc_count,
             **canvas,
             **navigation["stats"],
+            **(result.get("resources", resources["stats"]) if result else resources["stats"]),
             **(result.get("productDocs", product_docs["stats"]) if result else product_docs["stats"]),
             **(result.get("changelog", changelog["stats"]) if result else changelog["stats"]),
         },

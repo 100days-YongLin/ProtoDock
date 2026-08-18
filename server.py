@@ -28,7 +28,12 @@ from urllib.parse import quote, unquote, urlparse
 from pdf_service import PdfService
 from feishu_notifications import FeishuNotificationError, send_publish_card
 from github_delivery import GitDeliveryError, copy_project_to_workspace, publish_git_delivery
-from protodock_validation import validate_changelog, validate_cross_page_navigation, validate_product_documents
+from protodock_validation import (
+    validate_changelog,
+    validate_cross_page_navigation,
+    validate_product_documents,
+    validate_static_resource_references,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -634,28 +639,35 @@ def validate_project_manifest_files(
 
     canvas_validation = validate_canvas_layout(manifest)
     navigation_validation = validate_cross_page_navigation(project_dir, manifest)
+    resource_validation = validate_static_resource_references(project_dir, manifest)
     product_doc_validation = validate_product_documents(project_dir, manifest)
     change_log_validation = validate_changelog(manifest)
     canvas_issues = canvas_validation["issues"]
     navigation_issues = navigation_validation["issues"]
+    resource_issues = resource_validation["issues"]
     change_log_issues = change_log_validation["issues"]
-    if issues or canvas_issues or navigation_issues or change_log_issues:
-        issue_categories = sum(bool(category) for category in (issues, canvas_issues, navigation_issues, change_log_issues))
+    if issues or canvas_issues or navigation_issues or resource_issues or change_log_issues:
+        issue_categories = sum(
+            bool(category)
+            for category in (issues, canvas_issues, navigation_issues, resource_issues, change_log_issues)
+        )
         if issue_categories > 1:
             code = "PROJECT_VALIDATION_FAILED"
         elif canvas_issues:
             code = "CANVAS_LAYOUT_INVALID"
         elif navigation_issues:
             code = "NAVIGATION_INVALID"
+        elif resource_issues:
+            code = "STATIC_RESOURCES_INVALID"
         elif change_log_issues:
             code = "CHANGELOG_INVALID"
         else:
             code = "PROJECT_FILES_INVALID"
         raise ProtoDockError(
             HTTPStatus.BAD_REQUEST,
-            f"项目包校验失败。请确保文件路径相对于{source_label}，且 Canvas 与跨页导航符合契约。{remediation}",
+            f"项目包校验失败。请确保文件路径相对于{source_label}，且静态资源、Canvas 与跨页导航符合契约。{remediation}",
             code=code,
-            details=issues + canvas_issues + navigation_issues + change_log_issues,
+            details=issues + canvas_issues + navigation_issues + resource_issues + change_log_issues,
         )
     return {
         "manifest": manifest,
@@ -667,11 +679,13 @@ def validate_project_manifest_files(
             "stats": navigation_validation["stats"],
             "routes": navigation_validation["routes"],
         },
+        "resources": resource_validation["stats"],
         "productDocs": product_doc_validation["stats"],
         "changelog": change_log_validation["stats"],
         "warnings": (
             canvas_validation["warnings"]
             + navigation_validation["warnings"]
+            + resource_validation["warnings"]
             + change_log_validation["warnings"]
             + product_doc_validation["warnings"]
         ),

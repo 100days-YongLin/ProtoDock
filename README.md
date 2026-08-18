@@ -143,6 +143,8 @@ http://localhost:4175/index.html
 
 打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json` 与 `docs/*.md`。
 
+本地项目预览读取资源前会自动剥离 URL 的 query/hash，兼容历史页面中的 `admin.js?v=1.1.2`。新交付仍必须使用纯项目相对路径；上传校验会扫描脚本、样式、图片、媒体、iframe、`srcset` 及 CSS `url()`/`@import`，查询串、片段、越界路径和缺失文件都会阻止发布。需要缓存失效时使用内容哈希文件名，不要依赖查询串。
+
 打开项目后，可以点击顶部显示的当前项目名称进行重命名。点击“保存名称”后需要填写版本号和变更内容，再把名称与本次记录一并写回 `protodock.project.json`；公开预览等只读项目不允许重命名。
 
 只要项目存在未保存修改，顶部保存按钮都会要求记录本次版本和变更内容。记录追加到 `changelog` 末尾，最后一条作为当前版本显示在完整产品文档中。旧项目没有 `changelog` 时仍可打开，第一次保存后自动建立历史。存在未保存修改时，统一发布会要求先完成保存，避免发布内容没有对应版本记录。
@@ -153,7 +155,7 @@ http://localhost:4175/index.html
 
 二级页面的返回键使用 `data-protodock-back`，ProtoDock 会回到用户实际访问的上一页并恢复 query/hash；可用 `data-protodock-back="home"` 指定没有访问历史时的兜底页。这个属性只表达语义，不会代替页面实现点击逻辑。独立静态页面必须自带桥接脚本：优先调用 `window.ProtoDockPreview.back(fallbackPageId)`，不可用时向父窗口发送 `{ type: 'protodock:back', fallbackPageId }`。可从 Skill 的 `templates/protodock-back-bridge.js` 复制标准实现到项目 `assets/`。只声明属性、依赖宿主自动拦截，或使用 iframe 的 `history.back()` 都会被上传校验器拦截。
 
-统一发布会对同一份 ZIP 执行一次后端解压校验，自动检查入口、文档、Canvas、跨页目标和返回协议；任一错误都会在写入公开版本或推送仓库前阻止操作。`scripts/protodock-validate` 用于 Agent 在交付前对同一份最终 ZIP 提前执行相同门禁。
+统一发布会对同一份 ZIP 执行一次后端解压校验，自动检查入口、文档、本地静态资源、Canvas、跨页目标和返回协议；任一错误都会在写入公开版本或推送仓库前阻止操作。`scripts/protodock-validate` 用于 Agent 在交付前对可编辑目录和同一份最终 ZIP 执行相同门禁。
 
 `docs/<page-id>.md` 是给产品、设计、研发和 Agent 对齐的产品文档，不是源码导出说明。新建页面会生成“页面定位、使用场景、前置条件、页面内容、交互规则、业务规则、状态与异常、数据影响、产品验收、非本期范围”模板；验收场景统一写成“前提 / 操作 / 预期”。源码目录和入口在页面信息二级视图查看，不应占用 PRD 主体。
 

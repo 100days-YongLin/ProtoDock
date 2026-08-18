@@ -267,6 +267,74 @@ class PackageValidatorTests(unittest.TestCase):
 
         self.assertTrue(any("navigation.js:1" in issue for issue in result["issues"]))
 
+    def test_rejects_query_or_hash_on_local_static_resources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_project(
+                root,
+                """
+                <link rel="stylesheet" href="./app.css?v=1.1.2">
+                <img src="./cover.png#preview" alt="">
+                <script src="./admin.js?v=1.1.2"></script>
+                """,
+            )
+            (root / "pages/home/app.css").write_text(
+                'body { background: url("./background.png?v=1.1.2"); }',
+                encoding="utf-8",
+            )
+            (root / "pages/home/background.png").write_bytes(b"png")
+            (root / "pages/home/cover.png").write_bytes(b"png")
+            (root / "pages/home/admin.js").write_text("console.log('ready');", encoding="utf-8")
+
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.validate_project_manifest_files(root)
+
+        self.assertEqual(context.exception.code, "STATIC_RESOURCES_INVALID")
+        self.assertEqual(sum("query/hash" in issue for issue in context.exception.details), 4)
+        self.assertFalse(any("静态资源不存在" in issue for issue in context.exception.details))
+
+    def test_accepts_clean_local_static_resources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_project(
+                root,
+                """
+                <link rel="stylesheet" href="./app.css">
+                <img src="./cover.png" alt="">
+                <script src="./admin.js"></script>
+                """,
+            )
+            (root / "pages/home/app.css").write_text("body { color: black; }", encoding="utf-8")
+            (root / "pages/home/cover.png").write_bytes(b"png")
+            (root / "pages/home/admin.js").write_text("console.log('ready');", encoding="utf-8")
+
+            result = server.validate_project_manifest_files(root)
+
+        self.assertEqual(result["resources"]["staticResourceReferenceCount"], 3)
+        self.assertEqual(result["resources"]["staticResourceCompatibilityIssueCount"], 0)
+        self.assertEqual(result["resources"]["missingStaticResourceCount"], 0)
+
+    def test_rejects_query_string_in_final_zip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "project"
+            root.mkdir()
+            write_project(root, '<script src="./admin.js?v=1.1.2"></script>')
+            (root / "pages/home/admin.js").write_text("console.log('ready');", encoding="utf-8")
+            archive_path = Path(directory) / "prototype-protodock-upload.zip"
+            archive_project(root, archive_path)
+
+            completed = subprocess.run(
+                [str(VALIDATOR), "--json", str(archive_path)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report = json.loads(completed.stdout)
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertTrue(any("admin.js?v=1.1.2" in issue for issue in report["errors"]))
+
     def test_cli_validates_final_zip_and_returns_nonzero_on_error(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "project"

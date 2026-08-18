@@ -748,7 +748,8 @@ function resolvePath(baseDir, target) {
 }
 
 async function getFileHandleByPath(rootHandle, path) {
-  const parts = splitPath(path);
+  const filesystemPath = window.ProtoDockLocalResourcePaths?.filesystemPath?.(path) ?? path;
+  const parts = splitPath(filesystemPath);
   if (!parts.length) {
     throw new Error('路径为空');
   }

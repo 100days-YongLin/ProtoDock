@@ -63,6 +63,21 @@ PRODUCT_DOC_SECTIONS = (
 TECHNICAL_DOC_HEADINGS = {"源码", "源码位置", "原型入口", "react来源", "技术实现", "实现说明"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_ACCEPTANCE_LABELS = ("前提", "操作", "预期")
+STATIC_RESOURCE_ATTRIBUTES = {
+    "audio": ("src",),
+    "embed": ("src",),
+    "iframe": ("src",),
+    "img": ("src",),
+    "input": ("src",),
+    "link": ("href",),
+    "object": ("data",),
+    "script": ("src",),
+    "source": ("src",),
+    "track": ("src",),
+    "video": ("src", "poster"),
+}
+CSS_URL_PATTERN = re.compile(r"url\(\s*(['\"]?)([^'\")]+)\1\s*\)", re.IGNORECASE)
+CSS_IMPORT_PATTERN = re.compile(r"@import\s+(?:url\(\s*)?(['\"])([^'\"]+)\1", re.IGNORECASE)
 
 
 def validate_changelog(manifest: dict) -> dict:
@@ -295,11 +310,38 @@ class PrototypeHTMLParser(HTMLParser):
         self.controls = []
         self.inline_scripts = []
         self.script_sources = []
+        self.resource_references = []
         self._control_stack = []
         self._script = None
 
     def handle_starttag(self, tag, attrs):
         attributes = {str(name).lower(): value or "" for name, value in attrs}
+        for attribute in STATIC_RESOURCE_ATTRIBUTES.get(tag, ()):
+            value = attributes.get(attribute, "").strip()
+            if value:
+                self.resource_references.append({
+                    "tag": tag,
+                    "attribute": attribute,
+                    "value": value,
+                    "line": self.getpos()[0],
+                    "rel": attributes.get("rel", "").lower(),
+                })
+        for attribute in ("srcset", "imagesrcset"):
+            value = attributes.get(attribute, "").strip()
+            if not value:
+                continue
+            if value.lower().startswith("data:"):
+                continue
+            for candidate in value.split(","):
+                source = candidate.strip().split(maxsplit=1)[0]
+                if source:
+                    self.resource_references.append({
+                        "tag": tag,
+                        "attribute": attribute,
+                        "value": source,
+                        "line": self.getpos()[0],
+                        "rel": attributes.get("rel", "").lower(),
+                    })
         input_type = attributes.get("type", "").lower()
         has_navigation_attribute = any(
             name in attributes
@@ -348,6 +390,135 @@ class PrototypeHTMLParser(HTMLParser):
         for _, control in self._control_stack:
             if control is not None:
                 control["text"].append(data)
+
+
+def static_resource_target(source_path: Path, reference: str, project_root: Path) -> tuple[Path | None, str | None]:
+    value = str(reference or "").strip()
+    if not value or value.startswith(("#", "data:", "blob:", "protodock:")):
+        return None, None
+    parsed = urlsplit(value)
+    if parsed.scheme or parsed.netloc:
+        return None, None
+    if not parsed.path:
+        return None, None
+    if parsed.path.startswith("/"):
+        return None, "使用了脱离项目根目录的绝对资源路径"
+    target = (source_path.parent / unquote(parsed.path)).resolve()
+    if target != project_root and project_root not in target.parents:
+        return None, "资源路径越过项目根目录"
+    return target, None
+
+
+def static_resource_suffix(reference: str) -> str:
+    parsed = urlsplit(str(reference or "").strip())
+    suffix = []
+    if parsed.query:
+        suffix.append(f"?{parsed.query}")
+    if parsed.fragment:
+        suffix.append(f"#{parsed.fragment}")
+    return "".join(suffix)
+
+
+def validate_static_resource_references(project_dir: Path, manifest: dict) -> dict:
+    project_root = project_dir.resolve()
+    pages = manifest.get("pages", {}) if isinstance(manifest, dict) else {}
+    issues = []
+    warnings = []
+    scanned_files = set()
+    reference_count = 0
+    incompatible_count = 0
+    missing_count = 0
+
+    def inspect_reference(page_id: str, source_path: Path, source_label: str, line: int, reference: str):
+        nonlocal reference_count, incompatible_count, missing_count
+        target, path_issue = static_resource_target(source_path, reference, project_root)
+        if target is None and path_issue is None:
+            return None
+        reference_count += 1
+        location = f"{page_id} · {source_label}:{line}"
+        if path_issue:
+            issues.append(f"{location} {path_issue}：{reference}")
+            return None
+        suffix = static_resource_suffix(reference)
+        if suffix:
+            incompatible_count += 1
+            issues.append(
+                f"{location} 的本地静态资源引用携带 query/hash：{reference}；"
+                "File System Access 本地项目模式会按纯文件路径读取，请移除查询串或片段"
+            )
+        if not target.is_file():
+            missing_count += 1
+            relative = target.relative_to(project_root).as_posix()
+            issues.append(f"{location} 引用的本地静态资源不存在：{relative}")
+            return None
+        return target
+
+    def inspect_css(page_id: str, css_path: Path):
+        if css_path in scanned_files:
+            return
+        scanned_files.add(css_path)
+        try:
+            source = css_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            warnings.append(f"{page_id} · {css_path.relative_to(project_root)} 不是 UTF-8，未执行资源扫描")
+            return
+        references = []
+        for match in CSS_URL_PATTERN.finditer(source):
+            references.append((match.group(2).strip(), source.count("\n", 0, match.start()) + 1))
+        for match in CSS_IMPORT_PATTERN.finditer(source):
+            references.append((match.group(2).strip(), source.count("\n", 0, match.start()) + 1))
+        for reference, line in dict.fromkeys(references):
+            target = inspect_reference(
+                page_id,
+                css_path,
+                css_path.relative_to(project_root).as_posix(),
+                line,
+                reference,
+            )
+            if target and target.suffix.lower() == ".css":
+                inspect_css(page_id, target)
+
+    for page_id, page in pages.items():
+        if not isinstance(page, dict):
+            continue
+        entry = str(page.get("entry") or "").strip()
+        entry_path = (project_root / entry).resolve()
+        if not entry_path.is_file() or project_root not in entry_path.parents:
+            continue
+        try:
+            source = entry_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            warnings.append(f"{page_id} · {entry} 不是 UTF-8，未执行资源扫描")
+            continue
+        scanned_files.add(entry_path)
+        parser = PrototypeHTMLParser(page_id)
+        try:
+            parser.feed(source)
+        except Exception as error:
+            issues.append(f"{page_id} · {entry} 无法解析 HTML 资源引用：{error}")
+            continue
+        for resource in parser.resource_references:
+            target = inspect_reference(
+                page_id,
+                entry_path,
+                entry,
+                resource["line"],
+                resource["value"],
+            )
+            if target and target.suffix.lower() == ".css" and "stylesheet" in resource["rel"]:
+                inspect_css(page_id, target)
+
+    deduplicated_issues = list(dict.fromkeys(issues))
+    return {
+        "issues": deduplicated_issues,
+        "warnings": list(dict.fromkeys(warnings)),
+        "stats": {
+            "staticResourceReferenceCount": reference_count,
+            "staticResourceFileCount": len(scanned_files),
+            "staticResourceCompatibilityIssueCount": incompatible_count,
+            "missingStaticResourceCount": missing_count,
+        },
+    }
 
 
 def node_counts(manifest: dict) -> dict[str, int]:
