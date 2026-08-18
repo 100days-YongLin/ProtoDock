@@ -41,7 +41,7 @@ Before editing, read:
 7. Validate every declared page entry and document against the final project artifact.
 8. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
 9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
-10. After completing a batch of project edits, append one `changelog` item with the version, ISO 8601 timestamp, and concise change description. The final item is the current version; never rewrite prior history.
+10. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and concise description. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
 
 ## Local Project Root Contract
 
@@ -133,8 +133,8 @@ Treat a feature change as a coherent documentation unit, even though the durable
 2. Update all affected `docs/<page-id>.md` files for the feature flow, including entry, result, failure, empty, permission, and return behavior where applicable.
 3. Keep unaffected page documents unchanged so Git diff expresses the real feature boundary.
 4. Ensure cross-page rules agree across the involved documents; do not describe a multi-page feature in only its entry page.
-5. Append one changelog item that names the feature and summarizes the user-visible behavior change.
-6. Deliver the feature only when the final Git diff contains the required page artifacts, PRD changes, and changelog together.
+5. Append one `pendingChanges` item that names the feature and summarizes the user-visible behavior change. Several completed feature batches may accumulate before release.
+6. Deliver the feature only when the final Git diff contains the required page artifacts, PRD changes, and pending change description together. A formal release must additionally contain the single merged `changelog` entry produced from the publish version.
 
 ## Manifest Contract
 
@@ -145,7 +145,8 @@ Treat a feature change as a coherent documentation unit, even though the durable
 - Final static resource references must use plain project-relative paths. Do not append cache-busting query strings or fragments such as `admin.js?v=1.1.2`, `app.css?build=7`, or `icon.svg#preview`; ProtoDock's File System Access mode resolves real files, not URL variants.
 - Do not use localhost URLs, local absolute paths, dev-server-only routes, or unavailable external runtime dependencies.
 - React, Vue, Svelte, and other framework pages must be built into static artifacts before delivery.
-- Top-level `changelog` is append-only. Each entry requires `version`, `changedAt`, and `description`; every Agent-authored delivery must add one entry describing that batch.
+- Top-level `pendingChanges` stores unreleased edit batches. Each item requires `changedAt` and `description` and must not contain a version.
+- Top-level `changelog` is append-only formal release history. Each entry requires `version`, `changedAt`, and `description`; its final version must exactly match the ProtoDock publish version. Only publishing may turn accumulated pending changes into a release entry.
 - Keep local integration secrets, including Feishu custom-bot Webhooks, only in optional `protodock.local.json`. Ensure it is ignored by Git and excluded from upload ZIPs, public shares, downloads, pages, docs, assets, and the manifest.
 - “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
 
@@ -231,6 +232,18 @@ The same final artifact must run when opened as a local project and when served 
 7. Open the directory through ProtoDock's `打开本地项目` and confirm representative JavaScript, CSS, images, navigation bridge, and back bridge load without 404. Then repeat a representative interaction in public Share.
 
 ProtoDock strips URL query/hash suffixes and observes dynamically inserted local media for legacy File System Access previews. This runtime tolerance does not make a new package compliant.
+
+### Share resource failure diagnosis
+
+Do not conflate package-path errors, browser-extension noise, and Share service availability failures.
+
+1. Public Share reads published files from the ProtoDock server's local `shares/` directory. GitHub is used during publishing and version delivery; normal page and asset requests must not fetch Git objects or repository files on demand.
+2. A stable `404` for one resource means the requested path or published file is missing. Inspect the exact request URL, final ZIP, manifest, HTML/CSS base path, and extracted server file.
+3. Intermittent or burst-wide `503` responses, especially when the same URL later returns `200`, indicate that the proxy could not reach the Share service or the service exhausted connection capacity. Check the reverse-proxy response headers, server listener queue, process health, file-descriptor limits, concurrent PDF rendering, and service logs before changing project files.
+4. Runtime-generated local asset paths remain a release-blocking portability error, but their presence alone does not prove the cause of a `503`. Missing or malformed paths normally produce deterministic `404` responses.
+5. `establish connection. Receiving end does not exist.` is commonly emitted by a browser extension whose message receiver is absent. Treat it as unrelated unless its source URL belongs to ProtoDock or the prototype itself.
+6. Reproduce failures with a cold public Share load, preserve failed request URLs and status codes, and compare a representative direct server request with the public proxy URL. Do not declare the package fixed merely because a later refresh returns `200`.
+7. A Share deployment must provide sufficient request queue capacity, connection reuse, and browser caching for versioned assets. Large projects must not require viewers to choose between GitHub and the ProtoDock server at runtime.
 
 ## Canvas Rules
 
@@ -346,7 +359,8 @@ After packaging, extract the final ZIP into a new temporary directory and valida
 - all manifest paths are relative to the extracted root;
 - entries contain no localhost URL, local absolute path, or unavailable external dependency;
 - the validated entry and document counts match the manifest page count.
-- `changelog` contains the delivered version as its final item, with a valid timestamp and non-empty change description;
+- `pendingChanges` is empty in the final release ZIP;
+- `changelog` contains exactly one new merged release item for this publish, and its final version exactly matches the version entered in ProtoDock, with a valid timestamp and non-empty description;
 - every cross-page control has an explicit, valid manifest target and no unresolved script-only or root-absolute navigation remains;
 - every visible back control uses the ProtoDock back protocol; no `history.back()`, `history.go(-1)`, or unbound back icon remains;
 - every page has exactly one node, all edge endpoints exist, and no nodes overlap;
