@@ -22,7 +22,7 @@ ProtoDock 已把可分发版本放在仓库的 `skills/protodock-canvas/SKILL.md
 ./scripts/install-protodock-skill.sh claude
 ```
 
-脚本会在覆盖旧版本前创建时间戳备份，并同时安装校验器与 `templates/protodock-back-bridge.js` 返回桥接模板。安装完成后，重新打开 Agent 或新建会话，让工具重新扫描 Skill。
+脚本会在覆盖旧版本前创建时间戳备份，并同时安装校验器、`references/` 专项规则、`templates/protodock-back-bridge.js` 返回桥接和 `templates/product-workspace/` 多端工作区模板。安装完成后，重新打开 Agent 或新建会话，让工具重新扫描 Skill。
 
 ## 更新已有 Skill
 
@@ -39,7 +39,7 @@ git pull
 ./scripts/install-protodock-skill.sh both project /path/to/old-prototype-project
 ```
 
-更新 Skill 会替换 Agent 规则文件、安装校验命令和返回桥接模板，并备份旧规则；不会自动修改该原型的页面或 `protodock.project.json`。旧页面若只有 `data-protodock-back`，需要由 Agent 显式把桥接模板复制到项目并写入页面脚本引用。之后是否加入页面组，仍由下面的分组迁移流程决定。
+更新 Skill 会替换 Agent 规则文件，安装校验命令、专项参考和模板，并备份旧规则；不会自动修改任何原型页面、工作区、Git 历史或 `protodock.project.json`。旧页面若只有 `data-protodock-back`，需要由 Agent 显式把桥接模板复制到项目并写入页面脚本引用。旧项目是否迁移为多端工作区、是否加入页面组，仍需用户确认。
 
 ## 安装到项目
 
@@ -64,18 +64,18 @@ git pull
 
 ## 手动安装
 
-无法运行 Shell 脚本时，从仓库下载 [`skills/protodock-canvas/SKILL.md`](/skills/protodock-canvas/SKILL.md)，放入上表对应目录即可。目录和文件名必须保持为 `protodock-canvas/SKILL.md`。
+无法运行 Shell 脚本时，应复制整个 `skills/protodock-canvas/` 目录，而不只是 [`SKILL.md`](/skills/protodock-canvas/SKILL.md)。目录名必须保持为 `protodock-canvas`，并保留其中的 `references/` 与 `templates/`。
 
 Windows PowerShell 安装到 Codex 用户目录的示例：
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME/.agents/skills/protodock-canvas"
-Copy-Item "skills/protodock-canvas/SKILL.md" "$HOME/.agents/skills/protodock-canvas/SKILL.md"
+Copy-Item "skills/protodock-canvas/*" "$HOME/.agents/skills/protodock-canvas/" -Recurse -Force
 ```
 
 Claude Code 只需把目标中的 `.agents` 改为 `.claude`。
 
-手动只复制 `SKILL.md` 时只能安装规则，校验器仍需从 ProtoDock 仓库运行，返回桥接模板也要另外复制到 Skill 的 `templates/protodock-back-bridge.js`。需要 Agent 在任意项目中都能直接找到校验命令和模板时，请优先使用一键安装脚本。
+手动只复制 `SKILL.md` 会缺少多端协作参考、工作区模板、返回桥接和校验器。需要 Agent 在任意项目中都能直接找到完整规则和工具时，请优先使用一键安装脚本。
 
 ## 验证安装
 
@@ -230,7 +230,7 @@ Rule 需要由代码执行，不能只让 Agent 按文字自查。使用安装�
 ./scripts/protodock-validate /path/to/project-v1.1-protodock-upload.zip
 ```
 
-必须校验最终上传 ZIP，并以退出码 `0` 作为交付条件。`--json` 输出可供 Agent 或 CI 读取，`--warnings-as-errors` 会把 Canvas 视觉、产品文档和 UI 文案警告提升为阻断错误。校验结果包含错误、警告、统计信息、UI 文案检查和跨页路由表；上传后端还会执行同一套核心校验，避免本地与服务器口径不同。
+必须校验最终上传 ZIP，并以退出码 `0` 作为交付条件。`--json` 输出可供 Agent 或 CI 读取，`--warnings-as-errors` 会把全部警告提升为阻断错误；多端工作区可使用 `--workspace-contracts-as-errors`，只阻断目录、共享协作文档、页面契约关联和嵌套 Git 问题。校验结果包含错误、警告、统计信息、UI 文案检查和跨页路由表；上传后端还会执行同一套核心校验，避免本地与服务器口径不同。
 
 仅检查源码目录、口头声称“已按 Rule 检查”或依赖 ProtoDock 运行时兜底，都不算完成。
 

@@ -53,11 +53,16 @@ prototype-project/
 
 ```text
 product-workspace/
-├── protodock.workspace.json
+├── protodock.workspace.json             # 产品身份、统一版本和端列表
+├── README.md                            # 团队入口、端职责、构建与验证命令
+├── .gitignore                           # 排除临时文件、密钥、备份和发布 ZIP
 ├── shared-docs/
 │   ├── 01-product-overview.md
 │   ├── 02-roles-and-permissions.md
-│   └── 03-shared-business-rules.md
+│   ├── 03-domain-data-contract.md
+│   ├── 04-interface-event-contract.md
+│   ├── 05-cross-end-flows.md
+│   └── 90-decisions-open-questions.md
 └── prototypes/
     ├── parent/
     │   ├── protodock.project.json
@@ -69,6 +74,36 @@ product-workspace/
     └── admin/
         └── ...
 ```
+
+新建工作区时，以工作区根目录作为一个产品的唯一 Git 根；不要在 `prototypes/<endpoint>/` 内再建立嵌套仓库。这样一次跨端需求可以在同一分支、同一 diff 和同一审查中包含共享契约、各端 PRD、原型页面与变更记录。已有独立仓库不会因此无法打开，但迁移到工作区后应先制定合并历史方案，不要让团队继续同时维护多份事实来源。
+
+工作区仍遵循四层边界：
+
+- **协作层**：`README.md`、`shared-docs/`，由产品、设计、前端和后端共同维护。
+- **端项目层**：`prototypes/<endpoint>/`，每个端仍是完整、独立可打开的 ProtoDock 项目。
+- **工作层**：可选的根级 `references/`、`qa/`、`scripts/`、`tests/`，服务于跨端参考、验收和自动化。
+- **本地临时层**：`temps/`、`protodock/backups/`、`protodock.local.json`、缓存、日志和发布 ZIP，必须忽略且不进入发布。
+
+`shared-docs/` 直属 Markdown 的职责固定如下：
+
+| 文档 | 解决的问题 | 主要读者 |
+| --- | --- | --- |
+| `01-product-overview.md` | 产品目标、边界、端职责和成功标准 | 全员 |
+| `02-roles-permissions.md` | 角色、权限矩阵、数据范围和越权处理 | 产品、前后端 |
+| `03-domain-data-contract.md` | 术语、实体、字段口径、状态机和事实来源 | 产品、前后端 |
+| `04-interface-event-contract.md` | 前后端职责、接口、错误、幂等、审计和联调数据 | 前后端 |
+| `05-cross-end-flows.md` | 跨端主流程、事件、异常补偿和端到端验收 | 全员 |
+| `90-decisions-open-questions.md` | 已确认决策、待确认问题及其变更原因 | 全员 |
+
+每个工作区页面 PRD 增加 `关联共享契约`，至少写清“共享契约”“本页职责”和“依赖能力”。它引用共享文档的文件标识，不复制共享规则；端内布局、交互、状态和页面验收仍写在本页 PRD。
+
+跨端需求按“共享契约先行”协作：
+
+1. 产品先在共享文档确定角色、范围、业务状态、端职责、异常和跨端验收，不确定项进入决策文档。
+2. 后端根据领域、接口和事件契约确定事实来源、权限、状态迁移、幂等、错误及联调数据。
+3. 各端前端在受影响页面 PRD 中声明依赖的共享契约，再实现加载、输入、操作、反馈和恢复状态。
+4. 设计或原型 Agent 只修改受影响端的页面、PRD 和必要 Canvas 增量，不复制共享规则、不合并多端 Canvas。
+5. 同一功能分支必须同时包含共享契约、受影响端 PRD、可操作原型、`pendingChanges` 和验证结果；跨端验收通过后才可进入统一产品版本发布。
 
 `protodock.workspace.json` 示例：
 
@@ -97,6 +132,8 @@ product-workspace/
 - 发布仍以当前端为单位。发布包在 `docs/_shared/` 固化共享文档快照，并把 `workspaceSnapshot` 写入发布清单；不会修改子项目源目录。公开标识使用 `<产品标识>-<端标识>` 避免不同端互相覆盖，各端共用 `product.version` 作为产品发布版本。
 - 发布成功后，ProtoDock 同时把版本写回工作区 `product.version` 和当前端 `changelog`。若同一产品版本包含多个端的变化，应依次发布这些端并使用同一个版本号。
 - 使用 `scripts/protodock-validate <product-workspace>` 可一次验证工作区清单、共享文档目录和所有子项目；发布前仍需对每个最终 ZIP 单独执行同一校验。
+- 工作区校验会额外提示核心协作文档、必要章节、端 README、页面 `关联共享契约` 和嵌套 Git 仓库问题。为保留旧版兼容，这些默认是升级警告；新工作区和 CI 可使用 `--workspace-contracts-as-errors` 只阻断协作契约问题，不受“尚未首次发布”等普通提示影响。
+- 工作区是单项目能力的外层编排：本地打开、变更检测、页面树、搜索、分组、Canvas、PRD 编辑、可操作预览、跨页与返回、截图、设备壳、完整产品文档、打印/PDF、全屏演示、公开 Share、GitHub 发布、最新版链接、飞书通知和变更历史继续复用原能力。没有 `protodock.workspace.json` 时不进入任何工作区分支。
 
 ## Agent 写入边界
 

@@ -1,6 +1,6 @@
 ---
 name: protodock-canvas
-description: "Use when creating, updating, organizing, packaging, or troubleshooting a ProtoDock prototype project, including project-directory cleanup, manifest pages, docs, assets, canvas state, legacy Canvas Groups migration, ZIP uploads, and Agent collaboration."
+description: "Use when creating, updating, organizing, packaging, or troubleshooting ProtoDock prototypes and multi-endpoint product workspaces, including PRDs, team contracts, manifests, assets, Canvas state, legacy migration, ZIP delivery, and Agent collaboration."
 ---
 
 # ProtoDock Canvas
@@ -30,6 +30,8 @@ Before editing, read:
 - the current `protodock.project.json`;
 - only the relevant files under `pages/`, `docs/`, and `assets/`.
 
+When the selected root contains `protodock.workspace.json`, or the request changes more than one endpoint, shared roles/data/interfaces, or a cross-end flow, also read [references/product-workspace-collaboration.md](references/product-workspace-collaboration.md) before planning or editing.
+
 ## Multi-Endpoint Product Workspace
 
 Use one optional product workspace when several complete ProtoDock projects are endpoints of the same product and need a small shared documentation pool:
@@ -37,6 +39,8 @@ Use one optional product workspace when several complete ProtoDock projects are 
 ```text
 product-workspace/
 ├── protodock.workspace.json
+├── README.md
+├── .gitignore
 ├── shared-docs/*.md
 └── prototypes/<endpoint>/
     ├── protodock.project.json
@@ -46,13 +50,17 @@ product-workspace/
 ```
 
 1. Keep every endpoint independently valid and openable. Do not replace child manifests with one combined manifest and do not merge endpoint Canvas data.
-2. `protodock.workspace.json` may contain only `schemaVersion`, product identity/version, `sharedDocs`, and endpoint `id`/`name`/`path` records. Every path is relative to the workspace root and must not contain `..`.
-3. Store only truly cross-end product material in direct `shared-docs/*.md` files: product overview, roles and permissions, shared business rules, common data meaning, and terminology. Keep endpoint/page behavior in the owning `docs/<page-id>.md`.
-4. Update one shared document instead of copying the same rule into multiple endpoint PRDs. Do not create a feature database, relation graph, cross-end Canvas, or synchronization service unless the user explicitly asks for one.
-5. Open the workspace root in ProtoDock for endpoint switching and shared docs. Open a child project root when working on only that endpoint. Never open or recommend a wrapper that has neither workspace nor project manifest.
-6. Validate the workspace with `scripts/protodock-validate <workspace-root>` and validate every final endpoint ZIP separately.
-7. Publishing remains endpoint-scoped. ProtoDock copies shared docs into `docs/_shared/` and generates `workspaceSnapshot` only inside the release artifact. Agents must not add `workspaceSnapshot` to editable child manifests or copy `docs/_shared/` back into source projects.
-8. Use one coordinated product version from `product.version`. When a release changes several endpoints, publish each affected endpoint with that same version. Endpoint-specific publish identifiers prevent one endpoint from overwriting another.
+2. Use the workspace root as the single Git root for new products. Do not create nested endpoint repositories; keep cross-end contracts, endpoint PRDs, prototypes, and release notes reviewable in one diff.
+3. `protodock.workspace.json` contains only product identity/version, `sharedDocs`, and endpoint `id`/`name`/`path`. Every path is workspace-relative and must not contain `..`.
+4. Use the standard direct shared documents for product scope, roles/permissions, domain/data, interface/events, cross-end flows, and decisions/open questions. Keep page presentation and interaction in the owning `docs/<page-id>.md`.
+5. Every workspace page PRD declares `关联共享契约`, `共享契约`, `本页职责`, and `依赖能力`. Reference shared document/flow IDs; never copy or redefine shared roles, fields, states, permissions, interface outcomes, or cross-end acceptance.
+6. For a cross-end requirement, update shared contracts before endpoint implementation. Product/design owns scope and acceptance; backend owns source-of-truth, authorization, transitions, errors, idempotency, audit, and fixtures; each frontend owns its page-state mapping and recovery behavior.
+7. Record unresolved shared decisions in `90-decisions-open-questions.md`; never invent a business rule, interface field, or user-facing explanation to fill a gap.
+8. Open the workspace root for endpoint switching and shared docs. Open a child root for single-end work. Never open or recommend a wrapper without a workspace/project manifest, `dist`, or a published copy.
+9. Validate the workspace, affected child roots, and every final endpoint ZIP. New workspaces and CI use `--workspace-contracts-as-errors`; legacy collaboration gaps remain warnings so old projects still open.
+10. Publishing remains endpoint-scoped. Shared docs are copied to `docs/_shared/` and `workspaceSnapshot` exists only in the release artifact. Agents must not write either into editable children.
+11. Use one coordinated `product.version` for all endpoints in the same release. Endpoint-specific publish IDs prevent endpoint overwrite.
+12. Do not create a feature database, relation graph, cross-end Canvas, or synchronization service unless explicitly requested. The complete directory, document authority, role workflow, Git model, migration rules, and completion checklist are in [references/product-workspace-collaboration.md](references/product-workspace-collaboration.md).
 
 ## Agent Workflow
 

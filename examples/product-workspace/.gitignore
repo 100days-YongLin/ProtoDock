@@ -1,0 +1,7 @@
+temps/
+protodock/backups/
+protodock.local.json
+*.zip
+.DS_Store
+node_modules/
+*.log

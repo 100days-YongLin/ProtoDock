@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -23,6 +24,47 @@ from protodock_validation import (  # noqa: E402
 
 
 WORKSPACE_FILE = "protodock.workspace.json"
+WORKSPACE_CORE_DOCS = {
+    "01-product-overview.md": ("产品目标", "用户与使用场景", "产品边界", "端与职责", "成功标准"),
+    "02-roles-permissions.md": ("角色定义", "权限矩阵", "数据范围", "越权处理"),
+    "03-domain-data-contract.md": ("术语", "核心实体", "字段与口径", "状态机", "数据归属与来源", "一致性与生命周期"),
+    "04-interface-event-contract.md": ("前端职责", "后端职责", "接口契约", "错误与重试", "幂等与并发", "权限与审计", "联调数据"),
+    "05-cross-end-flows.md": ("流程索引", "主流程", "状态与事件", "异常与补偿", "跨端验收"),
+}
+WORKSPACE_RECOMMENDED_DOCS = {
+    "90-decisions-open-questions.md": ("已确认决策", "待确认问题", "变更记录"),
+}
+
+
+def markdown_headings(path: Path) -> set[str]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    return {
+        match.group(1).strip()
+        for line in text.splitlines()
+        if (match := re.match(r"^#{1,6}\s+(.+?)\s*$", line))
+    }
+
+
+def inspect_workspace_page_contracts(project_dir: Path) -> list[str]:
+    try:
+        manifest = json.loads((project_dir / server.MANIFEST_FILE).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    missing = []
+    for page_id, page in (manifest.get("pages") or {}).items():
+        if not isinstance(page, dict):
+            continue
+        doc_path = project_dir / str(page.get("doc") or "")
+        if not doc_path.is_file():
+            continue
+        text = doc_path.read_text(encoding="utf-8")
+        headings = markdown_headings(doc_path)
+        if "关联共享契约" not in headings or "共享契约" not in text or "本页职责" not in text:
+            missing.append(str(page_id))
+    return missing
 
 
 def parse_args():
@@ -32,13 +74,23 @@ def parse_args():
     parser.add_argument("target", type=Path, help="Project directory or .zip upload package")
     parser.add_argument("--json", action="store_true", dest="as_json", help="Print machine-readable JSON")
     parser.add_argument("--warnings-as-errors", action="store_true", help="Return non-zero when warnings exist")
+    parser.add_argument(
+        "--workspace-contracts-as-errors",
+        action="store_true",
+        help="Return non-zero only when product-workspace collaboration contract warnings exist",
+    )
     return parser.parse_args()
 
 
 def inspect_workspace_target(target: Path) -> dict:
     errors = []
     warnings = []
+    contract_warnings = []
     routes = []
+
+    def warn_contract(message: str):
+        contract_warnings.append(message)
+        warnings.append(message)
     try:
         config = json.loads((target / WORKSPACE_FILE).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -48,11 +100,15 @@ def inspect_workspace_target(target: Path) -> dict:
             "sourceType": "workspace",
             "errors": [f"{WORKSPACE_FILE} 无法读取：{error}"],
             "warnings": [],
+            "workspaceContractWarnings": [],
             "routes": [],
             "stats": {},
         }
-    product = config.get("product") if isinstance(config, dict) else None
-    projects = config.get("projects") if isinstance(config, dict) else None
+    if not isinstance(config, dict):
+        errors.append(f"{WORKSPACE_FILE} 必须是 JSON 对象")
+        config = {}
+    product = config.get("product")
+    projects = config.get("projects")
     if config.get("schemaVersion") != 1:
         errors.append(f"{WORKSPACE_FILE} 的 schemaVersion 必须为 1")
     if not isinstance(product, dict) or not str(product.get("id") or "").strip() or not str(product.get("name") or "").strip():
@@ -71,10 +127,36 @@ def inspect_workspace_target(target: Path) -> dict:
             errors.append(f"共享文档目录不存在：{shared_path.as_posix()}")
             shared_dir = None
     shared_docs = sorted(shared_dir.glob("*.md")) if shared_dir else []
+    shared_doc_names = {path.name for path in shared_docs}
+    if not (target / "README.md").is_file():
+        warn_contract("工作区缺少 README.md；团队无法确认端列表、源码入口、构建命令和验收方式")
+    if not (target / ".gitignore").is_file():
+        warn_contract("工作区缺少 .gitignore；请排除 temps、备份、本地密钥、缓存和发布 ZIP")
+    for name, required_headings in WORKSPACE_CORE_DOCS.items():
+        doc_path = shared_dir / name if shared_dir else None
+        if name not in shared_doc_names:
+            warn_contract(f"缺少核心协作文档：{shared_path.as_posix()}/{name}")
+            continue
+        headings = markdown_headings(doc_path)
+        missing_headings = [heading for heading in required_headings if heading not in headings]
+        if missing_headings:
+            warn_contract(f"{shared_path.as_posix()}/{name} 缺少章节：{'、'.join(missing_headings)}")
+    for name, required_headings in WORKSPACE_RECOMMENDED_DOCS.items():
+        doc_path = shared_dir / name if shared_dir else None
+        if name not in shared_doc_names:
+            warn_contract(f"建议补充协作文档：{shared_path.as_posix()}/{name}")
+            continue
+        headings = markdown_headings(doc_path)
+        missing_headings = [heading for heading in required_headings if heading not in headings]
+        if missing_headings:
+            warn_contract(f"{shared_path.as_posix()}/{name} 缺少章节：{'、'.join(missing_headings)}")
 
     seen_ids = set()
     seen_paths = set()
+    seen_project_manifest_ids = set()
     child_reports = []
+    unlinked_page_docs = 0
+    nested_git_projects = []
     for index, project in enumerate(projects):
         label = f"projects[{index}]"
         if not isinstance(project, dict):
@@ -96,11 +178,37 @@ def inspect_workspace_target(target: Path) -> dict:
         if target.resolve() not in project_dir.parents or not project_dir.is_dir():
             errors.append(f"{name} 项目目录不存在：{raw_path}")
             continue
+        if not (project_dir / "README.md").is_file():
+            warn_contract(f"{name} · 缺少 README.md；请说明源码目录、构建命令、验证命令和本端职责")
+        if (project_dir / ".git").exists():
+            nested_git_projects.append(name)
+        try:
+            child_manifest = json.loads((project_dir / server.MANIFEST_FILE).read_text(encoding="utf-8"))
+            child_project_id = str((child_manifest.get("project") or {}).get("id") or "").strip()
+            if child_project_id and child_project_id in seen_project_manifest_ids:
+                warn_contract(f"{name} · 子项目 project.id 与其他端重复：{child_project_id}")
+            if child_project_id:
+                seen_project_manifest_ids.add(child_project_id)
+        except (OSError, json.JSONDecodeError):
+            pass
         child = inspect_target(project_dir)
         child_reports.append(child)
         errors.extend(f"{name} · {issue}" for issue in child["errors"])
         warnings.extend(f"{name} · {warning}" for warning in child["warnings"])
         routes.extend({**route, "workspaceProjectId": project_id} for route in child["routes"])
+        missing_contracts = inspect_workspace_page_contracts(project_dir)
+        unlinked_page_docs += len(missing_contracts)
+        if missing_contracts:
+            preview = "、".join(missing_contracts[:8])
+            suffix = f" 等 {len(missing_contracts)} 页" if len(missing_contracts) > 8 else ""
+            warn_contract(f"{name} · 页面 PRD 缺少‘关联共享契约’声明：{preview}{suffix}")
+
+    if nested_git_projects:
+        warn_contract(
+            "检测到子端嵌套 Git 仓库："
+            + "、".join(nested_git_projects)
+            + "；新版工作区应以产品根目录作为唯一 Git 根，以便跨端变更原子提交和审查"
+        )
 
     return {
         "ok": not errors,
@@ -108,10 +216,15 @@ def inspect_workspace_target(target: Path) -> dict:
         "sourceType": "workspace",
         "errors": errors,
         "warnings": warnings,
+        "workspaceContractWarnings": contract_warnings,
         "routes": routes,
         "stats": {
             "workspaceProjectCount": len(child_reports),
             "workspaceSharedDocCount": len(shared_docs),
+            "workspaceCoreDocCount": sum(name in shared_doc_names for name in WORKSPACE_CORE_DOCS),
+            "workspaceMissingCoreDocCount": sum(name not in shared_doc_names for name in WORKSPACE_CORE_DOCS),
+            "workspaceUnlinkedPageDocCount": unlinked_page_docs,
+            "workspaceNestedGitProjectCount": len(nested_git_projects),
             "pageCount": sum(report["stats"].get("pageCount", 0) for report in child_reports),
             "nodeCount": sum(report["stats"].get("nodeCount", 0) for report in child_reports),
             "routeCount": len(routes),
@@ -228,6 +341,14 @@ def print_text_report(report: dict) -> None:
         f"{stats.get('uiCopyWarningCount', 0)} warnings, "
         f"errors={len(report['errors'])}, warnings={len(report['warnings'])}"
     )
+    if report.get("sourceType") == "workspace":
+        print(
+            "Workspace contracts: "
+            f"coreDocs={stats.get('workspaceCoreDocCount', 0)}/{len(WORKSPACE_CORE_DOCS)}, "
+            f"unlinkedPageDocs={stats.get('workspaceUnlinkedPageDocCount', 0)}, "
+            f"nestedGitProjects={stats.get('workspaceNestedGitProjectCount', 0)}, "
+            f"contractWarnings={len(report.get('workspaceContractWarnings', []))}"
+        )
     if report["errors"]:
         print("\nErrors:")
         for issue in report["errors"]:
@@ -254,7 +375,8 @@ def main() -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
         print_text_report(report)
-    return 1 if not report["ok"] or (args.warnings_as_errors and report["warnings"]) else 0
+    contract_failure = args.workspace_contracts_as_errors and report.get("workspaceContractWarnings", [])
+    return 1 if not report["ok"] or (args.warnings_as_errors and report["warnings"]) or contract_failure else 0
 
 
 if __name__ == "__main__":

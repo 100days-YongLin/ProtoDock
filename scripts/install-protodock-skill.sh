@@ -2,9 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_FILE="$ROOT_DIR/skills/protodock-canvas/SKILL.md"
+SOURCE_SKILL_DIR="$ROOT_DIR/skills/protodock-canvas"
+SOURCE_FILE="$SOURCE_SKILL_DIR/SKILL.md"
 SOURCE_VALIDATOR="$ROOT_DIR/scripts/protodock-validate"
-SOURCE_BACK_BRIDGE="$ROOT_DIR/skills/protodock-canvas/templates/protodock-back-bridge.js"
+SOURCE_TEMPLATES="$SOURCE_SKILL_DIR/templates"
+SOURCE_REFERENCES="$SOURCE_SKILL_DIR/references"
 AGENT="${1:-both}"
 SCOPE="${2:-user}"
 PROJECT_DIR="${3:-$PWD}"
@@ -31,8 +33,13 @@ if [[ ! -x "$SOURCE_VALIDATOR" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$SOURCE_BACK_BRIDGE" ]]; then
-  printf 'ProtoDock back bridge template not found: %s\n' "$SOURCE_BACK_BRIDGE" >&2
+if [[ ! -d "$SOURCE_TEMPLATES" ]]; then
+  printf 'ProtoDock templates not found: %s\n' "$SOURCE_TEMPLATES" >&2
+  exit 1
+fi
+
+if [[ ! -d "$SOURCE_REFERENCES" ]]; then
+  printf 'ProtoDock references not found: %s\n' "$SOURCE_REFERENCES" >&2
   exit 1
 fi
 
@@ -70,7 +77,6 @@ install_for() {
   local destination="$skill_root/protodock-canvas"
   local target_file="$destination/SKILL.md"
   local target_validator="$destination/scripts/protodock-validate"
-  local target_back_bridge="$destination/templates/protodock-back-bridge.js"
   mkdir -p "$destination"
   if [[ -f "$target_file" ]] && ! cmp -s "$SOURCE_FILE" "$target_file"; then
     cp "$target_file" "$target_file.backup.$(date +%Y%m%d-%H%M%S)"
@@ -85,11 +91,10 @@ install_for() {
   printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$SOURCE_VALIDATOR" > "$temporary_validator"
   chmod +x "$temporary_validator"
   mv "$temporary_validator" "$target_validator"
-  mkdir -p "$(dirname "$target_back_bridge")"
-  local temporary_back_bridge="$target_back_bridge.tmp.$$"
-  cp "$SOURCE_BACK_BRIDGE" "$temporary_back_bridge"
-  mv "$temporary_back_bridge" "$target_back_bridge"
-  printf 'Installed ProtoDock Skill and validator for %s: %s\n' "$tool" "$destination"
+  mkdir -p "$destination/templates" "$destination/references"
+  cp -R "$SOURCE_TEMPLATES/." "$destination/templates/"
+  cp -R "$SOURCE_REFERENCES/." "$destination/references/"
+  printf 'Installed ProtoDock Skill, references, templates, and validator for %s: %s\n' "$tool" "$destination"
 }
 
 if [[ "$AGENT" == "codex" || "$AGENT" == "both" ]]; then

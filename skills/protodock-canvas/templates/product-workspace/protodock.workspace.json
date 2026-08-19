@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "product": {
+    "id": "replace-product-id",
+    "name": "替换为产品名称",
+    "description": "替换为产品范围说明",
+    "version": "v0.1.0"
+  },
+  "sharedDocs": "shared-docs",
+  "projects": [
+    { "id": "mobile", "name": "移动端", "path": "prototypes/mobile" },
+    { "id": "admin", "name": "Web 管理端", "path": "prototypes/admin" }
+  ]
+}
