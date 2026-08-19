@@ -5016,6 +5016,7 @@ window.ProtoDock = {
     return {
       projectId: state.manifest?.project?.id || null,
       projectName: state.manifest?.project?.name || null,
+      lastPublishedVersion: currentChange?.version || null,
       currentVersion: currentChange?.version || window.ProtoDockChangeLog?.inferredVersion?.(state.manifest) || null,
       currentChangeDescription: currentChange?.description || null,
       pendingChangeCount: pendingChanges.length,

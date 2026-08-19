@@ -1,4 +1,19 @@
 (function initProtoDockPublishTargets(global) {
+  function previousVersion(options = {}) {
+    const candidates = [
+      options.lastPublishedVersion,
+      options.savedVersion,
+      options.inferredVersion
+    ];
+    for (const candidate of candidates) {
+      const value = String(candidate || '').trim();
+      if (value) {
+        return value;
+      }
+    }
+    return '';
+  }
+
   function build(options = {}) {
     const product = String(options.product || '').trim();
     const version = String(options.version || '').trim();
@@ -22,5 +37,5 @@
     };
   }
 
-  global.ProtoDockPublishTargets = Object.freeze({ build });
+  global.ProtoDockPublishTargets = Object.freeze({ build, previousVersion });
 })(typeof window !== 'undefined' ? window : globalThis);

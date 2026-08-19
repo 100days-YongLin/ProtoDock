@@ -5,6 +5,7 @@
     close: document.getElementById('closeShareModal'),
     product: document.getElementById('publishProductName'),
     version: document.getElementById('publishVersion'),
+    versionHint: document.getElementById('publishVersionHint'),
     targetSummary: document.querySelector('.publish-target-summary'),
     branchPreview: document.getElementById('publishBranchPreview'),
     tagPreview: document.getElementById('publishTagPreview'),
@@ -182,11 +183,16 @@
     formProjectId = projectId;
     syncPreferenceApplied = false;
     const target = window.ProtoDockGithubPreferences?.getPushTarget?.(projectId) || {};
+    const previousVersion = window.ProtoDockPublishTargets?.previousVersion?.({
+      lastPublishedVersion: state.lastPublishedVersion,
+      savedVersion: target.version,
+      inferredVersion: state.currentVersion
+    }) || '';
     if (els.product) {
       els.product.value = target.productName || '';
     }
     if (els.version) {
-      els.version.value = target.version || '';
+      els.version.value = initialBranchValue(previousVersion, '');
     }
     if (els.commitMessage) {
       els.commitMessage.value = '';
@@ -198,14 +204,20 @@
 
   function fillDefaults() {
     const state = protoDockState();
+    const previousVersion = window.ProtoDockPublishTargets?.previousVersion?.({
+      lastPublishedVersion: state.lastPublishedVersion,
+      inferredVersion: state.currentVersion
+    }) || '';
     if (els.product && !els.product.value) {
       els.product.value = initialBranchValue(state.projectName || state.projectId, 'prototype');
     }
-    if (els.version && state.pendingChangeCount && els.version.value === state.currentVersion) {
-      els.version.value = '';
+    if (els.version && !els.version.value) {
+      els.version.value = initialBranchValue(previousVersion, 'v1');
     }
-    if (els.version && !els.version.value && !state.pendingChangeCount) {
-      els.version.value = initialBranchValue(state.currentVersion, 'v1');
+    if (els.versionHint) {
+      els.versionHint.textContent = previousVersion
+        ? `已带出上一发布版本 ${els.version.value}；发布新内容时请修改为新版本。`
+        : '首次发布，请填写本次发布版本。';
     }
     if (els.commitMessage && state.pendingChangeCount && state.pendingChangeDescription) {
       els.commitMessage.value = state.pendingChangeDescription;
