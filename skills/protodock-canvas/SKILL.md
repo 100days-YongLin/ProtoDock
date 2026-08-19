@@ -39,9 +39,10 @@ Before editing, read:
 5. Merge manifest changes by field and page ID. Never regenerate the entire manifest when a scoped merge is sufficient.
 6. Preserve all existing canvas layout data unless the user explicitly requests a reset or re-layout.
 7. Before packaging, build a route table from every Canvas edge and every visible cross-page control. Each route must name its source page, control label, exact target `pageId`, and target entry. Add the explicit target to the page source now; do not leave it for upload-time inference.
-8. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
-9. Run `scripts/protodock-validate <project-root>` before packaging, then run the same command on the final ZIP. A non-zero exit code blocks delivery; do not hand the ZIP to the user or ask them to discover the error during upload.
-10. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and a concise description. Prefer the sections `用户体验`, `产品调整`, and `前后端逻辑`, and include only sections relevant to the change. This is an Agent writing convention, not a save, validation, or publishing gate. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
+8. Before packaging, open every modified page and its modal, drawer, expandable, empty, error, and success states at the manifest viewport. Complete the User-Facing UI Copy Purity audit and remove internal explanations or identifiers from rendered UI.
+9. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
+10. Run `scripts/protodock-validate <project-root>` before packaging, then run the same command on the final ZIP. A non-zero exit code blocks delivery; do not hand the ZIP to the user or ask them to discover the error during upload.
+11. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and a concise description. Prefer the sections `用户体验`, `产品调整`, and `前后端逻辑`, and include only sections relevant to the change. This is an Agent writing convention, not a save, validation, or publishing gate. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
 
 ## Local Project Root Contract
 
@@ -230,6 +231,29 @@ Rejected:
 <button type="button" aria-label="返回">←</button>
 <button type="button" aria-label="设置">⚙</button>
 ```
+
+## User-Facing UI Copy Purity Contract
+
+The prototype must read like the real product for its intended role. It must not expose the Agent's reasoning or the system's implementation model.
+
+1. Before adding visible copy, state the intended role and the task being completed. Keep only labels, required instructions, immediate consequences, actionable feedback, and product content that role needs.
+2. Do not render implementation explanations, architecture boundaries, system or model policies, prompt-engineering notes, rule inheritance, data provenance, state-machine descriptions, acceptance annotations, fallback strategy, QA commentary, or design rationale.
+3. Do not show internal identifiers, prompt keys, schema names, build markers, source names, or version suffixes in labels or helper text. Examples that block delivery include `system-boundary-v7`, `class-dragon2-v4`, internal `pageId` values, and labels such as `三级继承` used to explain implementation.
+4. Put internal detail in `docs/<page-id>.md`, code comments, configuration metadata, `data-*` attributes, or developer-only diagnostics. Hiding it visually while leaving it accessible as ordinary product copy is not a fix.
+5. When a real user must configure an AI-assisted behavior, translate the control into domain language. Prefer `回复要求`, `班级回复风格`, `适用场景`, and `恢复默认设置`; do not expose raw system prompts or policy hierarchy unless the product owner explicitly confirms that the target role manages them.
+6. Helper copy should normally be one short, actionable sentence. Do not add prose panels that explain why the system behaves a certain way when the user cannot act on that explanation.
+7. Audit rendered text after implementation, not only source strings. Open every modified modal, drawer, empty state, error state, success state, and expandable area at the manifest viewport. Read the interface from the intended role's perspective.
+8. Any visible string that requires knowledge of ProtoDock, Agent instructions, source code, prompts, schemas, internal inheritance, or internal versioning is a delivery-blocking issue. Remove or rewrite it before screenshots, ZIP validation, or handoff.
+
+Examples:
+
+| Rejected visible copy | Preferred user-facing copy |
+| --- | --- |
+| `系统事实边界（只读 · system-boundary-v7）` | `回复要求` and, when needed, `由平台统一设置，当前不可编辑` |
+| `班级初始提示词（class-dragon2-v4）` | `班级回复风格` |
+| `三级继承 / 系统边界始终生效` | Omit it, or use `当前使用平台统一规则` only when that fact affects the user's decision |
+
+This rule applies to rendered product UI. Precise technical terminology remains appropriate in PRD, source code, and developer-only diagnostics. If the product itself targets developers, retain only terms that are part of their confirmed product task; internal build and prompt IDs still require explicit product justification.
 
 ## Product Documentation Contract
 

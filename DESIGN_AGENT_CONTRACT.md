@@ -64,6 +64,7 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 46. Do not generate project-local image/media URLs at runtime through `.src = "./..."`, generated `<img src>`, inline `background-image`, `document.currentScript.src`, or `import.meta.url`. Declare finite prototype assets in original HTML/CSS, switch them with CSS classes, or embed data/blob URLs so local Player and public Share use the same resource identity.
 47. ProtoDock may rewrite dynamically inserted local media in legacy previews. New and modified pages must still pass the static runtime-path gate; runtime recovery is not delivery evidence.
 48. Every icon-like UI control or status mark must use a mature SVG from the existing design system or an established library such as Lucide, Material Symbols SVG, or Heroicons. Do not substitute emoji, Unicode glyphs, punctuation, letters, icon-font characters, or CSS approximations such as `←`, `×`, `+`, `⋯`, `⚙`, `✓`, or emoji. Bundle SVGs under project assets, keep one consistent icon family, add accessible names to icon-only controls, and reserve custom SVG drawing for brand or domain-specific concepts that have no standard icon.
+49. Every visible string must belong to the intended user's task. Do not render implementation explanations, internal prompt or policy names, inheritance models, architecture boundaries, acceptance annotations, debug metadata, internal identifiers, or version suffixes such as `system-boundary-v7` and `class-dragon2-v4`. Move those details to PRD, code comments, configuration metadata, or developer diagnostics. A modified page or dialog with unexplained internal language visible at its manifest viewport fails delivery.
 
 ## Icon Asset Quality
 
@@ -73,6 +74,27 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 - Character content is allowed when it is genuinely text or punctuation. It is rejected when styled or clicked as the graphical representation of an action, navigation item, status, or decoration.
 - Icon-only buttons need `aria-label`; decorative SVGs use `aria-hidden="true"`, and image icons inside labelled controls use `alt=""`.
 - Visually inspect all new or modified pages at the manifest viewport before delivery. Missing SVGs, mixed icon styles, blank controls, pseudo-icons, inconsistent stroke weight, and misaligned active or disabled states block handoff.
+
+## User-Facing UI Copy Quality
+
+Prototype UI is a simulation of the product seen by its real user, not a diagram of how the product is implemented.
+
+- Before writing visible copy, name the role using the screen and the task that role is completing. Visible copy may label an action, request required input, explain an immediate consequence, or report a result the role can act on.
+- Do not expose implementation rationale, system architecture, prompt engineering, model policy, data provenance, rule inheritance, state-machine notes, QA instructions, acceptance commentary, fallback design, or developer terminology merely to explain the prototype.
+- Never append internal keys, build markers, prompt IDs, schema names, or version suffixes to user-facing labels. Put stable machine identifiers in `data-*`, configuration, or source metadata instead.
+- If a technical capability is genuinely configured by the intended role, translate it into that role's domain language and expose only the decision and consequence they need. When the intended role is unclear, ask the product owner before adding the field.
+- Helper text must be short and action-oriented. A paragraph that explains why the system behaves a certain way belongs in `docs/<page-id>.md`, not below a form field.
+- Review every modified page and every opened modal, drawer, empty state, error state, and success state at the manifest viewport. Read only the rendered text from the intended role's perspective. Any string that requires knowledge of ProtoDock, Agent instructions, source code, prompts, schemas, inheritance levels, or internal versioning blocks handoff.
+
+Rejected and preferred examples:
+
+| Rejected visible copy | Preferred user-facing copy |
+| --- | --- |
+| `系统事实边界（只读 · system-boundary-v7）` | `回复要求` with a short note such as `由平台统一设置，当前不可编辑` |
+| `班级初始提示词（class-dragon2-v4）` | `班级回复风格` |
+| `三级继承 / 系统边界始终生效` | Omit it, or show `当前使用平台统一规则` only when the user needs that fact |
+
+This contract applies to rendered product UI. It does not prohibit precise technical language inside PRD, source code, diagnostics intended for developers, or a product whose explicitly confirmed target user is a developer.
 
 ## Product Documentation Contract
 
