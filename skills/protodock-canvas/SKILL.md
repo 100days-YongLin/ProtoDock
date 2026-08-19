@@ -38,9 +38,9 @@ Before editing, read:
 4. Update pages and documents as durable source files, not browser-only state.
 5. Merge manifest changes by field and page ID. Never regenerate the entire manifest when a scoped merge is sufficient.
 6. Preserve all existing canvas layout data unless the user explicitly requests a reset or re-layout.
-7. Validate every declared page entry and document against the final project artifact.
+7. Before packaging, build a route table from every Canvas edge and every visible cross-page control. Each route must name its source page, control label, exact target `pageId`, and target entry. Add the explicit target to the page source now; do not leave it for upload-time inference.
 8. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
-9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
+9. Run `scripts/protodock-validate <project-root>` before packaging, then run the same command on the final ZIP. A non-zero exit code blocks delivery; do not hand the ZIP to the user or ask them to discover the error during upload.
 10. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and a concise description. Prefer the sections `用户体验`, `产品调整`, and `前后端逻辑`, and include only sections relevant to the change. This is an Agent writing convention, not a save, validation, or publishing gate. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
 
 ## Local Project Root Contract
@@ -297,6 +297,18 @@ Treat navigation validation as a release-blocking check on the extracted final Z
 9. Scan controls labeled or identified as back/return. Every such control must declare `data-protodock-back` or use the back API/message.
 10. For every page containing `data-protodock-back`, statically require executable click binding, selection or reading of the back attribute, a `ProtoDockPreview.back()` call, and a `protodock:back` postMessage fallback. The attribute alone is a release-blocking error. A recognized shared runtime script is valid only when its final ZIP file is present and contains all four capabilities.
 11. Actually click a back control in the player and public Share preview. Test both history behavior (`source page -> second-level page -> back` returns to the real source with query/hash restored) and fallback behavior (direct entry to the second-level page returns to its declared fallback). DOM inspection or calling the back function directly is not an acceptance test.
+
+Before packaging, resolve the specific error `仅依赖 Canvas 连线文案推断目标` at its reported HTML line:
+
+```html
+<!-- Canvas edge: state-schedule-empty-day -> schedule-history, label: 复用其他天 -->
+<button data-protodock-page="schedule-history">复用其他天</button>
+```
+
+- Use the exact target page ID from `protodock.project.json`, not its title, entry path, node ID, or a guessed slug.
+- Keep the page's executable click behavior; the attribute declares the host-level destination and does not replace the page's JavaScript.
+- If the control only opens a modal, changes a filter, expands content, or updates local state, it is not cross-page navigation. Do not add a fake `data-protodock-page`; remove or rename the same-label Canvas edge instead.
+- Re-run validation on the editable root immediately after the fix, then rebuild, re-extract, and validate the final ZIP. Upload is not the first validation step.
 
 ProtoDock's runtime recovery for legacy pages is compatibility behavior only. It must not be used as evidence that a new delivery satisfies this gate.
 

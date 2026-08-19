@@ -91,6 +91,26 @@ class PackageValidatorTests(unittest.TestCase):
         self.assertEqual(result["navigation"]["stats"]["routeCount"], 1)
         self.assertEqual(result["navigation"]["routes"][0]["targetPageId"], "detail")
 
+    def test_canvas_label_only_route_reports_exact_target_fix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_project(root, '<button>查看详情</button>')
+
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.validate_project_manifest_files(root)
+
+        self.assertEqual(context.exception.code, "NAVIGATION_INVALID")
+        self.assertIn("跨页导航校验失败", context.exception.message)
+        self.assertNotIn("文件路径相对于", context.exception.message)
+        self.assertTrue(any(
+            'data-protodock-page="detail"' in issue
+            for issue in context.exception.details
+        ))
+        self.assertTrue(any(
+            "页内操作" in issue and "Canvas 连线" in issue
+            for issue in context.exception.details
+        ))
+
     def test_accepts_protodock_link_and_navigation_api(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

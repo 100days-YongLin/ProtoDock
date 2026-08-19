@@ -696,20 +696,26 @@ def node_counts(manifest: dict) -> dict[str, int]:
     return counts
 
 
-def outgoing_edge_labels(manifest: dict, page_id: str) -> set[str]:
+def outgoing_edge_targets(manifest: dict, page_id: str) -> dict[str, set[str]]:
     canvas = manifest.get("canvas") if isinstance(manifest, dict) else {}
     nodes = canvas.get("nodes", []) if isinstance(canvas, dict) else []
     edges = canvas.get("edges", []) if isinstance(canvas, dict) else []
     source_ids = {node.get("id") for node in nodes if isinstance(node, dict) and node.get("pageId") == page_id}
-    labels = set()
+    page_by_node_id = {
+        str(node.get("id") or ""): str(node.get("pageId") or "")
+        for node in nodes
+        if isinstance(node, dict) and node.get("id")
+    }
+    targets = {}
     for edge in edges:
         if not isinstance(edge, dict) or edge.get("from") not in source_ids:
             continue
         label = str(edge.get("label") or "").strip()
+        target_page_id = page_by_node_id.get(str(edge.get("to") or ""), "")
         if label:
-            labels.add(normalize_text(label))
-            labels.add(action_text(label))
-    return labels
+            for key in {normalize_text(label), action_text(label)} - {""}:
+                targets.setdefault(key, set()).add(target_page_id)
+    return targets
 
 
 def control_label(control: dict) -> str:
@@ -1020,7 +1026,7 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
             else:
                 back_bridge_page_count += 1
 
-        edge_labels = outgoing_edge_labels(manifest, page_id)
+        edge_targets = outgoing_edge_targets(manifest, page_id)
         for control in parser.controls:
             label = control_label(control)
             location = f"{page_id} · {entry}:{control['line']} · {label}"
@@ -1089,8 +1095,20 @@ def validate_cross_page_navigation(project_dir: Path, manifest: dict) -> dict:
 
             normalized_label = normalize_text(label)
             normalized_action = action_text(label)
-            if normalized_label in edge_labels or (normalized_action and normalized_action in edge_labels):
-                issues.append(f"{location} 仅依赖 Canvas 连线文案推断目标；请显式声明 ProtoDock pageId")
+            inferred_targets = edge_targets.get(normalized_label) or edge_targets.get(normalized_action) or set()
+            if inferred_targets:
+                usable_targets = sorted(target for target in inferred_targets if target)
+                if len(usable_targets) == 1:
+                    target_hint = (
+                        f"若该控件用于跨页，请添加 data-protodock-page=\"{usable_targets[0]}\"；"
+                        "若它只是页内操作，请移除或改名同名 Canvas 连线"
+                    )
+                else:
+                    target_hint = (
+                        "同名连线存在多个候选目标，请确认唯一目标并添加 data-protodock-page；"
+                        "若它只是页内操作，请移除或改名同名 Canvas 连线"
+                    )
+                issues.append(f"{location} 仅依赖 Canvas 连线文案推断目标；{target_hint}")
 
         for script_record in page_scripts["records"]:
             result = scan_script(

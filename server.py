@@ -780,9 +780,26 @@ def validate_project_manifest_files(
             code = "CHANGELOG_INVALID"
         else:
             code = "PROJECT_FILES_INVALID"
+        messages = {
+            "CANVAS_LAYOUT_INVALID": f"Canvas 校验失败。请修复节点、连线或分组后重试。{remediation}",
+            "NAVIGATION_INVALID": (
+                "跨页导航校验失败。请为跨 manifest 页面控件显式声明目标 pageId；"
+                f"页内操作不要配置同名 Canvas 连线。{remediation}"
+            ),
+            "STATIC_RESOURCES_INVALID": (
+                f"静态资源校验失败。请确认资源存在且路径相对于{source_label}。{remediation}"
+            ),
+            "CHANGELOG_INVALID": f"变更记录校验失败。请修复空内容或无效时间后重试。{remediation}",
+            "PROJECT_FILES_INVALID": (
+                f"项目文件校验失败。请确认 entry 与 doc 路径相对于{source_label}且文件存在。{remediation}"
+            ),
+            "PROJECT_VALIDATION_FAILED": (
+                f"项目存在多类校验问题。请按下方明细分别修复文件、Canvas、导航或资源。{remediation}"
+            ),
+        }
         raise ProtoDockError(
             HTTPStatus.BAD_REQUEST,
-            f"项目包校验失败。请确保文件路径相对于{source_label}，且静态资源、Canvas 与跨页导航符合契约。{remediation}",
+            messages[code],
             code=code,
             details=issues + canvas_issues + navigation_issues + resource_issues + change_log_issues,
         )
