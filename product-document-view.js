@@ -19,6 +19,7 @@
   let presentation = null;
   let readyTimer = null;
   let started = false;
+  let scrollStabilizationToken = 0;
 
   const els = {
     projectName: document.getElementById('documentProjectName'),
@@ -223,6 +224,25 @@
     }
   }
 
+  function cancelScrollStabilization() {
+    scrollStabilizationToken += 1;
+  }
+
+  function stabilizePrototypeScroll(pageId) {
+    const token = ++scrollStabilizationToken;
+    const startedAt = performance.now();
+    const correctPosition = () => {
+      if (token !== scrollStabilizationToken || activePageId !== pageId) return;
+      const article = pageElements.get(pageId);
+      if (!article) return;
+      const targetTop = Number.parseFloat(getComputedStyle(article).scrollMarginTop) || 60;
+      const delta = article.getBoundingClientRect().top - targetTop;
+      if (Math.abs(delta) > 2) window.scrollBy({ top: delta, behavior: 'auto' });
+      if (performance.now() - startedAt < 5_000) window.setTimeout(correctPosition, 200);
+    };
+    window.setTimeout(correctPosition, 250);
+  }
+
   function scrollToPrototype(pageId) {
     const article = pageElements.get(pageId);
     if (!article) {
@@ -234,6 +254,7 @@
     els.outlineNavigation.querySelectorAll('[data-outline-page]').forEach((link) => {
       link.classList.toggle('is-active', link.dataset.outlinePage === pageId);
     });
+    stabilizePrototypeScroll(pageId);
   }
 
   function navigatePrototype(fromPageId, targetPageId, suffix = '') {
@@ -624,7 +645,10 @@
   els.outlineNavigation.addEventListener('click', (event) => {
     const pageLink = event.target.closest('[data-outline-page]');
     if (pageLink) {
-      activePageId = pageLink.dataset.outlinePage;
+      event.preventDefault();
+      const pageId = pageLink.dataset.outlinePage;
+      window.history.replaceState(null, '', pageLink.hash);
+      scrollToPrototype(pageId);
     }
     document.body.classList.remove('is-outline-open');
     els.toggleOutline.setAttribute('aria-expanded', 'false');
@@ -636,12 +660,17 @@
     }
   });
   document.addEventListener('keydown', (event) => {
+    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) {
+      cancelScrollStabilization();
+    }
     if (event.key === 'Escape') {
       closeImagePreview();
       document.body.classList.remove('is-outline-open');
       els.toggleOutline.setAttribute('aria-expanded', 'false');
     }
   });
+  window.addEventListener('wheel', cancelScrollStabilization, { passive: true });
+  window.addEventListener('touchstart', cancelScrollStabilization, { passive: true });
   window.addEventListener('beforeunload', () => {
     prototypeObserver?.disconnect();
     presentation?.destroy();

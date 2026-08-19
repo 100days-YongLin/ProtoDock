@@ -4707,12 +4707,14 @@ function showUnsavedHomeDialog() {
 }
 
 function startPlayback() {
-  if (!state.manifest?.canvas.nodes.length) {
+  const nodes = state.manifest?.canvas.nodes || [];
+  if (!nodes.length) {
     return;
   }
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.playbackActive = true;
-  state.playbackIndex = 0;
+  const selectedIndex = nodes.findIndex((node) => node.id === state.selectedNodeId);
+  state.playbackIndex = selectedIndex >= 0 ? selectedIndex : 0;
   state.playbackLocationSuffix = '';
   state.playbackHistory.reset();
   els.inspector?.classList.add('is-playback');

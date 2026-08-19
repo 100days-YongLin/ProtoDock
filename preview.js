@@ -100,6 +100,8 @@
     printImageUrls: new Set(),
     printCaptureAssetCache: new Map(),
     prototypeObserverSuppressedUntil: 0,
+    activeObserverSuppressedUntil: 0,
+    scrollStabilizationToken: 0,
     prototypeObserver: null,
     activeObserver: null,
     presentation: null
@@ -752,9 +754,31 @@
       state.pageHistory.push(options.fromPageId);
     }
     mountPrototype(page, options.suffix || '');
-    state.prototypeObserverSuppressedUntil = Date.now() + 600;
+    state.prototypeObserverSuppressedUntil = Date.now() + 5_500;
+    state.activeObserverSuppressedUntil = Date.now() + 5_500;
     article.scrollIntoView({ behavior: 'auto', block: 'start' });
     setActivePage(pageId);
+    stabilizePageScroll(pageId);
+  }
+
+  function cancelPageScrollStabilization() {
+    state.scrollStabilizationToken += 1;
+    state.activeObserverSuppressedUntil = 0;
+  }
+
+  function stabilizePageScroll(pageId) {
+    const token = ++state.scrollStabilizationToken;
+    const startedAt = performance.now();
+    const correctPosition = () => {
+      if (token !== state.scrollStabilizationToken) return;
+      const article = state.articleByPageId.get(pageId);
+      if (!article) return;
+      const targetTop = Number.parseFloat(getComputedStyle(article).scrollMarginTop) || 60;
+      const delta = article.getBoundingClientRect().top - targetTop;
+      if (Math.abs(delta) > 2) window.scrollBy({ top: delta, behavior: 'auto' });
+      if (performance.now() - startedAt < 5_000) window.setTimeout(correctPosition, 200);
+    };
+    window.setTimeout(correctPosition, 250);
   }
 
   function installDirectFrameNavigation(frame, page) {
@@ -880,9 +904,7 @@
   }
 
   function setActivePage(pageId) {
-    if (!pageId || state.activePageId === pageId) {
-      return;
-    }
+    if (!pageId) return;
     state.activePageId = pageId;
     els.outlineNavigation.querySelectorAll('[data-outline-page]').forEach((link) => {
       link.classList.toggle('is-active', link.dataset.outlinePage === pageId);
@@ -912,6 +934,7 @@
       });
     }, { rootMargin: '900px 0px' });
     state.activeObserver = new IntersectionObserver((entries) => {
+      if (Date.now() < state.activeObserverSuppressedUntil) return;
       const visible = entries
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
@@ -1010,11 +1033,16 @@
       });
     });
     document.addEventListener('keydown', (event) => {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) {
+        cancelPageScrollStabilization();
+      }
       if (event.key === 'Escape') {
         document.body.classList.remove('is-outline-open');
         els.toggleOutline.setAttribute('aria-expanded', 'false');
       }
     });
+    window.addEventListener('wheel', cancelPageScrollStabilization, { passive: true });
+    window.addEventListener('touchstart', cancelPageScrollStabilization, { passive: true });
     window.addEventListener('afterprint', () => setProgress(state.pages.length, state.pages.length));
     window.addEventListener('beforeunload', () => {
       state.presentation?.destroy();
