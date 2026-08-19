@@ -6,8 +6,9 @@
   <title>完整产品文档 · ProtoDock</title>
   <link rel="icon" type="image/png" href="./assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
-  <link rel="stylesheet" href="./product-document.css?v=13">
-  <link rel="stylesheet" href="./preview.css?v=9">
+  <link rel="stylesheet" href="./vendor/devices.css">
+  <link rel="stylesheet" href="./product-document.css?v=14">
+  <link rel="stylesheet" href="./preview.css?v=10">
 </head>
 <body>
   <header class="document-header">
@@ -15,6 +16,10 @@
       <button class="document-back-button" id="returnToCanvas" type="button" title="返回流程图">
         <i data-lucide="arrow-left"></i>
         <span>返回流程图</span>
+      </button>
+      <button class="document-presentation-button" id="openPresentation" type="button" title="正在准备可操作原型" disabled>
+        <i data-lucide="presentation"></i>
+        <span>全屏演示</span>
       </button>
       <img src="./assets/protodock-icon.png" alt="">
       <strong>完整产品文档</strong>
@@ -80,7 +85,8 @@
   <script src="./project-changelog.js?v=6"></script>
   <script src="./capture.js?v=8"></script>
   <script src="./prototype-navigation.js?v=3"></script>
+  <script src="./prototype-presentation.js?v=4"></script>
   <script src="./product-document.js?v=7"></script>
-  <script src="./product-document-view.js?v=8"></script>
+  <script src="./product-document-view.js?v=9"></script>
 </body>
 </html>

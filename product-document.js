@@ -304,6 +304,9 @@
           name: manifest.project?.name || '未命名项目',
           description: manifest.project?.description || '',
           devicePreset: manifest.project?.devicePreset || 'iphone-portrait',
+          safeAreaEnabled: manifest.project?.safeAreaEnabled,
+          safeAreaTop: manifest.project?.safeAreaTop,
+          safeAreaBottom: manifest.project?.safeAreaBottom,
           changelog: global.ProtoDockChangeLog?.normalize(manifest.changelog) || []
         },
         navigationManifest: {

@@ -38,6 +38,7 @@
     projectName: document.getElementById('documentProjectName'),
     progress: document.getElementById('documentProgress'),
     canvasLink: document.getElementById('canvasLink'),
+    openPresentation: document.getElementById('openPresentation'),
     downloadLink: document.getElementById('downloadLink'),
     print: document.getElementById('printDocument'),
     toggleOutline: document.getElementById('toggleOutline'),
@@ -99,7 +100,8 @@
     printCaptureAssetCache: new Map(),
     prototypeObserverSuppressedUntil: 0,
     prototypeObserver: null,
-    activeObserver: null
+    activeObserver: null,
+    presentation: null
   };
 
   function shareIdFromLocation() {
@@ -274,6 +276,20 @@
       }
     });
     mountPrototype(state.pages[0]);
+    state.presentation?.destroy();
+    state.presentation = window.ProtoDockPresentation?.create?.({
+      trigger: els.openPresentation,
+      project,
+      manifest: state.manifest,
+      pages: state.pages,
+      initialPageId: () => state.activePageId || state.pages[0]?.id || '',
+      sourceForPage(pageId, page) {
+        return page?.entry
+          ? { src: projectFileUrl(page.entry) }
+          : { error: '该页面没有配置入口文件。' };
+      },
+      onPageChange: setActivePage
+    }) || null;
   }
 
   function renderDocument(page, markdown, error = '') {
@@ -938,6 +954,7 @@
     });
     window.addEventListener('afterprint', () => setProgress(state.pages.length, state.pages.length));
     window.addEventListener('beforeunload', () => {
+      state.presentation?.destroy();
       state.printImageUrls.forEach((url) => URL.revokeObjectURL(url));
     });
   }

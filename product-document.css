@@ -71,7 +71,8 @@ button {
   white-space: nowrap;
 }
 
-.document-back-button {
+.document-back-button,
+.document-presentation-button {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
@@ -86,20 +87,29 @@ button {
 }
 
 .document-back-button:hover,
-.document-back-button:focus-visible {
+.document-back-button:focus-visible,
+.document-presentation-button:hover:not(:disabled),
+.document-presentation-button:focus-visible {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   outline: none;
 }
 
-.document-back-button svg {
+.document-back-button svg,
+.document-presentation-button svg {
   width: 17px;
   height: 17px;
 }
 
-.document-back-button span {
+.document-back-button span,
+.document-presentation-button span {
   font-size: 12px;
   font-weight: 680;
+}
+
+.document-presentation-button:disabled {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .document-project-name {
@@ -906,8 +916,15 @@ button {
   }
 
   .document-back-button span,
+  .document-presentation-button span,
   .document-brand img {
     display: none;
+  }
+
+  .document-presentation-button {
+    width: 34px;
+    justify-content: center;
+    padding: 0;
   }
 }
 

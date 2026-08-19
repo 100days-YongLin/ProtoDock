@@ -15,12 +15,15 @@
   let navigationManifest = { pages: {}, canvas: { nodes: [], edges: [] } };
   let project = {};
   let webDocument = false;
+  let activePageId = '';
+  let presentation = null;
   let readyTimer = null;
   let started = false;
 
   const els = {
     projectName: document.getElementById('documentProjectName'),
     returnToCanvas: document.getElementById('returnToCanvas'),
+    openPresentation: document.getElementById('openPresentation'),
     progress: document.getElementById('documentProgress'),
     print: document.getElementById('printDocument'),
     toggleOutline: document.getElementById('toggleOutline'),
@@ -223,6 +226,7 @@
       return;
     }
     mountPrototype(pageId);
+    activePageId = pageId;
     article.scrollIntoView({ behavior: 'smooth', block: 'start' });
     els.outlineNavigation.querySelectorAll('[data-outline-page]').forEach((link) => {
       link.classList.toggle('is-active', link.dataset.outlinePage === pageId);
@@ -329,7 +333,7 @@
   }
 
   function rememberPrototype(payload) {
-    if (!webDocument || (!payload.prototypeSrc && !payload.prototypeSrcdoc && !payload.prototypeError)) {
+    if (!payload.prototypeSrc && !payload.prototypeSrcdoc && !payload.prototypeError) {
       return;
     }
     prototypeSources.set(payload.id, {
@@ -337,6 +341,10 @@
       srcdoc: payload.prototypeSrcdoc || '',
       error: payload.prototypeError || ''
     });
+    presentation?.refresh();
+    if (!webDocument) {
+      return;
+    }
     const article = pageElements.get(payload.id);
     const rect = article?.getBoundingClientRect?.();
     if (!rect || (rect.top < window.innerHeight + 900 && rect.bottom > -900)) {
@@ -353,6 +361,7 @@
     prototypeHistory = window.ProtoDockNavigation?.createPageHistory?.() || null;
     const sections = Array.isArray(payload.sections) ? payload.sections : [];
     const pages = sections.flatMap((section) => section.pages || []);
+    activePageId = pages[0]?.id || '';
     window.ProtoDockProductDocument?.applyDocumentLayout?.(document.body, project);
     document.title = `${project.name || '完整产品文档'} · ProtoDock`;
     els.projectName.textContent = project.name || '未命名项目';
@@ -408,6 +417,18 @@
       }
     });
     installPrototypeObserver();
+    presentation?.destroy();
+    presentation = window.ProtoDockPresentation?.create?.({
+      trigger: els.openPresentation,
+      project,
+      manifest: navigationManifest,
+      pages,
+      initialPageId: () => activePageId,
+      sourceForPage: (pageId) => prototypeSources.get(pageId) || {},
+      onPageChange(pageId) {
+        activePageId = pageId;
+      }
+    }) || null;
   }
 
   function renderPage(payload) {
@@ -558,7 +579,11 @@
     const open = document.body.classList.toggle('is-outline-open');
     els.toggleOutline.setAttribute('aria-expanded', String(open));
   });
-  els.outlineNavigation.addEventListener('click', () => {
+  els.outlineNavigation.addEventListener('click', (event) => {
+    const pageLink = event.target.closest('[data-outline-page]');
+    if (pageLink) {
+      activePageId = pageLink.dataset.outlinePage;
+    }
     document.body.classList.remove('is-outline-open');
     els.toggleOutline.setAttribute('aria-expanded', 'false');
   });
@@ -577,6 +602,7 @@
   });
   window.addEventListener('beforeunload', () => {
     prototypeObserver?.disconnect();
+    presentation?.destroy();
     screenshotUrls.forEach((url) => URL.revokeObjectURL(url));
     channel?.close();
   });
