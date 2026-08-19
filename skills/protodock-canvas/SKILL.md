@@ -157,19 +157,42 @@ Product-document changelog text is release communication, not an engineering dia
 1. Store `description` as a Markdown-style bullet list. Every non-empty line must be exactly `- 用户：<change>` or `- 产品：<change>`.
 2. Put every user-view bullet first. Describe what the user can now see, understand, complete, avoid, or recover from. Use the product's user role when useful, such as parent, teacher, or administrator.
 3. Put every product-view bullet second. Describe feature scope, workflow, state, permission, data, pricing, or business-rule changes.
-4. Keep one change per bullet, use an action/result sentence, and keep each item within 80 Chinese characters. Use at most 8 bullets per release; merge duplicates and remove filler.
-5. Require at least one `用户` bullet and one `产品` bullet. Several pending edit batches may be merged, but the release entry must still group all user bullets before all product bullets.
+4. Keep one product outcome per bullet. Aim for 25-50 Chinese characters and never exceed 80. A normal release should contain 4-6 bullets total: usually 2-3 user bullets followed by 2-3 product bullets. Eight is an exceptional hard ceiling, not a target.
+5. Require at least one `用户` bullet and one `产品` bullet. When several pending edit batches accumulate, synthesize them into a fresh release summary; never concatenate every pending sentence into the final changelog.
 6. Do not write a prose paragraph. Do not start with vague text such as “完成优化”“相关调整” or “若干问题修复”. State the actual outcome.
 7. Do not put commit hashes, file paths, component names, build commands, validation counts, deployment status, or internal implementation details in the product changelog. Those belong in Git, QA evidence, or the engineering handoff.
 8. Preserve older prose-form changelog entries for compatibility. Apply this contract to every newly appended `pendingChanges` item and every new formal release entry; never rewrite historical releases merely to change formatting.
 
-Example:
+### Release-summary synthesis
+
+Before writing the final release description, perform this reduction pass:
+
+1. Collect all candidate changes from Git diff, affected PRDs, and accumulated `pendingChanges`.
+2. Classify each candidate as `user outcome`, `product rule/scope`, or `engineering/QA evidence`.
+3. Drop engineering and QA evidence from the product changelog. Do not mention project workspaces, PRD/resource completeness, generated design counts, page/node/group/edge counts, Canvas coordinates, viewport sizes, UAT pixel alignment, test totals, commits, branches, packaging, deployment, or “state unchanged”.
+4. Merge candidates that describe the same capability. Summarize by business ability such as daily report, weekly report, role permissions, content configuration, or account switching, not by individual page or edit batch.
+5. Keep only changes that materially affect what a role can do or how the product behaves. Baseline preservation, visual alignment, internal refactoring, and unchanged behavior are not release highlights unless they resolve a named user problem.
+6. Write user bullets with the real role and result, for example “学校管理员可按园所查看日报配置”, not “V1.1 保持 27 个页面”.
+7. Write product bullets as decisions and rules, for example “日报与周报统一使用分步配置和保存状态”, not “新增 9 个页面和 7 条连线”.
+8. Read the result as a product manager. If two bullets can be merged without losing a distinct product decision, merge them. If a bullet only proves that engineering work happened, delete it.
+
+Bad release summary:
 
 ```text
-- 用户：教师可以在周报页直接展开本周日程并编辑活动
-- 用户：保存失败时保留已填写内容并显示重试入口
-- 产品：统一周报日程的展开、编辑和保存状态
-- 产品：补充空数据、保存失败和权限不足规则
+- 用户：36 个页面按新手任务重组
+- 用户：Canvas 按 8 个业务分组清晰排列
+- 产品：新增 9 个页面、3 个分组和 7 条连线
+- 产品：完成 1440×900 全量回归
+```
+
+Good release summary:
+
+```text
+- 用户：管理员可在单页完成日报和周报配置，低频信息按需展开
+- 用户：学校管理员与教师登录后仅看到匹配的数据和管理能力
+- 用户：账号菜单可切换角色并在跨页操作中保持当前身份
+- 产品：日报与周报统一使用分步配置、预览和保存状态
+- 产品：补充学校管理员与教师首页、导航范围和数据权限
 ```
 
 ## Icon Asset Quality Contract
