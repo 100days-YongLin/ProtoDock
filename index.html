@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="./vendor/devices.css">
-  <link rel="stylesheet" href="./styles.css?v=11">
+  <link rel="stylesheet" href="./styles.css?v=12">
   <link rel="stylesheet" href="./canvas-groups.css">
   <link rel="stylesheet" href="./canvas-minimap.css">
 </head>
@@ -391,8 +391,12 @@
 
       <div class="change-log-form">
         <label class="field">
-          <span>变更内容</span>
-          <textarea id="changeLogDescription" maxlength="1200" rows="5" placeholder="说明本次新增、调整或修复了什么"></textarea>
+          <span>用户视角（每行一项）</span>
+          <textarea id="changeLogUserDescription" maxlength="600" rows="3" placeholder="例如：家长可以在报告页直接查看本周成长趋势"></textarea>
+        </label>
+        <label class="field">
+          <span>产品视角（每行一项）</span>
+          <textarea id="changeLogProductDescription" maxlength="600" rows="3" placeholder="例如：统一周报入口、状态判断和空数据规则"></textarea>
         </label>
         <span class="field-message" id="changeLogMessage" aria-live="polite"></span>
       </div>
@@ -564,7 +568,8 @@
 
       <label class="github-message-field" id="publishCommitField">
         <span>更新内容</span>
-        <textarea id="publishCommitMessage" maxlength="1200" rows="5" placeholder="会自动汇总多次保存的待发布变更，也可以在发布前统一整理"></textarea>
+        <textarea id="publishCommitMessage" maxlength="1200" rows="6" placeholder="- 用户：用户能感知到的变化&#10;- 产品：功能范围、流程或规则变化"></textarea>
+        <small>每行一项；用户视角在前，产品视角在后。</small>
       </label>
 
       <details class="github-key-panel publish-github-settings">
@@ -706,13 +711,13 @@
   <script src="./publish-summary.js?v=4"></script>
   <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=2"></script>
-  <script src="./project-changelog.js?v=3"></script>
-  <script src="./project-changelog-dialog.js?v=2"></script>
+  <script src="./project-changelog.js?v=4"></script>
+  <script src="./project-changelog-dialog.js?v=3"></script>
   <script src="./local-resource-paths.js?v=1"></script>
   <script src="./local-preview-assets.js?v=1"></script>
   <script src="./product-document-cache.js?v=4"></script>
   <script src="./product-document.js?v=7"></script>
-  <script src="./app.js?v=16"></script>
+  <script src="./app.js?v=17"></script>
   <script src="./project-name.js"></script>
   <script src="./share.js?v=10"></script>
 </body>

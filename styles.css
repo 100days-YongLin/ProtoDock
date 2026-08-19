@@ -1804,7 +1804,7 @@ select {
 }
 
 .change-log-form textarea {
-  min-height: 124px;
+  min-height: 88px;
   border-radius: 10px;
 }
 
@@ -2817,6 +2817,12 @@ select {
 
 .github-message-field textarea {
   resize: vertical;
+}
+
+.github-message-field small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .github-message-field.is-disabled {

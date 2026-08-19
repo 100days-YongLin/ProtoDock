@@ -15,7 +15,7 @@ class ChangeLogValidationTests(unittest.TestCase):
         result = validate_changelog({
             "pendingChanges": [{
                 "changedAt": "2026-08-18T10:30:00+08:00",
-                "description": "补充空状态。",
+                "description": "- 用户：空数据时可以看到明确提示\n- 产品：补充空状态展示规则",
             }]
         })
         self.assertEqual(result["issues"], [])
@@ -27,6 +27,15 @@ class ChangeLogValidationTests(unittest.TestCase):
             "pendingChanges": [{"changedAt": "", "description": ""}]
         })
         self.assertEqual(len(result["issues"]), 2)
+
+    def test_pending_change_requires_user_first_bullet_format(self):
+        result = validate_changelog({
+            "pendingChanges": [{
+                "changedAt": "2026-08-18T10:30:00+08:00",
+                "description": "- 产品：统一空状态规则\n- 用户：可以看到明确提示",
+            }]
+        })
+        self.assertTrue(any("先写用户视角" in issue for issue in result["issues"]))
 
     def test_valid_changelog_reports_current_version(self):
         result = validate_changelog({
@@ -44,7 +53,8 @@ class ChangeLogValidationTests(unittest.TestCase):
             ]
         })
         self.assertEqual(result["issues"], [])
-        self.assertEqual(result["warnings"], [])
+        self.assertEqual(result["stats"]["changeLogFormatWarningCount"], 2)
+        self.assertEqual(len(result["warnings"]), 2)
         self.assertEqual(result["stats"]["changeLogCount"], 2)
         self.assertEqual(result["stats"]["currentVersion"], "v1.1")
         self.assertEqual(result["stats"]["pendingChangeCount"], 0)

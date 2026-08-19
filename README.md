@@ -53,7 +53,7 @@ prototype-project/
 
 - `pages/**`、`docs/**`、`assets/**` 可以由 Agent 生成或更新。
 - `protodock.project.json` 中的 `project` 和 `pages` 可以由 Agent 按需更新。
-- Agent 每次完成一批项目修改时，只向 `pendingChanges` 追加 ISO 8601 时间和变更内容，不自行填写版本号。ProtoDock 正式发布时把累计内容合并为一条 `changelog`，并以发布弹窗中的版本号为唯一版本；历史发布项不得回写或删除。
+- Agent 每次完成一批项目修改时，只向 `pendingChanges` 追加 ISO 8601 时间和变更内容，不自行填写版本号。变更内容使用短项目符号：先写 `- 用户：...`，再写 `- 产品：...`，禁止整段技术叙述。ProtoDock 正式发布时把累计内容按同一顺序合并为一条 `changelog`，并以发布弹窗中的版本号为唯一版本；历史发布项不得回写或删除。
 - `canvas.nodes`、`canvas.edges`、`canvas.notes`、`canvas.groups` 默认视为用户在 ProtoDock 中编辑过的布局数据，Agent 不得整体重写。
 - Agent 如需新增页面节点，只能按 `id` 或 `pageId` 增量追加缺失节点，并必须保留已有节点的 `x`、`y`、`fromSide`、`toSide`、锚点、说明文本以及未知字段。
 - 只有用户明确说“重排画布”“重建 flow”或“覆盖 canvas”时，Agent 才能重写 `canvas`。
@@ -87,13 +87,13 @@ protodock/backups/protodock.project.<YYYYMMDD-HHMMSS>.json
     {
       "version": "v1.1",
       "changedAt": "2026-08-17T15:30:00+08:00",
-      "description": "补充成长报告页面与产品验收说明。"
+      "description": "- 用户：家长可以查看成长报告和异常提示\n- 产品：补充成长报告状态与产品验收规则"
     }
   ],
   "pendingChanges": [
     {
       "changedAt": "2026-08-18T10:30:00+08:00",
-      "description": "补充空状态与返回流程。"
+      "description": "- 用户：空数据时可以看到明确提示并返回来源页\n- 产品：补充空状态与返回 fallback 规则"
     }
   ],
   "pages": {
@@ -153,7 +153,7 @@ http://localhost:4175/index.html
 
 打开项目后，可以点击顶部显示的当前项目名称进行重命名。点击“保存名称”后填写本次变更内容，名称与一条不带版本号的待发布记录会一并写回 `protodock.project.json`；公开预览等只读项目不允许重命名。
 
-只要项目存在未保存修改，顶部保存按钮都会要求记录本次变更内容，并追加到 `pendingChanges`。可以累计多次保存，期间不产生新版本。统一发布时必须填写发布版本与更新内容；ProtoDock 会在发布快照中把全部待发布内容合并为一条正式 `changelog`，成功后再把同一条记录写回本地并清空 `pendingChanges`。完整产品文档只展示正式发布历史，最后一条就是当前版本。旧项目没有这两个字段时仍可打开。
+只要项目存在未保存修改，顶部保存按钮都会要求分别填写“用户视角”和“产品视角”，每行一项；ProtoDock 自动生成先用户、后产品的项目符号并追加到 `pendingChanges`。可以累计多次保存，期间不产生新版本。统一发布时必须填写发布版本与更新内容；ProtoDock 会把所有用户项汇总在前、产品项汇总在后，生成一条正式 `changelog`，成功后再写回本地并清空 `pendingChanges`。完整产品文档只展示正式发布历史，最后一条就是当前版本。旧项目没有这些字段或历史记录仍是散文格式时仍可打开。
 
 选中页面后，右侧标题区的“复制页面 PNG”按钮会把当前页面首屏写入剪贴板。复制按钮右侧可以切换“带设备框”和“无设备框”：带框模式会合成项目设备壳，无框模式按项目真实视口输出纯页面截图并保留安全区。浏览器不支持图片剪贴板写入时，会自动下载 PNG。
 

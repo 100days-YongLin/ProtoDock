@@ -41,7 +41,7 @@ Before editing, read:
 7. Validate every declared page entry and document against the final project artifact.
 8. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
 9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
-10. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and concise description. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
+10. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and a concise bullet-list description. Write all `- 用户：...` items first, followed by all `- 产品：...` items. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
 
 ## Local Project Root Contract
 
@@ -133,7 +133,7 @@ Treat a feature change as a coherent documentation unit, even though the durable
 2. Update all affected `docs/<page-id>.md` files for the feature flow, including entry, result, failure, empty, permission, and return behavior where applicable.
 3. Keep unaffected page documents unchanged so Git diff expresses the real feature boundary.
 4. Ensure cross-page rules agree across the involved documents; do not describe a multi-page feature in only its entry page.
-5. Append one `pendingChanges` item that names the feature and summarizes the user-visible behavior change. Several completed feature batches may accumulate before release.
+5. Append one `pendingChanges` item that summarizes the feature with user-view bullets first and product-view bullets second. Several completed feature batches may accumulate before release.
 6. Deliver the feature only when the final Git diff contains the required page artifacts, PRD changes, and pending change description together. A formal release must additionally contain the single merged `changelog` entry produced from the publish version.
 
 ## Manifest Contract
@@ -149,6 +149,28 @@ Treat a feature change as a coherent documentation unit, even though the durable
 - Top-level `changelog` is append-only formal release history. Each entry requires `version`, `changedAt`, and `description`; its final version must exactly match the ProtoDock publish version. Only publishing may turn accumulated pending changes into a release entry.
 - Keep local integration secrets, including Feishu custom-bot Webhooks, only in optional `protodock.local.json`. Ensure it is ignored by Git and excluded from upload ZIPs, public shares, downloads, pages, docs, assets, and the manifest.
 - “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
+
+## Changelog Writing Contract
+
+Product-document changelog text is release communication, not an engineering diary.
+
+1. Store `description` as a Markdown-style bullet list. Every non-empty line must be exactly `- 用户：<change>` or `- 产品：<change>`.
+2. Put every user-view bullet first. Describe what the user can now see, understand, complete, avoid, or recover from. Use the product's user role when useful, such as parent, teacher, or administrator.
+3. Put every product-view bullet second. Describe feature scope, workflow, state, permission, data, pricing, or business-rule changes.
+4. Keep one change per bullet, use an action/result sentence, and keep each item within 80 Chinese characters. Use at most 8 bullets per release; merge duplicates and remove filler.
+5. Require at least one `用户` bullet and one `产品` bullet. Several pending edit batches may be merged, but the release entry must still group all user bullets before all product bullets.
+6. Do not write a prose paragraph. Do not start with vague text such as “完成优化”“相关调整” or “若干问题修复”. State the actual outcome.
+7. Do not put commit hashes, file paths, component names, build commands, validation counts, deployment status, or internal implementation details in the product changelog. Those belong in Git, QA evidence, or the engineering handoff.
+8. Preserve older prose-form changelog entries for compatibility. Apply this contract to every newly appended `pendingChanges` item and every new formal release entry; never rewrite historical releases merely to change formatting.
+
+Example:
+
+```text
+- 用户：教师可以在周报页直接展开本周日程并编辑活动
+- 用户：保存失败时保留已填写内容并显示重试入口
+- 产品：统一周报日程的展开、编辑和保存状态
+- 产品：补充空数据、保存失败和权限不足规则
+```
 
 ## Icon Asset Quality Contract
 

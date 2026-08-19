@@ -63,6 +63,9 @@ PRODUCT_DOC_SECTIONS = (
 TECHNICAL_DOC_HEADINGS = {"源码", "源码位置", "原型入口", "react来源", "技术实现", "实现说明"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_ACCEPTANCE_LABELS = ("前提", "操作", "预期")
+CHANGELOG_BULLET_PATTERN = re.compile(r"^-\s*(用户|产品)\s*：\s*(\S.+|\S)$")
+MAX_CHANGELOG_ITEMS = 8
+MAX_CHANGELOG_ITEM_LENGTH = 80
 STATIC_RESOURCE_ATTRIBUTES = {
     "audio": ("src",),
     "embed": ("src",),
@@ -96,6 +99,25 @@ SCRIPT_RELATIVE_BASE_PATTERN = re.compile(
 )
 
 
+def changelog_description_issue(description: str) -> str:
+    lines = [line.strip() for line in str(description or "").splitlines() if line.strip()]
+    if not lines:
+        return "更新内容不能为空"
+    matches = [CHANGELOG_BULLET_PATTERN.fullmatch(line) for line in lines]
+    if any(match is None for match in matches):
+        return "每行必须使用“- 用户：”或“- 产品：”项目符号"
+    if len(lines) > MAX_CHANGELOG_ITEMS:
+        return f"最多 {MAX_CHANGELOG_ITEMS} 项，请合并精简"
+    if any(len(match.group(2).strip()) > MAX_CHANGELOG_ITEM_LENGTH for match in matches):
+        return f"每项不能超过 {MAX_CHANGELOG_ITEM_LENGTH} 字"
+    audiences = [match.group(1) for match in matches]
+    if "用户" not in audiences or "产品" not in audiences:
+        return "必须同时包含用户视角和产品视角"
+    if audiences.index("产品") < len(audiences) - 1 - audiences[::-1].index("用户"):
+        return "必须先写用户视角，再写产品视角"
+    return ""
+
+
 def validate_changelog(manifest: dict) -> dict:
     entries = manifest.get("changelog") if isinstance(manifest, dict) else None
     pending_entries = manifest.get("pendingChanges") if isinstance(manifest, dict) else None
@@ -117,6 +139,10 @@ def validate_changelog(manifest: dict) -> dict:
         description = str(entry.get("description") or "").strip()
         if not description:
             issues.append(f"{label}.description 不能为空")
+        else:
+            format_issue = changelog_description_issue(description)
+            if format_issue:
+                issues.append(f"{label}.description {format_issue}")
         if not changed_at:
             issues.append(f"{label}.changedAt 不能为空")
         else:
@@ -136,6 +162,7 @@ def validate_changelog(manifest: dict) -> dict:
 
     previous_time = None
     current_version = ""
+    description_format_warning_count = 0
     for index, entry in enumerate(entries):
         label = f"changelog[{index}]"
         if not isinstance(entry, dict):
@@ -148,6 +175,11 @@ def validate_changelog(manifest: dict) -> dict:
             issues.append(f"{label}.version 不能为空")
         if not description:
             issues.append(f"{label}.description 不能为空")
+        else:
+            format_issue = changelog_description_issue(description)
+            if format_issue:
+                description_format_warning_count += 1
+                warnings.append(f"{label}.description 使用旧版格式：{format_issue}")
         parsed_time = None
         if not changed_at:
             issues.append(f"{label}.changedAt 不能为空")
@@ -173,6 +205,7 @@ def validate_changelog(manifest: dict) -> dict:
             "changeLogCount": len(entries),
             "currentVersion": current_version,
             "pendingChangeCount": len(pending_entries),
+            "changeLogFormatWarningCount": description_format_warning_count,
         },
     }
 

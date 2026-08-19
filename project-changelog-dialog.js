@@ -1,7 +1,8 @@
 (() => {
   const els = {
     modal: document.getElementById('changeLogModal'),
-    description: document.getElementById('changeLogDescription'),
+    userDescription: document.getElementById('changeLogUserDescription'),
+    productDescription: document.getElementById('changeLogProductDescription'),
     message: document.getElementById('changeLogMessage'),
     close: document.getElementById('closeChangeLogModal'),
     cancel: document.getElementById('cancelChangeLog'),
@@ -23,35 +24,42 @@
         resolve(entry);
       };
       const submit = () => {
-        const description = els.description.value.trim();
-        if (!description) {
-          els.message.textContent = '请填写本次变更内容';
-          els.description.focus();
+        const description = window.ProtoDockChangeLog.formatDescription(
+          els.userDescription.value,
+          els.productDescription.value
+        );
+        const validation = window.ProtoDockChangeLog.validateDescription(description);
+        if (!validation.ok) {
+          els.message.textContent = validation.message;
+          (els.userDescription.value.trim() ? els.productDescription : els.userDescription).focus();
           return;
         }
         close({ description, changedAt: new Date().toISOString() });
       };
 
       closeActive = () => close(null);
-      els.description.value = '';
+      els.userDescription.value = '';
+      els.productDescription.value = '';
       els.message.textContent = '';
       els.close.onclick = closeActive;
       els.cancel.onclick = closeActive;
       els.confirm.onclick = submit;
-      els.description.oninput = () => { els.message.textContent = ''; };
-      els.description.onkeydown = (event) => {
-        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-          event.preventDefault();
-          submit();
-        }
-      };
+      [els.userDescription, els.productDescription].forEach((textarea) => {
+        textarea.oninput = () => { els.message.textContent = ''; };
+        textarea.onkeydown = (event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+            event.preventDefault();
+            submit();
+          }
+        };
+      });
       els.modal.onclick = (event) => {
         if (event.target === els.modal) {
           closeActive?.();
         }
       };
       els.modal.hidden = false;
-      window.requestAnimationFrame(() => els.description.focus());
+      window.requestAnimationFrame(() => els.userDescription.focus());
     });
   }
 
