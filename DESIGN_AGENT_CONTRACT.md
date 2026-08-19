@@ -65,6 +65,8 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 47. ProtoDock may rewrite dynamically inserted local media in legacy previews. New and modified pages must still pass the static runtime-path gate; runtime recovery is not delivery evidence.
 48. Every icon-like UI control or status mark must use a mature SVG from the existing design system or an established library such as Lucide, Material Symbols SVG, or Heroicons. Do not substitute emoji, Unicode glyphs, punctuation, letters, icon-font characters, or CSS approximations such as `←`, `×`, `+`, `⋯`, `⚙`, `✓`, or emoji. Bundle SVGs under project assets, keep one consistent icon family, add accessible names to icon-only controls, and reserve custom SVG drawing for brand or domain-specific concepts that have no standard icon.
 49. Every visible string must belong to the intended user's task. Do not render implementation explanations, internal prompt or policy names, inheritance models, architecture boundaries, acceptance annotations, debug metadata, internal identifiers, or version suffixes such as `system-boundary-v7` and `class-dragon2-v4`. Move those details to PRD, code comments, configuration metadata, or developer diagnostics. A modified page or dialog with unexplained internal language visible at its manifest viewport fails delivery.
+50. The copy audit covers runtime-rendered content and assistive text, not only static HTML: dialogs, drawers, menus, tooltips, placeholders, toasts, tables, loading, empty, error, success, disabled, permission, and expanded states, plus `aria-label`, `title`, and image alternative text. `TODO`, `TBD`, mock/placeholder labels, demo annotations, source or API errors, and unfinished product decisions block handoff.
+51. Keep review and implementation annotations outside the product viewport. Put them in Canvas notes, page PRD, QA evidence, or an explicitly developer-only diagnostic surface that is excluded from the release. Do not add explanatory cards, badges, legends, or help text solely to make the prototype understandable to reviewers.
 
 ## Icon Asset Quality
 
@@ -79,12 +81,36 @@ Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stac
 
 Prototype UI is a simulation of the product seen by its real user, not a diagram of how the product is implemented.
 
-- Before writing visible copy, name the role using the screen and the task that role is completing. Visible copy may label an action, request required input, explain an immediate consequence, or report a result the role can act on.
-- Do not expose implementation rationale, system architecture, prompt engineering, model policy, data provenance, rule inheritance, state-machine notes, QA instructions, acceptance commentary, fallback design, or developer terminology merely to explain the prototype.
-- Never append internal keys, build markers, prompt IDs, schema names, or version suffixes to user-facing labels. Put stable machine identifiers in `data-*`, configuration, or source metadata instead.
+Use three separate information layers:
+
+1. **Product UI:** labels, values, actions, business content, required instructions, and feedback the intended role needs to decide, act, or recover.
+2. **User help:** short, optional guidance about an immediate task or consequence. It must not explain implementation.
+3. **Internal context:** rationale, rules, prompts, architecture, identifiers, data lineage, acceptance notes, and diagnostics. Store this in Canvas notes, PRD, QA evidence, configuration, or source code, never in ordinary product UI.
+
+Apply these rules:
+
+- Name the intended role and task before writing a screen. Do not mix terminology, permissions, or explanations from product managers, developers, operators, and end users on one surface unless the confirmed product supports those roles there.
+- Visible or assistive copy may exist only when it helps the role identify content, provide required input, choose an action, understand its immediate consequence, or recover from a result.
+- Do not expose implementation rationale, system architecture, prompt engineering, model policy, data provenance, rule inheritance, state-machine notes, QA instructions, acceptance commentary, fallback design, developer terminology, or source/API errors merely to explain the prototype.
+- Never append internal keys, build markers, prompt IDs, schema names, page IDs, source names, or version suffixes to labels, placeholders, tooltips, badges, table cells, helper text, `aria-label`, `title`, or alternative text.
+- Do not show `TODO`, `TBD`, `待确认`, `待补充`, `示例文案`, `模拟数据`, `Mock`, `占位`, `静态状态`, or reviewer instructions in a release prototype. Use plausible role-appropriate content and put unresolved decisions in PRD.
+- Helper text should normally be one short, actionable sentence. If removing a paragraph does not prevent the user from deciding, acting, or recovering, move it to PRD.
+- Use one stable name for each role, object, status, and action across the page and flow. Avoid unexplained acronyms, mixed product/developer terminology, or different labels for the same destination.
+- Button copy should state the action and, when ambiguity exists, its object. Field labels must remain visible; placeholders show format or examples and must not carry the only instruction. Destructive confirmations state the affected object and irreversible consequence.
+- Use realistic synthetic content for prototype records, but never expose real credentials, webhook secrets, access tokens, private local paths, or unnecessary personal data. Do not label synthetic content as `测试数据` or `Mock` in the product UI.
+- Loading copy describes what the user is waiting for; empty copy states what is absent and the available next action; errors state what failed in user language and how to recover; success copy confirms the completed result. Never expose routes, status codes, stack traces, storage keys, service names, or retry internals.
 - If a technical capability is genuinely configured by the intended role, translate it into that role's domain language and expose only the decision and consequence they need. When the intended role is unclear, ask the product owner before adding the field.
-- Helper text must be short and action-oriented. A paragraph that explains why the system behaves a certain way belongs in `docs/<page-id>.md`, not below a form field.
-- Review every modified page and every opened modal, drawer, empty state, error state, and success state at the manifest viewport. Read only the rendered text from the intended role's perspective. Any string that requires knowledge of ProtoDock, Agent instructions, source code, prompts, schemas, inheritance levels, or internal versioning blocks handoff.
+- Review every modified page and every opened modal, drawer, menu, tooltip, expandable section, loading, empty, error, success, disabled, and permission state at the manifest viewport. Runtime JavaScript strings and accessibility text are part of the same gate.
+
+For every rendered string, ask:
+
+1. Would the intended role naturally understand this term?
+2. Does it help them decide, act, or recover now?
+3. Is it product content rather than an explanation for reviewers?
+4. Is it free of internal identifiers, versions, implementation, and unresolved decisions?
+5. Would moving it to PRD leave the task fully usable? If yes, move it.
+
+Any unresolved answer blocks handoff.
 
 Rejected and preferred examples:
 
@@ -93,8 +119,11 @@ Rejected and preferred examples:
 | `系统事实边界（只读 · system-boundary-v7）` | `回复要求` with a short note such as `由平台统一设置，当前不可编辑` |
 | `班级初始提示词（class-dragon2-v4）` | `班级回复风格` |
 | `三级继承 / 系统边界始终生效` | Omit it, or show `当前使用平台统一规则` only when the user needs that fact |
+| `本页面用于演示班级配置流程` | Omit it; describe the flow in the page PRD |
+| `模拟空状态 / 接口待接入` | `暂无班级` and a real next action such as `新建班级` |
+| `保存失败：API 500 / class_policy 写入异常` | `保存失败，请重试` or a confirmed recovery action |
 
-This contract applies to rendered product UI. It does not prohibit precise technical language inside PRD, source code, diagnostics intended for developers, or a product whose explicitly confirmed target user is a developer.
+This contract applies to all product UI included in the release. It does not prohibit precise technical language inside PRD, source code, or developer diagnostics excluded from the product surface. If the confirmed product itself targets developers, retain only technical terms required for their product task; internal build IDs, prompt IDs, review annotations, and unresolved implementation notes still require explicit product justification.
 
 ## Product Documentation Contract
 

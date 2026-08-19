@@ -340,7 +340,7 @@ export PROTODOCK_GITHUB_PROXY=http://127.0.0.1:7890
 
 ## 设计 Agent
 
-设计 Agent 不需要理解 ProtoDock 的内部画布实现，只需要遵守 [DESIGN_AGENT_CONTRACT.md](./DESIGN_AGENT_CONTRACT.md)。每个 manifest page 必须恰好对应一个 canvas node；上传会阻止缺失/重复节点、悬空/重复连线和节点重叠，并对连线交叉、穿过无关节点及间距不足给出警告。普通 build/export 和上传不会自动重排画布。
+设计 Agent 不需要理解 ProtoDock 的内部画布实现，只需要遵守 [DESIGN_AGENT_CONTRACT.md](./DESIGN_AGENT_CONTRACT.md)。每个 manifest page 必须恰好对应一个 canvas node；上传会阻止缺失/重复节点、悬空/重复连线和节点重叠，并对连线交叉、穿过无关节点及间距不足给出警告。面向用户的页面不得显示实现解释、系统边界、提示词版本、继承层级、内部标识、评审注释、模拟占位或技术错误；高置信度泄露会被上传校验阻止，动态文案与可疑说明会进入校验警告并要求实际渲染复核。普通 build/export 和上传不会自动重排画布。
 
 ## 安装 ProtoDock Skill
 

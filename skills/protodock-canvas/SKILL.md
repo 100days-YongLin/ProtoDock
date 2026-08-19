@@ -41,7 +41,7 @@ Before editing, read:
 7. Before packaging, build a route table from every Canvas edge and every visible cross-page control. Each route must name its source page, control label, exact target `pageId`, and target entry. Add the explicit target to the page source now; do not leave it for upload-time inference.
 8. Before packaging, open every modified page and its modal, drawer, expandable, empty, error, and success states at the manifest viewport. Complete the User-Facing UI Copy Purity audit and remove internal explanations or identifiers from rendered UI.
 9. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
-10. Run `scripts/protodock-validate <project-root>` before packaging, then run the same command on the final ZIP. A non-zero exit code blocks delivery; do not hand the ZIP to the user or ask them to discover the error during upload.
+10. Run `scripts/protodock-validate <project-root>` before packaging, then run the same command on the final ZIP. A non-zero exit code blocks delivery; do not hand the ZIP to the user or ask them to discover the error during upload. Treat every `UI 文案` warning as unresolved until rendered inspection proves it is internal-only metadata; visible matches must be removed or rewritten. Use `--warnings-as-errors` when the reviewed project has no accepted visual or documentation warnings.
 11. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and a concise description. Prefer the sections `用户体验`, `产品调整`, and `前后端逻辑`, and include only sections relevant to the change. This is an Agent writing convention, not a save, validation, or publishing gate. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
 
 ## Local Project Root Contract
@@ -236,14 +236,82 @@ Rejected:
 
 The prototype must read like the real product for its intended role. It must not expose the Agent's reasoning or the system's implementation model.
 
-1. Before adding visible copy, state the intended role and the task being completed. Keep only labels, required instructions, immediate consequences, actionable feedback, and product content that role needs.
-2. Do not render implementation explanations, architecture boundaries, system or model policies, prompt-engineering notes, rule inheritance, data provenance, state-machine descriptions, acceptance annotations, fallback strategy, QA commentary, or design rationale.
-3. Do not show internal identifiers, prompt keys, schema names, build markers, source names, or version suffixes in labels or helper text. Examples that block delivery include `system-boundary-v7`, `class-dragon2-v4`, internal `pageId` values, and labels such as `三级继承` used to explain implementation.
-4. Put internal detail in `docs/<page-id>.md`, code comments, configuration metadata, `data-*` attributes, or developer-only diagnostics. Hiding it visually while leaving it accessible as ordinary product copy is not a fix.
-5. When a real user must configure an AI-assisted behavior, translate the control into domain language. Prefer `回复要求`, `班级回复风格`, `适用场景`, and `恢复默认设置`; do not expose raw system prompts or policy hierarchy unless the product owner explicitly confirms that the target role manages them.
-6. Helper copy should normally be one short, actionable sentence. Do not add prose panels that explain why the system behaves a certain way when the user cannot act on that explanation.
-7. Audit rendered text after implementation, not only source strings. Open every modified modal, drawer, empty state, error state, success state, and expandable area at the manifest viewport. Read the interface from the intended role's perspective.
-8. Any visible string that requires knowledge of ProtoDock, Agent instructions, source code, prompts, schemas, internal inheritance, or internal versioning is a delivery-blocking issue. Remove or rewrite it before screenshots, ZIP validation, or handoff.
+### Surface separation
+
+Keep these layers separate:
+
+1. **Product UI:** labels, values, actions, business content, required instructions, and feedback needed by the intended role.
+2. **User help:** brief optional guidance about the immediate task or consequence.
+3. **Internal context:** rationale, architecture, prompts, policies, inheritance, identifiers, state models, data lineage, acceptance notes, and diagnostics. Store this in `docs/<page-id>.md`, Canvas notes, QA evidence, configuration, `data-*`, source comments, or an explicitly developer-only diagnostic surface excluded from release.
+
+Do not add explanatory cards, badges, legends, inline annotations, or paragraphs merely to help product reviewers understand the prototype. The page PRD and Canvas notes are the review layer.
+
+### Allowed product copy
+
+Before writing a screen, state the intended role and current task. A rendered string is justified only when it helps that role:
+
+- identify content or a business state;
+- provide required input;
+- choose or confirm an action;
+- understand the immediate user-visible consequence;
+- recover from loading, empty, error, permission, or disabled states;
+- read genuine product, legal, safety, or compliance content required by the product.
+
+Labels use the role's domain language. Buttons describe the action. Helper text should normally be one short actionable sentence. If removing a paragraph does not prevent the role from deciding, acting, or recovering, move it to PRD.
+
+Keep product language internally consistent:
+
+- Use one stable name for each role, object, status, and destination across related pages.
+- Use action-oriented button labels; include the object when `确定`, `继续`, or `提交` would be ambiguous.
+- Keep field labels visible. Placeholders may show an example or format but must not be the only label or instruction.
+- Destructive confirmations name the affected object and irreversible consequence. Do not hide the impact in generic helper prose.
+- Use concise, natural language and familiar domain terms. Avoid unexplained acronyms and mixed product/developer terminology.
+
+### Forbidden leakage
+
+The following are delivery-blocking when rendered in ordinary product UI:
+
+1. Implementation explanations, architecture boundaries, state-machine descriptions, fallback strategy, source/API behavior, storage behavior, data provenance, model policy, prompt-engineering notes, or rule inheritance.
+2. Product-review language such as acceptance commentary, design rationale, interaction explanation, scope notes, QA instructions, or text beginning with ideas such as `本页面用于`, `这里展示`, `本次新增`, or `为了方便演示` when it addresses reviewers instead of users.
+3. Internal identifiers, prompt keys, schema names, route names, source names, component names, internal `pageId` values, build markers, commit hashes, or internal version suffixes. Examples include `system-boundary-v7` and `class-dragon2-v4`.
+4. Unfinished or fake-product copy such as `TODO`, `TBD`, `待确认`, `待补充`, `示例文案`, `模拟数据`, `Mock`, `占位`, `静态状态`, `接口待接入`, and test instructions. Use plausible role-appropriate content; record uncertainty in PRD.
+5. Raw technical failure details such as HTTP status codes, stack traces, file paths, service names, database keys, payload fields, or retry internals. User errors must state what failed and the confirmed recovery action.
+6. Internal text hidden only visually. Tooltips, placeholders, menus, toasts, table cells, `aria-label`, `title`, and image alternative text are user-facing too.
+7. Real credentials, webhook secrets, access tokens, private local paths, or unnecessary personal data. Use realistic synthetic records without labeling them as `Mock` or `测试数据` in the product UI.
+
+### State copy
+
+- **Loading:** say what the user is waiting for, without naming the internal pipeline.
+- **Empty:** say what is absent and offer a real next action when one exists.
+- **Error:** say what failed in user language and how to retry, change input, or seek help.
+- **Success:** confirm the completed result and the next meaningful action, if any.
+- **Permission or disabled:** state the required permission or condition only when the user can understand or act on it. Do not explain authorization architecture.
+
+### AI-assisted settings
+
+Translate AI implementation into business controls. Prefer terms such as `回复要求`, `班级回复风格`, `适用场景`, and `恢复默认设置`. Do not expose raw system prompts, policy hierarchy, model names, temperature, prompt IDs, or hidden guardrails unless the product owner explicitly confirms that the intended role manages those exact technical concepts. When the role is unclear, ask before adding the control.
+
+### Rendered-copy gate
+
+Audit behavior after implementation, not only source strings:
+
+1. Inventory every modified page and its modal, drawer, menu, tooltip, expandable section, loading, empty, error, success, disabled, and permission states.
+2. Open each state at the manifest viewport in the local Player and representative public Share flow.
+3. Read all visible and assistive strings from the intended role's perspective, including runtime JavaScript content.
+4. Classify each string as product label, input, action, business content, user help, feedback, legal/safety content, or internal context. Internal context must leave the product surface.
+5. Compare repeated roles, objects, statuses, destinations, and actions across the flow; resolve inconsistent names and ambiguous generic buttons.
+6. Check that sample records are synthetic and contain no credential, webhook, token, private path, or unnecessary personal data.
+7. Confirm interaction remains understandable after removals; do not replace deleted explanations with another annotation block.
+
+Ask of every string:
+
+1. Would the intended role naturally understand this term?
+2. Does it help them decide, act, or recover now?
+3. Is it product content rather than an explanation for reviewers?
+4. Is it free of internal IDs, versions, implementation, and unresolved decisions?
+5. Would moving it to PRD leave the task fully usable? If yes, move it.
+
+Any unresolved answer blocks screenshots, ZIP validation, release, and handoff.
 
 Examples:
 
@@ -252,8 +320,11 @@ Examples:
 | `系统事实边界（只读 · system-boundary-v7）` | `回复要求` and, when needed, `由平台统一设置，当前不可编辑` |
 | `班级初始提示词（class-dragon2-v4）` | `班级回复风格` |
 | `三级继承 / 系统边界始终生效` | Omit it, or use `当前使用平台统一规则` only when that fact affects the user's decision |
+| `本页面用于演示班级配置流程` | Omit it; describe the flow in `docs/<page-id>.md` |
+| `模拟空状态 / 接口待接入` | `暂无班级` and a real next action such as `新建班级` |
+| `保存失败：API 500 / class_policy 写入异常` | `保存失败，请重试` or another confirmed recovery action |
 
-This rule applies to rendered product UI. Precise technical terminology remains appropriate in PRD, source code, and developer-only diagnostics. If the product itself targets developers, retain only terms that are part of their confirmed product task; internal build and prompt IDs still require explicit product justification.
+This rule applies to every product surface included in the release. Precise technical language remains appropriate in PRD, source code, and developer diagnostics excluded from product UI. If the confirmed product itself targets developers, retain only terms required for their product task; internal build IDs, prompt IDs, review annotations, and unresolved implementation notes still require explicit product justification.
 
 ## Product Documentation Contract
 

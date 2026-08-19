@@ -101,6 +101,66 @@ SCRIPT_RELATIVE_BASE_PATTERN = re.compile(
     r"new\s+URL\s*\([^)]*,\s*(?:document\s*\.\s*currentScript\s*\.\s*src|import\s*\.\s*meta\s*\.\s*url)",
     re.IGNORECASE,
 )
+UI_COPY_ATTRIBUTES = ("aria-label", "title", "placeholder", "alt")
+UI_COPY_EXCLUDED_TAGS = {"script", "style", "template", "noscript"}
+UI_COPY_INTERNAL_PATTERNS = (
+    (
+        "内部版本标识",
+        re.compile(
+            r"\b(?:system|class|prompt|policy|boundary|schema|state|page|component|model|flow|rule)"
+            r"(?:-[a-z0-9]+){1,}-v\d+\b",
+            re.IGNORECASE,
+        ),
+    ),
+    ("内部实现术语", re.compile(r"系统事实边界|系统边界始终生效|三级继承")),
+)
+UI_COPY_WARNING_PATTERNS = (
+    (
+        "未完成或模拟内容",
+        re.compile(
+            r"\b(?:TODO|TBD|FIXME|Lorem\s+ipsum)\b|待确认|待补充|待设计|待开发|开发中|"
+            r"示例文案|临时文案|模拟(?:空状态|数据)|测试数据|接口待接入|静态状态|仅供演示",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "面向评审的解释",
+        re.compile(r"本页面用于|为了方便演示|这里展示|本次新增|原型说明|设计说明|交互说明|验收说明"),
+    ),
+    (
+        "内部实现术语",
+        re.compile(
+            r"页面\s*ID|\bpageId\b|状态机|数据来源|接口字段|兜底策略|降级策略|"
+            r"(?:system|class|prompt|policy|boundary|schema|state|page|component|model|flow|rule)_[a-z0-9_]+",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "技术错误细节",
+        re.compile(
+            r"\bAPI\s*[45]\d\d\b|\bHTTP\s*[45]\d\d\b|stack\s*trace|traceback|"
+            r"\b(?:ENOENT|ECONNREFUSED|SQLException|NullPointerException)\b|写入异常|解析异常",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "AI 内部配置术语",
+        re.compile(r"系统提示词|初始提示词|提示词版本|模型温度|策略层级|规则继承|\btemperature\b", re.IGNORECASE),
+    ),
+    (
+        "敏感凭证或本地路径",
+        re.compile(
+            r"https://open\.feishu\.cn/open-apis/bot/v2/hook/[a-z0-9-]+|"
+            r"\b(?:sk|ghp|github_pat)_[a-z0-9_-]{12,}\b|\bBearer\s+[a-z0-9._-]{12,}|"
+            r"(?:/Users/|/home/|[A-Z]:\\Users\\)[^\s<>'\"]+",
+            re.IGNORECASE,
+        ),
+    ),
+)
+JAVASCRIPT_STRING_PATTERN = re.compile(
+    r"(?P<quote>['\"`])(?P<value>(?:\\.|(?!(?P=quote)).)*)(?P=quote)",
+    re.DOTALL,
+)
 
 
 def changelog_description_issue(description: str) -> str:
@@ -410,11 +470,41 @@ class PrototypeHTMLParser(HTMLParser):
         self.inline_scripts = []
         self.script_sources = []
         self.resource_references = []
+        self.copy_candidates = []
         self._control_stack = []
+        self._copy_stack = []
         self._script = None
 
     def handle_starttag(self, tag, attrs):
         attributes = {str(name).lower(): value or "" for name, value in attrs}
+        parent_excluded = any(excluded for _, excluded in self._copy_stack)
+        inline_style = attributes.get("style", "").replace(" ", "").lower()
+        copy_excluded = parent_excluded or tag in UI_COPY_EXCLUDED_TAGS or (
+            "hidden" in attributes
+            or attributes.get("aria-hidden", "").lower() == "true"
+            or (tag == "input" and attributes.get("type", "").lower() == "hidden")
+            or "display:none" in inline_style
+            or "visibility:hidden" in inline_style
+        )
+        if not copy_excluded:
+            for attribute in UI_COPY_ATTRIBUTES:
+                value = attributes.get(attribute, "").strip()
+                if value:
+                    self.copy_candidates.append({
+                        "kind": attribute,
+                        "text": value,
+                        "line": self.getpos()[0],
+                    })
+            if tag == "input" and attributes.get("type", "").lower() not in {
+                "password", "file", "checkbox", "radio", "range", "color",
+            }:
+                value = attributes.get("value", "").strip()
+                if value:
+                    self.copy_candidates.append({
+                        "kind": "value",
+                        "text": value,
+                        "line": self.getpos()[0],
+                    })
         for attribute in STATIC_RESOURCE_ATTRIBUTES.get(tag, ()):
             value = attributes.get(attribute, "").strip()
             if value:
@@ -463,6 +553,7 @@ class PrototypeHTMLParser(HTMLParser):
             self.controls.append(control)
         if tag not in VOID_TAGS:
             self._control_stack.append((tag, control))
+            self._copy_stack.append((tag, copy_excluded))
         if tag == "script":
             source = attributes.get("src", "").strip()
             if source:
@@ -482,10 +573,20 @@ class PrototypeHTMLParser(HTMLParser):
             if self._control_stack[index][0] == tag:
                 del self._control_stack[index:]
                 break
+        for index in range(len(self._copy_stack) - 1, -1, -1):
+            if self._copy_stack[index][0] == tag:
+                del self._copy_stack[index:]
+                break
 
     def handle_data(self, data):
         if self._script is not None:
             self._script["text"].append(data)
+        elif not any(excluded for _, excluded in self._copy_stack) and data.strip():
+            self.copy_candidates.append({
+                "kind": "text",
+                "text": data.strip(),
+                "line": self.getpos()[0],
+            })
         for _, control in self._control_stack:
             if control is not None:
                 control["text"].append(data)
@@ -506,6 +607,123 @@ def static_resource_target(source_path: Path, reference: str, project_root: Path
     if target != project_root and project_root not in target.parents:
         return None, "资源路径越过项目根目录"
     return target, None
+
+
+def validate_user_facing_copy(project_dir: Path, manifest: dict) -> dict:
+    project_root = project_dir.resolve()
+    pages = manifest.get("pages", {}) if isinstance(manifest, dict) else {}
+    issues = []
+    warnings = []
+    scanned_page_count = 0
+    scanned_candidate_count = 0
+    scanned_scripts = set()
+    reported = set()
+
+    def report(page_id: str, source_label: str, line: int, kind: str, text: str, *, dynamic: bool):
+        nonlocal scanned_candidate_count
+        value = " ".join(str(text or "").split())
+        if not value:
+            return
+        scanned_candidate_count += 1
+        pattern_sets = (
+            (UI_COPY_INTERNAL_PATTERNS, "issue" if not dynamic else "warning"),
+            (UI_COPY_WARNING_PATTERNS, "warning"),
+        )
+        for patterns, severity in pattern_sets:
+            for category, pattern in patterns:
+                match = pattern.search(value)
+                if not match:
+                    continue
+                excerpt_start = max(0, match.start() - 28)
+                excerpt_end = min(len(value), match.end() + 48)
+                excerpt = value[excerpt_start:excerpt_end]
+                if excerpt_start:
+                    excerpt = f"…{excerpt}"
+                if excerpt_end < len(value):
+                    excerpt = f"{excerpt}…"
+                key = (severity, source_label, line, category, excerpt)
+                if key in reported:
+                    continue
+                reported.add(key)
+                location = f"{page_id} · {source_label}:{line}"
+                if severity == "issue":
+                    issues.append(
+                        f"{location} · UI 文案泄露{category}：{excerpt}；请改成目标用户语言或移至 PRD/内部元数据"
+                    )
+                else:
+                    runtime_note = "疑似运行时文案" if dynamic else "UI 文案"
+                    warnings.append(
+                        f"{location} · {runtime_note}包含{category}：{excerpt}；请在实际渲染状态中确认并移除"
+                    )
+
+    def inspect_script(page_id: str, source_label: str, source: str, base_line: int = 1):
+        for match in JAVASCRIPT_STRING_PATTERN.finditer(source):
+            value = match.group("value")
+            if not any(pattern.search(value) for pattern_group in (UI_COPY_INTERNAL_PATTERNS, UI_COPY_WARNING_PATTERNS) for _, pattern in pattern_group):
+                continue
+            line = base_line + source.count("\n", 0, match.start())
+            report(page_id, source_label, line, "script-string", value, dynamic=True)
+
+    for page_id, page in pages.items():
+        if not isinstance(page, dict):
+            continue
+        entry = clean_relative_path(page.get("entry", ""))
+        entry_path = (project_root / entry).resolve()
+        if not entry or not entry_path.is_file() or (entry_path != project_root and project_root not in entry_path.parents):
+            continue
+        try:
+            source = entry_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            warnings.append(f"{page_id} · {entry} 不是 UTF-8，未执行 UI 文案检查")
+            continue
+        parser = PrototypeHTMLParser(page_id)
+        try:
+            parser.feed(source)
+        except Exception:
+            warnings.append(f"{page_id} · {entry} HTML 无法完整解析，UI 文案检查可能不完整")
+        scanned_page_count += 1
+        for candidate in parser.copy_candidates:
+            report(
+                page_id,
+                entry,
+                candidate["line"],
+                candidate["kind"],
+                candidate["text"],
+                dynamic=False,
+            )
+        for inline_script in parser.inline_scripts:
+            inspect_script(
+                page_id,
+                entry,
+                "".join(inline_script["text"]),
+                inline_script["line"],
+            )
+        for script_source, script_line in parser.script_sources:
+            script_path, path_issue = static_resource_target(entry_path, script_source, project_root)
+            if path_issue or script_path is None or not script_path.is_file() or script_path.suffix.lower() not in {".js", ".mjs"}:
+                continue
+            if script_path in scanned_scripts:
+                continue
+            scanned_scripts.add(script_path)
+            try:
+                script_text = script_path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                warnings.append(
+                    f"{page_id} · {script_path.relative_to(project_root)} 不是 UTF-8，未执行运行时 UI 文案检查"
+                )
+                continue
+            inspect_script(page_id, script_path.relative_to(project_root).as_posix(), script_text)
+
+    return {
+        "issues": list(dict.fromkeys(issues)),
+        "warnings": list(dict.fromkeys(warnings)),
+        "stats": {
+            "uiCopyScannedPageCount": scanned_page_count,
+            "uiCopyCandidateCount": scanned_candidate_count,
+            "uiCopyIssueCount": len(list(dict.fromkeys(issues))),
+            "uiCopyWarningCount": len(list(dict.fromkeys(warnings))),
+        },
+    }
 
 
 def static_resource_suffix(reference: str) -> str:

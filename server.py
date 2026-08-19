@@ -33,6 +33,7 @@ from protodock_validation import (
     validate_cross_page_navigation,
     validate_product_documents,
     validate_static_resource_references,
+    validate_user_facing_copy,
 )
 
 
@@ -758,15 +759,17 @@ def validate_project_manifest_files(
     navigation_validation = validate_cross_page_navigation(project_dir, manifest)
     resource_validation = validate_static_resource_references(project_dir, manifest)
     product_doc_validation = validate_product_documents(project_dir, manifest)
+    ui_copy_validation = validate_user_facing_copy(project_dir, manifest)
     change_log_validation = validate_changelog(manifest)
     canvas_issues = canvas_validation["issues"]
     navigation_issues = navigation_validation["issues"]
     resource_issues = resource_validation["issues"]
+    ui_copy_issues = ui_copy_validation["issues"]
     change_log_issues = change_log_validation["issues"]
-    if issues or canvas_issues or navigation_issues or resource_issues or change_log_issues:
+    if issues or canvas_issues or navigation_issues or resource_issues or ui_copy_issues or change_log_issues:
         issue_categories = sum(
             bool(category)
-            for category in (issues, canvas_issues, navigation_issues, resource_issues, change_log_issues)
+            for category in (issues, canvas_issues, navigation_issues, resource_issues, ui_copy_issues, change_log_issues)
         )
         if issue_categories > 1:
             code = "PROJECT_VALIDATION_FAILED"
@@ -776,6 +779,8 @@ def validate_project_manifest_files(
             code = "NAVIGATION_INVALID"
         elif resource_issues:
             code = "STATIC_RESOURCES_INVALID"
+        elif ui_copy_issues:
+            code = "USER_FACING_COPY_INVALID"
         elif change_log_issues:
             code = "CHANGELOG_INVALID"
         else:
@@ -789,19 +794,23 @@ def validate_project_manifest_files(
             "STATIC_RESOURCES_INVALID": (
                 f"静态资源校验失败。请确认资源存在且路径相对于{source_label}。{remediation}"
             ),
+            "USER_FACING_COPY_INVALID": (
+                "用户界面文案校验失败。请移除内部标识、实现说明或评审注释，并改成目标用户语言。"
+                f"{remediation}"
+            ),
             "CHANGELOG_INVALID": f"变更记录校验失败。请修复空内容或无效时间后重试。{remediation}",
             "PROJECT_FILES_INVALID": (
                 f"项目文件校验失败。请确认 entry 与 doc 路径相对于{source_label}且文件存在。{remediation}"
             ),
             "PROJECT_VALIDATION_FAILED": (
-                f"项目存在多类校验问题。请按下方明细分别修复文件、Canvas、导航或资源。{remediation}"
+                f"项目存在多类校验问题。请按下方明细分别修复文件、Canvas、导航、资源、文案或变更记录。{remediation}"
             ),
         }
         raise ProtoDockError(
             HTTPStatus.BAD_REQUEST,
             messages[code],
             code=code,
-            details=issues + canvas_issues + navigation_issues + resource_issues + change_log_issues,
+            details=issues + canvas_issues + navigation_issues + resource_issues + ui_copy_issues + change_log_issues,
         )
     return {
         "manifest": manifest,
@@ -815,11 +824,13 @@ def validate_project_manifest_files(
         },
         "resources": resource_validation["stats"],
         "productDocs": product_doc_validation["stats"],
+        "uiCopy": ui_copy_validation["stats"],
         "changelog": change_log_validation["stats"],
         "warnings": (
             canvas_validation["warnings"]
             + navigation_validation["warnings"]
             + resource_validation["warnings"]
+            + ui_copy_validation["warnings"]
             + change_log_validation["warnings"]
             + product_doc_validation["warnings"]
         ),
