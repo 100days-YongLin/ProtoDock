@@ -50,7 +50,7 @@ product-workspace/
 ```
 
 1. Keep every endpoint independently valid and openable. Do not replace child manifests with one combined manifest and do not merge endpoint Canvas data.
-2. Use the workspace root as the single Git root for new products. Do not create nested endpoint repositories; keep cross-end contracts, endpoint PRDs, prototypes, and release notes reviewable in one diff.
+2. Use the workspace root as the single Git root for a new standalone product. When the product already lives inside one same-product monorepo, retain that ancestor as the only Git root and treat the workspace root as the product source boundary. In both cases, endpoint directories must not contain nested repositories, and cross-end contracts, endpoint PRDs, prototypes, and release notes must remain reviewable in one branch and one diff.
 3. `protodock.workspace.json` contains only product identity/version, `sharedDocs`, and endpoint `id`/`name`/`path`. Every path is workspace-relative and must not contain `..`.
 4. Use the standard direct shared documents for product scope, roles/permissions, domain/data, interface/events, cross-end flows, and decisions/open questions. Keep page presentation and interaction in the owning `docs/<page-id>.md`.
 5. Every workspace page PRD declares `关联共享契约`, `共享契约`, `本页职责`, and `依赖能力`. Reference shared document/flow IDs; never copy or redefine shared roles, fields, states, permissions, interface outcomes, or cross-end acceptance.
