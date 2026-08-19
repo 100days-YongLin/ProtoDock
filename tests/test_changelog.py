@@ -15,7 +15,7 @@ class ChangeLogValidationTests(unittest.TestCase):
         result = validate_changelog({
             "pendingChanges": [{
                 "changedAt": "2026-08-18T10:30:00+08:00",
-                "description": "- 用户：空数据时可以看到明确提示\n- 产品：补充空状态展示规则",
+                "description": "用户体验：\n- 空数据时可以看到明确提示\n产品调整：\n- 补充空状态展示规则",
             }]
         })
         self.assertEqual(result["issues"], [])
@@ -28,14 +28,32 @@ class ChangeLogValidationTests(unittest.TestCase):
         })
         self.assertEqual(len(result["issues"]), 2)
 
-    def test_pending_change_requires_user_first_bullet_format(self):
+    def test_pending_change_requires_section_order(self):
         result = validate_changelog({
             "pendingChanges": [{
                 "changedAt": "2026-08-18T10:30:00+08:00",
-                "description": "- 产品：统一空状态规则\n- 用户：可以看到明确提示",
+                "description": "产品调整：\n- 统一空状态规则\n用户体验：\n- 可以看到明确提示",
             }]
         })
-        self.assertTrue(any("先写用户视角" in issue for issue in result["issues"]))
+        self.assertTrue(any("依次填写" in issue for issue in result["issues"]))
+
+    def test_legacy_prefixed_bullets_remain_valid(self):
+        result = validate_changelog({
+            "pendingChanges": [{
+                "changedAt": "2026-08-18T10:30:00+08:00",
+                "description": "- 用户：可以看到明确提示\n- 产品：统一空状态规则",
+            }]
+        })
+        self.assertEqual(result["issues"], [])
+
+    def test_included_section_cannot_be_empty(self):
+        result = validate_changelog({
+            "pendingChanges": [{
+                "changedAt": "2026-08-18T10:30:00+08:00",
+                "description": "用户体验：\n- 可以看到明确提示\n产品调整：\n- 统一空状态规则\n前后端逻辑：",
+            }]
+        })
+        self.assertTrue(any("至少需要一条" in issue for issue in result["issues"]))
 
     def test_valid_changelog_reports_current_version(self):
         result = validate_changelog({

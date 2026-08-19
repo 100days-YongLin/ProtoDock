@@ -63,7 +63,11 @@ PRODUCT_DOC_SECTIONS = (
 TECHNICAL_DOC_HEADINGS = {"源码", "源码位置", "原型入口", "react来源", "技术实现", "实现说明"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_ACCEPTANCE_LABELS = ("前提", "操作", "预期")
-CHANGELOG_BULLET_PATTERN = re.compile(r"^-\s*(用户|产品)\s*：\s*(\S.+|\S)$")
+CHANGELOG_LEGACY_BULLET_PATTERN = re.compile(r"^-\s*(用户|产品)\s*：\s*(\S.+|\S)$")
+CHANGELOG_SECTION_PATTERN = re.compile(r"^(用户体验|产品调整|前后端逻辑)\s*：$")
+CHANGELOG_PLAIN_BULLET_PATTERN = re.compile(r"^-\s*(\S.+|\S)$")
+CHANGELOG_SECTION_ORDER = ("用户体验", "产品调整", "前后端逻辑")
+CHANGELOG_LEGACY_SECTION = {"用户": "用户体验", "产品": "产品调整"}
 MAX_CHANGELOG_ITEMS = 8
 MAX_CHANGELOG_ITEM_LENGTH = 80
 STATIC_RESOURCE_ATTRIBUTES = {
@@ -103,18 +107,43 @@ def changelog_description_issue(description: str) -> str:
     lines = [line.strip() for line in str(description or "").splitlines() if line.strip()]
     if not lines:
         return "更新内容不能为空"
-    matches = [CHANGELOG_BULLET_PATTERN.fullmatch(line) for line in lines]
-    if any(match is None for match in matches):
-        return "每行必须使用“- 用户：”或“- 产品：”项目符号"
-    if len(lines) > MAX_CHANGELOG_ITEMS:
+    legacy_matches = [CHANGELOG_LEGACY_BULLET_PATTERN.fullmatch(line) for line in lines]
+    if all(legacy_matches):
+        items = [
+            (CHANGELOG_LEGACY_SECTION[match.group(1)], match.group(2).strip())
+            for match in legacy_matches
+        ]
+    else:
+        headings = []
+        items = []
+        current_section = ""
+        for line in lines:
+            heading = CHANGELOG_SECTION_PATTERN.fullmatch(line)
+            if heading:
+                current_section = heading.group(1)
+                headings.append(current_section)
+                continue
+            bullet = CHANGELOG_PLAIN_BULLET_PATTERN.fullmatch(line)
+            if not bullet or not current_section:
+                return "必须按“用户体验 / 产品调整 / 前后端逻辑”分栏，并在栏目下使用短项目符号"
+            items.append((current_section, bullet.group(1).strip()))
+        if not headings or len(set(headings)) != len(headings):
+            return "每个更新栏目只能出现一次"
+        heading_indexes = [CHANGELOG_SECTION_ORDER.index(heading) for heading in headings]
+        if any(current <= previous for previous, current in zip(heading_indexes, heading_indexes[1:])):
+            return "必须依次填写用户体验、产品调整、前后端逻辑"
+        if any(not any(audience == heading for audience, _ in items) for heading in headings):
+            return "已填写的更新栏目至少需要一条内容"
+    if len(items) > MAX_CHANGELOG_ITEMS:
         return f"最多 {MAX_CHANGELOG_ITEMS} 项，请合并精简"
-    if any(len(match.group(2).strip()) > MAX_CHANGELOG_ITEM_LENGTH for match in matches):
+    if any(len(content) > MAX_CHANGELOG_ITEM_LENGTH for _, content in items):
         return f"每项不能超过 {MAX_CHANGELOG_ITEM_LENGTH} 字"
-    audiences = [match.group(1) for match in matches]
-    if "用户" not in audiences or "产品" not in audiences:
-        return "必须同时包含用户视角和产品视角"
-    if audiences.index("产品") < len(audiences) - 1 - audiences[::-1].index("用户"):
-        return "必须先写用户视角，再写产品视角"
+    audiences = [audience for audience, _ in items]
+    if "用户体验" not in audiences or "产品调整" not in audiences:
+        return "必须同时包含用户体验和产品调整"
+    audience_indexes = [CHANGELOG_SECTION_ORDER.index(audience) for audience in audiences]
+    if any(current < previous for previous, current in zip(audience_indexes, audience_indexes[1:])):
+        return "必须依次填写用户体验、产品调整、前后端逻辑"
     return ""
 
 

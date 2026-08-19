@@ -391,12 +391,16 @@
 
       <div class="change-log-form">
         <label class="field">
-          <span>用户视角（每行一项）</span>
+          <span>用户体验（每行一项）</span>
           <textarea id="changeLogUserDescription" maxlength="600" rows="3" placeholder="例如：家长可以在报告页直接查看本周成长趋势"></textarea>
         </label>
         <label class="field">
-          <span>产品视角（每行一项）</span>
+          <span>产品调整（每行一项）</span>
           <textarea id="changeLogProductDescription" maxlength="600" rows="3" placeholder="例如：统一周报入口、状态判断和空数据规则"></textarea>
+        </label>
+        <label class="field">
+          <span>前后端逻辑（可选，每行一项）</span>
+          <textarea id="changeLogTechnicalDescription" maxlength="600" rows="3" placeholder="例如：保存后同步刷新周报状态，失败时保留已填写内容"></textarea>
         </label>
         <span class="field-message" id="changeLogMessage" aria-live="polite"></span>
       </div>
@@ -568,8 +572,8 @@
 
       <label class="github-message-field" id="publishCommitField">
         <span>更新内容</span>
-        <textarea id="publishCommitMessage" maxlength="1200" rows="6" placeholder="- 用户：用户能感知到的变化&#10;- 产品：功能范围、流程或规则变化"></textarea>
-        <small>每行一项；用户视角在前，产品视角在后。</small>
+        <textarea id="publishCommitMessage" maxlength="1200" rows="8" placeholder="用户体验：&#10;- 用户能感知到的变化&#10;产品调整：&#10;- 功能范围、流程或规则变化&#10;前后端逻辑：&#10;- 必要的交互、接口或数据规则变化"></textarea>
+        <small>按用户体验、产品调整、前后端逻辑归纳；第三栏没有变化时可省略。</small>
       </label>
 
       <details class="github-key-panel publish-github-settings">
@@ -711,13 +715,13 @@
   <script src="./publish-summary.js?v=4"></script>
   <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=2"></script>
-  <script src="./project-changelog.js?v=4"></script>
-  <script src="./project-changelog-dialog.js?v=3"></script>
+  <script src="./project-changelog.js?v=5"></script>
+  <script src="./project-changelog-dialog.js?v=4"></script>
   <script src="./local-resource-paths.js?v=1"></script>
   <script src="./local-preview-assets.js?v=1"></script>
   <script src="./product-document-cache.js?v=4"></script>
   <script src="./product-document.js?v=7"></script>
-  <script src="./app.js?v=17"></script>
+  <script src="./app.js?v=18"></script>
   <script src="./project-name.js"></script>
   <script src="./share.js?v=10"></script>
 </body>

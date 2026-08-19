@@ -3,6 +3,7 @@
     modal: document.getElementById('changeLogModal'),
     userDescription: document.getElementById('changeLogUserDescription'),
     productDescription: document.getElementById('changeLogProductDescription'),
+    technicalDescription: document.getElementById('changeLogTechnicalDescription'),
     message: document.getElementById('changeLogMessage'),
     close: document.getElementById('closeChangeLogModal'),
     cancel: document.getElementById('cancelChangeLog'),
@@ -26,7 +27,8 @@
       const submit = () => {
         const description = window.ProtoDockChangeLog.formatDescription(
           els.userDescription.value,
-          els.productDescription.value
+          els.productDescription.value,
+          els.technicalDescription.value
         );
         const validation = window.ProtoDockChangeLog.validateDescription(description);
         if (!validation.ok) {
@@ -40,11 +42,12 @@
       closeActive = () => close(null);
       els.userDescription.value = '';
       els.productDescription.value = '';
+      els.technicalDescription.value = '';
       els.message.textContent = '';
       els.close.onclick = closeActive;
       els.cancel.onclick = closeActive;
       els.confirm.onclick = submit;
-      [els.userDescription, els.productDescription].forEach((textarea) => {
+      [els.userDescription, els.productDescription, els.technicalDescription].forEach((textarea) => {
         textarea.oninput = () => { els.message.textContent = ''; };
         textarea.onkeydown = (event) => {
           if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {

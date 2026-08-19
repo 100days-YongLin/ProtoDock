@@ -1,5 +1,9 @@
 (() => {
-  const DESCRIPTION_LINE = /^-\s*(用户|产品)\s*：\s*(.+)$/;
+  const LEGACY_DESCRIPTION_LINE = /^-\s*(用户|产品)\s*：\s*(.+)$/;
+  const SECTION_LINE = /^(用户体验|产品调整|前后端逻辑)\s*：$/;
+  const BULLET_LINE = /^-\s*(.+)$/;
+  const SECTION_ORDER = ['用户体验', '产品调整', '前后端逻辑'];
+  const LEGACY_SECTION = { 用户: '用户体验', 产品: '产品调整' };
   const MAX_DESCRIPTION_ITEMS = 8;
   const MAX_ITEM_LENGTH = 80;
 
@@ -8,14 +12,28 @@
   }
 
   function descriptionItems(value) {
-    return text(value)
+    const lines = text(value)
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const matched = line.match(DESCRIPTION_LINE);
-        return matched ? { audience: matched[1], content: matched[2].trim() } : null;
-      });
+      .filter(Boolean);
+    const legacyMatches = lines.map((line) => line.match(LEGACY_DESCRIPTION_LINE));
+    if (legacyMatches.every(Boolean)) {
+      return legacyMatches.map((matched) => ({
+        audience: LEGACY_SECTION[matched[1]],
+        content: matched[2].trim()
+      }));
+    }
+
+    let audience = '';
+    return lines.flatMap((line) => {
+      const section = line.match(SECTION_LINE);
+      if (section) {
+        audience = section[1];
+        return [];
+      }
+      const bullet = line.match(BULLET_LINE);
+      return bullet && audience ? [{ audience, content: bullet[1].trim() }] : [null];
+    });
   }
 
   function validateDescription(value) {
@@ -24,8 +42,23 @@
     if (!lines.length) {
       return { ok: false, message: '更新内容不能为空' };
     }
+    const legacyMatches = lines.map((line) => line.match(LEGACY_DESCRIPTION_LINE));
+    const isLegacy = legacyMatches.every(Boolean);
+    const headings = lines.filter((line) => SECTION_LINE.test(line)).map((line) => line.match(SECTION_LINE)[1]);
     if (items.some((item) => !item)) {
-      return { ok: false, message: '更新内容每行必须使用“用户”或“产品”项目符号' };
+      return { ok: false, message: '请按“用户体验 / 产品调整 / 前后端逻辑”分栏，并在栏目下使用短项目符号' };
+    }
+    if (!isLegacy) {
+      if (!headings.length || headings.some((heading, index) => headings.indexOf(heading) !== index)) {
+        return { ok: false, message: '每个更新栏目只能出现一次' };
+      }
+      const headingIndexes = headings.map((heading) => SECTION_ORDER.indexOf(heading));
+      if (headingIndexes.some((value, index) => index > 0 && value <= headingIndexes[index - 1])) {
+        return { ok: false, message: '请依次填写用户体验、产品调整、前后端逻辑' };
+      }
+      if (headings.some((heading) => !items.some((item) => item?.audience === heading))) {
+        return { ok: false, message: '已填写的更新栏目至少需要一条内容' };
+      }
     }
     if (items.length > MAX_DESCRIPTION_ITEMS) {
       return { ok: false, message: `更新内容最多 ${MAX_DESCRIPTION_ITEMS} 项，请合并精简` };
@@ -33,24 +66,30 @@
     if (items.some((item) => item.content.length > MAX_ITEM_LENGTH)) {
       return { ok: false, message: `每项更新内容不能超过 ${MAX_ITEM_LENGTH} 字` };
     }
-    const firstProductIndex = items.findIndex((item) => item.audience === '产品');
-    const lastUserIndex = items.findLastIndex((item) => item.audience === '用户');
-    if (lastUserIndex < 0 || firstProductIndex < 0) {
-      return { ok: false, message: '更新内容必须同时包含用户视角和产品视角' };
+    const audiences = items.map((item) => item.audience);
+    if (!audiences.includes('用户体验') || !audiences.includes('产品调整')) {
+      return { ok: false, message: '更新内容必须同时包含用户体验和产品调整' };
     }
-    if (firstProductIndex < lastUserIndex) {
-      return { ok: false, message: '请先写用户视角，再写产品视角' };
+    const audienceIndexes = audiences.map((audience) => SECTION_ORDER.indexOf(audience));
+    if (audienceIndexes.some((value, index) => index > 0 && value < audienceIndexes[index - 1])) {
+      return { ok: false, message: '请依次填写用户体验、产品调整、前后端逻辑' };
     }
-    return { ok: true, message: '', items };
+    return { ok: true, message: '', items, format: isLegacy ? 'legacy' : 'sections' };
   }
 
-  function formatDescription(userItems, productItems) {
-    const linesFor = (items, audience) => String(items || '')
+  function formatDescription(userItems, productItems, technicalItems = '') {
+    const linesFor = (items, audience) => {
+      const bullets = String(items || '')
       .split(/\r?\n/)
-      .map((line) => line.trim().replace(/^[-*•]\s*/, ''))
-      .filter(Boolean)
-      .map((line) => `- ${audience}：${line}`);
-    return [...linesFor(userItems, '用户'), ...linesFor(productItems, '产品')].join('\n');
+      .map((line) => line.trim().replace(/^[-*•]\s*/, '').replace(/^(?:用户|产品)\s*：\s*/, ''))
+      .filter(Boolean);
+      return bullets.length ? [`${audience}：`, ...bullets.map((line) => `- ${line}`)] : [];
+    };
+    return [
+      ...linesFor(userItems, '用户体验'),
+      ...linesFor(productItems, '产品调整'),
+      ...linesFor(technicalItems, '前后端逻辑')
+    ].join('\n');
   }
 
   function requireDescription(value) {
@@ -150,8 +189,9 @@
     const unique = (items) => [...new Set(items.map((item) => item.content))];
     const allItems = parsed.flatMap((result) => result.items);
     return formatDescription(
-      unique(allItems.filter((item) => item.audience === '用户')).join('\n'),
-      unique(allItems.filter((item) => item.audience === '产品')).join('\n')
+      unique(allItems.filter((item) => item.audience === '用户体验')).join('\n'),
+      unique(allItems.filter((item) => item.audience === '产品调整')).join('\n'),
+      unique(allItems.filter((item) => item.audience === '前后端逻辑')).join('\n')
     );
   }
 

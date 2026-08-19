@@ -26,20 +26,24 @@ assert.equal(chronologicalEntries[0].version, 'v1.0');
 
 ProtoDockChangeLog.appendPending(manifest, {
   changedAt: '2026-08-17T08:00:00.000Z',
-  description: '- 用户：登录失败时可以看到明确提示\n- 产品：补充登录页空状态规则'
+  description: '用户体验：\n- 登录失败时可以看到明确提示\n产品调整：\n- 补充登录页空状态规则'
 });
 ProtoDockChangeLog.appendPending(manifest, {
   changedAt: '2026-08-17T08:15:00.000Z',
-  description: '- 用户：二级页面可以返回真实来源页\n- 产品：统一返回历史栈与 fallback 规则'
+  description: '用户体验：\n- 二级页面可以返回真实来源页\n产品调整：\n- 统一返回规则\n前后端逻辑：\n- 优先返回历史栈，无记录时进入来源页'
 });
 
 assert.equal(manifest.changelog.length, 0);
 assert.equal(manifest.pendingChanges.length, 2);
 assert.equal(ProtoDockChangeLog.pendingDescription(manifest), [
-  '- 用户：登录失败时可以看到明确提示',
-  '- 用户：二级页面可以返回真实来源页',
-  '- 产品：补充登录页空状态规则',
-  '- 产品：统一返回历史栈与 fallback 规则'
+  '用户体验：',
+  '- 登录失败时可以看到明确提示',
+  '- 二级页面可以返回真实来源页',
+  '产品调整：',
+  '- 补充登录页空状态规则',
+  '- 统一返回规则',
+  '前后端逻辑：',
+  '- 优先返回历史栈，无记录时进入来源页'
 ].join('\n'));
 
 const release = {
@@ -62,21 +66,23 @@ assert.equal(ProtoDockChangeLog.suggestedVersion(manifest), 'v1.1');
 
 ProtoDockChangeLog.appendPending(manifest, {
   changedAt: '2026-08-17T09:00:00.000Z',
-  description: '- 用户：可以查看新增页面\n- 产品：补充新增页面入口'
+  description: '用户体验：\n- 可以查看新增页面\n产品调整：\n- 补充新增页面入口'
 });
 assert.throws(() => ProtoDockChangeLog.releaseSnapshot(manifest, {
   version: 'v1.1',
   changedAt: '2026-08-17T09:30:00.000Z',
-  description: '- 用户：可以查看新增页面\n- 产品：补充新增页面入口'
+  description: '用户体验：\n- 可以查看新增页面\n产品调整：\n- 补充新增页面入口'
 }), /已发布/);
 
 assert.equal(
-  ProtoDockChangeLog.formatDescription('可以查看新增页面\n- 返回入口更清晰', '补充页面入口'),
-  '- 用户：可以查看新增页面\n- 用户：返回入口更清晰\n- 产品：补充页面入口'
+  ProtoDockChangeLog.formatDescription('可以查看新增页面\n- 返回入口更清晰', '补充页面入口', '保存后同步刷新页面状态'),
+  '用户体验：\n- 可以查看新增页面\n- 返回入口更清晰\n产品调整：\n- 补充页面入口\n前后端逻辑：\n- 保存后同步刷新页面状态'
 );
-assert.equal(ProtoDockChangeLog.validateDescription('- 用户：体验更清晰\n- 产品：统一规则').ok, true);
+assert.equal(ProtoDockChangeLog.validateDescription('用户体验：\n- 体验更清晰\n产品调整：\n- 统一规则').ok, true);
+assert.equal(ProtoDockChangeLog.validateDescription('- 用户：旧版体验说明\n- 产品：旧版产品说明').format, 'legacy');
 assert.match(ProtoDockChangeLog.validateDescription('完成本次更新。').message, /项目符号/);
-assert.match(ProtoDockChangeLog.validateDescription('- 产品：统一规则\n- 用户：体验更清晰').message, /先写用户视角/);
+assert.match(ProtoDockChangeLog.validateDescription('产品调整：\n- 统一规则\n用户体验：\n- 体验更清晰').message, /依次填写/);
+assert.match(ProtoDockChangeLog.validateDescription('用户体验：\n- 体验更清晰\n产品调整：\n- 统一规则\n前后端逻辑：').message, /至少需要一条/);
 assert.throws(() => ProtoDockChangeLog.appendPending(manifest, {
   changedAt: new Date().toISOString(),
   description: '一段很长的更新说明。'
