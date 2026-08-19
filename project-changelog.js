@@ -38,41 +38,44 @@
 
   function validateDescription(value) {
     const lines = text(value).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    const items = descriptionItems(value);
     if (!lines.length) {
       return { ok: false, message: '更新内容不能为空' };
     }
+    if (text(value).length > 1200) {
+      return { ok: false, message: '更新内容不能超过 1200 字' };
+    }
+    const items = descriptionItems(value);
     const legacyMatches = lines.map((line) => line.match(LEGACY_DESCRIPTION_LINE));
     const isLegacy = legacyMatches.every(Boolean);
     const headings = lines.filter((line) => SECTION_LINE.test(line)).map((line) => line.match(SECTION_LINE)[1]);
     if (items.some((item) => !item)) {
-      return { ok: false, message: '请按“用户体验 / 产品调整 / 前后端逻辑”分栏，并在栏目下使用短项目符号' };
+      return { ok: true, message: '', warning: '建议按用户体验、产品调整和前后端逻辑归纳', items: [], format: 'freeform' };
     }
     if (!isLegacy) {
       if (!headings.length || headings.some((heading, index) => headings.indexOf(heading) !== index)) {
-        return { ok: false, message: '每个更新栏目只能出现一次' };
+        return { ok: true, message: '', warning: '建议每个更新栏目只出现一次', items: [], format: 'freeform' };
       }
       const headingIndexes = headings.map((heading) => SECTION_ORDER.indexOf(heading));
       if (headingIndexes.some((value, index) => index > 0 && value <= headingIndexes[index - 1])) {
-        return { ok: false, message: '请依次填写用户体验、产品调整、前后端逻辑' };
+        return { ok: true, message: '', warning: '建议依次填写用户体验、产品调整和前后端逻辑', items: [], format: 'freeform' };
       }
       if (headings.some((heading) => !items.some((item) => item?.audience === heading))) {
-        return { ok: false, message: '已填写的更新栏目至少需要一条内容' };
+        return { ok: true, message: '', warning: '空栏目可以省略', items: [], format: 'freeform' };
       }
     }
     if (items.length > MAX_DESCRIPTION_ITEMS) {
-      return { ok: false, message: `更新内容最多 ${MAX_DESCRIPTION_ITEMS} 项，请合并精简` };
+      return { ok: true, message: '', warning: `建议合并为 ${MAX_DESCRIPTION_ITEMS} 项以内`, items: [], format: 'freeform' };
     }
     if (items.some((item) => item.content.length > MAX_ITEM_LENGTH)) {
-      return { ok: false, message: `每项更新内容不能超过 ${MAX_ITEM_LENGTH} 字` };
+      return { ok: true, message: '', warning: `建议每项不超过 ${MAX_ITEM_LENGTH} 字`, items: [], format: 'freeform' };
     }
     const audiences = items.map((item) => item.audience);
     if (!audiences.includes('用户体验') || !audiences.includes('产品调整')) {
-      return { ok: false, message: '更新内容必须同时包含用户体验和产品调整' };
+      return { ok: true, message: '', warning: '建议同时说明用户体验和产品调整', items: [], format: 'freeform' };
     }
     const audienceIndexes = audiences.map((audience) => SECTION_ORDER.indexOf(audience));
     if (audienceIndexes.some((value, index) => index > 0 && value < audienceIndexes[index - 1])) {
-      return { ok: false, message: '请依次填写用户体验、产品调整、前后端逻辑' };
+      return { ok: true, message: '', warning: '建议依次填写用户体验、产品调整和前后端逻辑', items: [], format: 'freeform' };
     }
     return { ok: true, message: '', items, format: isLegacy ? 'legacy' : 'sections' };
   }
@@ -183,8 +186,8 @@
   function pendingDescription(manifest) {
     const descriptions = normalizePending(manifest?.pendingChanges).map((entry) => entry.description).filter(Boolean);
     const parsed = descriptions.map((description) => validateDescription(description));
-    if (!parsed.length || parsed.some((result) => !result.ok)) {
-      return descriptions.join('\n');
+    if (!parsed.length || parsed.some((result) => !result.ok || result.format === 'freeform')) {
+      return descriptions.join('\n\n');
     }
     const unique = (items) => [...new Set(items.map((item) => item.content))];
     const allItems = parsed.flatMap((result) => result.items);

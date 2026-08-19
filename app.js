@@ -3951,7 +3951,7 @@ ${pages}
 - 产品文档放在 \`docs/<page-id>.md\`，必须覆盖页面定位、场景、规则、状态、数据影响和产品验收。
 - 产品验收统一使用“前提 / 操作 / 预期”，源码路径和技术实现不要写入 PRD 主体。
 - 可以更新 \`${MANIFEST_FILE}\` 中的 \`pages\` 字段，但不要改 \`canvas.nodes[].x\`、\`canvas.nodes[].y\`、\`canvas.edges\` 或 \`canvas.groups\`，除非用户要求调整 flow 或页面组。
-- 每次完成一批修改后，向 \`${MANIFEST_FILE}\` 的 \`pendingChanges\` 追加时间和变更内容，不要自行生成版本号。变更内容按“用户体验 / 产品调整 / 前后端逻辑”分栏，每栏使用短项目符号；前两栏必填，第三栏仅在交互、接口、数据、权限或同步逻辑变化时填写。ProtoDock 发布时会把累计内容合并为一条正式 \`changelog\`，并以发布版本号为准。
+- 每次完成一批修改后，向 \`${MANIFEST_FILE}\` 的 \`pendingChanges\` 追加时间和变更内容，不要自行生成版本号。建议按“用户体验 / 产品调整 / 前后端逻辑”分栏并使用短项目符号；只记录与本次改动相关的栏目。此格式是写作建议，不得作为保存或发布门禁。ProtoDock 发布时会把累计内容合并为一条正式 \`changelog\`，并以发布版本号为准。
 - 飞书机器人 Webhook 等本地密钥只放在 \`protodock.local.json\`，不得写入 manifest、页面、文档、发布包或 GitHub。
 `;
 }

@@ -41,7 +41,7 @@ Before editing, read:
 7. Validate every declared page entry and document against the final project artifact.
 8. When delivering a ZIP, validate the final ZIP after packaging, not only the source directory.
 9. Run the bundled `scripts/protodock-validate` command on the final ZIP. A non-zero exit code blocks delivery; do not replace this command with a prose-only review.
-10. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and a concise three-section description: `用户体验`, `产品调整`, and optional `前后端逻辑`. Use short bullets under each heading. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
+10. After completing a batch of project edits, append one versionless `pendingChanges` item with an ISO 8601 timestamp and a concise description. Prefer the sections `用户体验`, `产品调整`, and `前后端逻辑`, and include only sections relevant to the change. This is an Agent writing convention, not a save, validation, or publishing gate. Do not invent a release version during normal editing. ProtoDock publishing merges all pending items into one `changelog` release entry using the version entered in the publish dialog, then clears `pendingChanges`.
 
 ## Local Project Root Contract
 
@@ -154,15 +154,15 @@ Treat a feature change as a coherent documentation unit, even though the durable
 
 Product-document changelog text is release communication, not an engineering diary.
 
-1. Store `description` in exactly this section order: `用户体验：`, `产品调整：`, then `前后端逻辑：` when needed. Put plain `- <change>` bullets under each heading; do not repeat the heading name on every bullet.
-2. `用户体验` is required. Describe what a real role can now see, understand, complete, avoid, or recover from. Name the role when useful, such as parent, teacher, or administrator.
-3. `产品调整` is required. Describe changed feature scope, workflow, state, permission, pricing, or business rules as product decisions.
+1. Prefer this section order when the available changes support it: `用户体验：`, `产品调整：`, then `前后端逻辑：`. Put plain `- <change>` bullets under each included heading; do not repeat the heading name on every bullet.
+2. Use `用户体验` for what a real role can now see, understand, complete, avoid, or recover from. Name the role when useful, such as parent, teacher, or administrator. Omit the section when the change has no user-visible effect.
+3. Use `产品调整` for changed feature scope, workflow, state, permission, pricing, or business rules as product decisions. Omit the section when no product rule changed.
 4. `前后端逻辑` is optional. Include it only when this release changes interaction state, validation, navigation, API behavior, data persistence, permission enforcement, synchronization, idempotency, or failure recovery. Describe observable contracts, not implementation files or code structure.
-5. Keep one outcome or rule per bullet. Aim for 25-50 Chinese characters and never exceed 80. A normal release contains 4-7 bullets total; eight is an exceptional hard ceiling, not a target. Each included section normally contains 1-3 bullets.
+5. Keep one outcome or rule per bullet. Aim for 25-50 Chinese characters. A normal release often contains 4-7 bullets total, but this is a readability target rather than a validation limit. Each included section normally contains 1-3 bullets.
 6. When several pending edit batches accumulate, synthesize them into a fresh release summary. Merge duplicate or closely related items and never concatenate every pending sentence into the final changelog.
 7. Do not write a prose paragraph. Do not start with vague text such as “完成优化”“相关调整” or “若干问题修复”. State the actual outcome.
 8. Do not put commit hashes, file paths, component names, build commands, validation counts, deployment status, page/node/edge counts, Canvas layout, viewport size, or other implementation evidence in the product changelog. Those belong in Git, QA evidence, or the engineering handoff.
-9. Preserve older prose-form and `- 用户：` / `- 产品：` entries for compatibility. Apply this contract to every newly appended `pendingChanges` item and every new formal release entry; never rewrite historical releases merely to change formatting.
+9. Preserve older prose-form and `- 用户：` / `- 产品：` entries for compatibility. User-authored freeform text and partial sections must remain publishable; formatting issues may produce suggestions but must never block save, validation, packaging, or release. Never rewrite historical releases merely to change formatting.
 
 ### Release-summary synthesis
 

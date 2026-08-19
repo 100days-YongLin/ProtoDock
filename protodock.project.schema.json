@@ -44,7 +44,7 @@
         "properties": {
           "version": { "type": "string", "minLength": 1, "maxLength": 40 },
           "changedAt": { "type": "string", "format": "date-time" },
-          "description": { "type": "string", "minLength": 1, "maxLength": 1200, "description": "Release summary with 用户体验, 产品调整, and optional 前后端逻辑 sections." }
+          "description": { "type": "string", "minLength": 1, "maxLength": 1200, "description": "Non-empty release summary; 用户体验, 产品调整, and 前后端逻辑 sections are recommended but optional." }
         }
       }
     },
@@ -57,7 +57,7 @@
         "additionalProperties": false,
         "properties": {
           "changedAt": { "type": "string", "format": "date-time" },
-          "description": { "type": "string", "minLength": 1, "maxLength": 1200, "description": "Unreleased summary with 用户体验, 产品调整, and optional 前后端逻辑 sections." }
+          "description": { "type": "string", "minLength": 1, "maxLength": 1200, "description": "Non-empty unreleased summary; sectioned bullets are recommended but optional." }
         }
       }
     },

@@ -28,14 +28,15 @@ class ChangeLogValidationTests(unittest.TestCase):
         })
         self.assertEqual(len(result["issues"]), 2)
 
-    def test_pending_change_requires_section_order(self):
+    def test_pending_change_format_only_warns(self):
         result = validate_changelog({
             "pendingChanges": [{
                 "changedAt": "2026-08-18T10:30:00+08:00",
                 "description": "产品调整：\n- 统一空状态规则\n用户体验：\n- 可以看到明确提示",
             }]
         })
-        self.assertTrue(any("依次填写" in issue for issue in result["issues"]))
+        self.assertEqual(result["issues"], [])
+        self.assertTrue(any("不影响发布" in warning for warning in result["warnings"]))
 
     def test_legacy_prefixed_bullets_remain_valid(self):
         result = validate_changelog({
@@ -46,14 +47,25 @@ class ChangeLogValidationTests(unittest.TestCase):
         })
         self.assertEqual(result["issues"], [])
 
-    def test_included_section_cannot_be_empty(self):
+    def test_included_empty_section_only_warns(self):
         result = validate_changelog({
             "pendingChanges": [{
                 "changedAt": "2026-08-18T10:30:00+08:00",
                 "description": "用户体验：\n- 可以看到明确提示\n产品调整：\n- 统一空状态规则\n前后端逻辑：",
             }]
         })
-        self.assertTrue(any("至少需要一条" in issue for issue in result["issues"]))
+        self.assertEqual(result["issues"], [])
+        self.assertTrue(any("不影响发布" in warning for warning in result["warnings"]))
+
+    def test_freeform_pending_description_is_allowed(self):
+        result = validate_changelog({
+            "pendingChanges": [{
+                "changedAt": "2026-08-18T10:30:00+08:00",
+                "description": "本次更新优化了报告查看与返回流程。",
+            }]
+        })
+        self.assertEqual(result["issues"], [])
+        self.assertTrue(result["warnings"])
 
     def test_valid_changelog_reports_current_version(self):
         result = validate_changelog({

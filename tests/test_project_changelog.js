@@ -80,13 +80,14 @@ assert.equal(
 );
 assert.equal(ProtoDockChangeLog.validateDescription('用户体验：\n- 体验更清晰\n产品调整：\n- 统一规则').ok, true);
 assert.equal(ProtoDockChangeLog.validateDescription('- 用户：旧版体验说明\n- 产品：旧版产品说明').format, 'legacy');
-assert.match(ProtoDockChangeLog.validateDescription('完成本次更新。').message, /项目符号/);
-assert.match(ProtoDockChangeLog.validateDescription('产品调整：\n- 统一规则\n用户体验：\n- 体验更清晰').message, /依次填写/);
-assert.match(ProtoDockChangeLog.validateDescription('用户体验：\n- 体验更清晰\n产品调整：\n- 统一规则\n前后端逻辑：').message, /至少需要一条/);
-assert.throws(() => ProtoDockChangeLog.appendPending(manifest, {
+assert.equal(ProtoDockChangeLog.validateDescription('完成本次更新。').format, 'freeform');
+assert.equal(ProtoDockChangeLog.validateDescription('产品调整：\n- 统一规则\n用户体验：\n- 体验更清晰').ok, true);
+assert.equal(ProtoDockChangeLog.validateDescription('用户体验：\n- 体验更清晰\n产品调整：\n- 统一规则\n前后端逻辑：').ok, true);
+ProtoDockChangeLog.appendPending(manifest, {
   changedAt: new Date().toISOString(),
   description: '一段很长的更新说明。'
-}), /项目符号/);
+});
+assert.equal(manifest.pendingChanges.at(-1).description, '一段很长的更新说明。');
 
 assert.match(ProtoDockChangeLog.formatDate('2026-08-17T08:30:00.000Z'), /2026/);
 assert.throws(() => ProtoDockChangeLog.append(manifest, {

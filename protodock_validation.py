@@ -171,7 +171,7 @@ def validate_changelog(manifest: dict) -> dict:
         else:
             format_issue = changelog_description_issue(description)
             if format_issue:
-                issues.append(f"{label}.description {format_issue}")
+                warnings.append(f"{label}.description 建议调整：{format_issue}；不影响发布")
         if not changed_at:
             issues.append(f"{label}.changedAt 不能为空")
         else:
