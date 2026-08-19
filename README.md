@@ -47,6 +47,57 @@ prototype-project/
 
 只有 manifest、`pages`、`docs` 和 `assets` 属于发布层。源码、脚本、测试、有效参考资料和当前 QA 证据属于工作层；`temps`、备份、本地密钥、缓存和日志属于本地临时层。工具要求的 `package.json`、锁文件和平台配置可以保留在根目录，除此之外不要在根目录散放截图、ZIP、实验目录或重复源码。
 
+## 多端产品工作区
+
+同一个产品包含家长端、教师端、Web 管理端等多个原型时，可以在这些项目外增加一个轻量产品工作区。每个子项目仍然是完整、独立、向后兼容的 ProtoDock 项目；工作区只增加产品身份、共享 Markdown 文档池和端列表。
+
+```text
+product-workspace/
+├── protodock.workspace.json
+├── shared-docs/
+│   ├── 01-product-overview.md
+│   ├── 02-roles-and-permissions.md
+│   └── 03-shared-business-rules.md
+└── prototypes/
+    ├── parent/
+    │   ├── protodock.project.json
+    │   ├── pages/
+    │   ├── docs/
+    │   └── assets/
+    ├── teacher/
+    │   └── ...
+    └── admin/
+        └── ...
+```
+
+`protodock.workspace.json` 示例：
+
+```json
+{
+  "schemaVersion": 1,
+  "product": {
+    "id": "youerjia",
+    "name": "优儿嘉",
+    "description": "幼儿园家园协同产品",
+    "version": "v1.2.0"
+  },
+  "sharedDocs": "shared-docs",
+  "projects": [
+    { "id": "parent", "name": "家长端", "path": "prototypes/parent" },
+    { "id": "teacher", "name": "教师端", "path": "prototypes/teacher" },
+    { "id": "admin", "name": "Web 管理端", "path": "prototypes/admin" }
+  ]
+}
+```
+
+- 想同时查看产品共享文档和多个端时，打开直接包含 `protodock.workspace.json` 的工作区根目录；顶部切换当前端，Canvas 仍只展示当前端的完整页面与连线。
+- 想单独维护某个端时，仍可直接打开该端包含 `protodock.project.json` 的项目根目录，行为与旧版完全一致。
+- `shared-docs/` 第一版只读取目录直属的 `.md` 文件，按文件名排序；一级标题作为文档名。跨端角色权限、公共业务规则、共享数据口径和术语只写一次，不复制进各端页面 PRD。
+- “完整产品文档”与公开 Share 产品文档都按“共享产品文档 → 当前端页面 PRD”汇总。它不建立功能数据库、跨端 Canvas 或额外关系图。
+- 发布仍以当前端为单位。发布包在 `docs/_shared/` 固化共享文档快照，并把 `workspaceSnapshot` 写入发布清单；不会修改子项目源目录。公开标识使用 `<产品标识>-<端标识>` 避免不同端互相覆盖，各端共用 `product.version` 作为产品发布版本。
+- 发布成功后，ProtoDock 同时把版本写回工作区 `product.version` 和当前端 `changelog`。若同一产品版本包含多个端的变化，应依次发布这些端并使用同一个版本号。
+- 使用 `scripts/protodock-validate <product-workspace>` 可一次验证工作区清单、共享文档目录和所有子项目；发布前仍需对每个最终 ZIP 单独执行同一校验。
+
 ## Agent 写入边界
 
 原型页面是可生成资产，画布排布是用户劳动成果。Agent 或导出脚本必须先保护画布，再更新页面。
@@ -147,7 +198,7 @@ python3 -m http.server 4175
 http://localhost:4175/index.html
 ```
 
-打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json` 与 `docs/*.md`。
+打开本地项目时，建议使用 Chrome 或 Edge。ProtoDock 使用 File System Access API 读取和保存 `protodock.project.json`、`docs/*.md`，以及产品工作区中的 `protodock.workspace.json` 与 `shared-docs/*.md`。
 
 本地项目预览读取资源前会自动剥离 URL 的 query/hash，并补充重写运行时插入的图片、媒体、内联背景、`srcset` 和 SVG 图片，兼容历史页面。新交付仍必须使用无歧义的纯项目相对路径：HTML 资源相对页面入口，CSS `url()`/`@import` 相对声明它的 CSS 文件。不要使用根路径、猜测源码目录层级，也不要通过 `.src = "./..."`、动态 `<img>`、`document.currentScript.src` 或 `import.meta.url` 生成项目本地图片地址；本地预览中的脚本会转换为 blob URL，与公开 Share 的基准不同。上传校验会阻止这些写法以及查询串、片段、越界路径和缺失文件。
 

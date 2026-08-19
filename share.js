@@ -24,6 +24,9 @@
     autoPanel: document.getElementById('shareAutoPanel'),
     autoTitle: document.getElementById('shareAutoTitle'),
     autoDescription: document.getElementById('shareAutoDescription'),
+    workspaceSnapshot: document.getElementById('workspacePublishSnapshot'),
+    workspaceProject: document.getElementById('workspacePublishProject'),
+    workspaceDocs: document.getElementById('workspacePublishDocs'),
     manualUpload: document.getElementById('shareManualUpload'),
     dropzone: document.getElementById('shareDropZone'),
     dropHint: document.getElementById('shareDropHint'),
@@ -176,7 +179,7 @@
 
   function preparePublishTarget() {
     const state = protoDockState();
-    const projectId = state.projectId || null;
+    const projectId = state.publishPreferenceId || state.projectId || null;
     if (formProjectId === projectId) {
       return;
     }
@@ -184,12 +187,12 @@
     syncPreferenceApplied = false;
     const target = window.ProtoDockGithubPreferences?.getPushTarget?.(projectId) || {};
     const previousVersion = window.ProtoDockPublishTargets?.previousVersion?.({
-      lastPublishedVersion: state.lastPublishedVersion,
+      lastPublishedVersion: state.workspaceVersion || state.lastPublishedVersion,
       savedVersion: target.version,
       inferredVersion: state.currentVersion
     }) || '';
     if (els.product) {
-      els.product.value = target.productName || '';
+      els.product.value = target.productName || state.publishProductId || '';
     }
     if (els.version) {
       els.version.value = initialBranchValue(previousVersion, '');
@@ -205,11 +208,11 @@
   function fillDefaults() {
     const state = protoDockState();
     const previousVersion = window.ProtoDockPublishTargets?.previousVersion?.({
-      lastPublishedVersion: state.lastPublishedVersion,
-      inferredVersion: state.currentVersion
+      lastPublishedVersion: state.workspaceVersion || state.lastPublishedVersion,
+      inferredVersion: state.workspaceVersion || state.currentVersion
     }) || '';
     if (els.product && !els.product.value) {
-      els.product.value = initialBranchValue(state.projectName || state.projectId, 'prototype');
+      els.product.value = initialBranchValue(state.publishProductId || state.projectName || state.projectId, 'prototype');
     }
     if (els.version && !els.version.value) {
       els.version.value = initialBranchValue(previousVersion, 'v1');
@@ -293,7 +296,21 @@
       const pendingText = state.pendingChangeCount
         ? `已累计 ${state.pendingChangeCount} 条待发布变更。`
         : '当前没有待发布变更。';
-      els.autoDescription.textContent = `${state.projectDirectoryName || '本地项目'}：${dirtyText}${pendingText}`;
+      const workspaceText = state.workspaceProductName
+        ? `${state.workspaceProductName} · ${state.workspaceProjectName || state.projectName}`
+        : (state.projectDirectoryName || '本地项目');
+      els.autoDescription.textContent = `${workspaceText}：${dirtyText}${pendingText}`;
+    }
+    const state = protoDockState();
+    const hasWorkspace = !!state.workspaceProductName && !!state.publishProductId;
+    if (els.workspaceSnapshot) {
+      els.workspaceSnapshot.hidden = !hasWorkspace || !usingAuto;
+    }
+    if (els.workspaceProject) {
+      els.workspaceProject.textContent = state.workspaceProjectName || state.projectName || '-';
+    }
+    if (els.workspaceDocs) {
+      els.workspaceDocs.textContent = `${state.workspaceSharedDocumentCount || 0} 份`;
     }
     if (els.manualUpload && !autoAvailable) {
       els.manualUpload.open = true;
@@ -806,7 +823,7 @@
         setStatus('高速通道不可用，正在切换普通通道...');
         payload = await uploadArchive(body, currentUploadEndpoint());
       }
-      window.ProtoDockGithubPreferences?.setPushTarget?.(protoDockState().projectId, {
+      window.ProtoDockGithubPreferences?.setPushTarget?.(protoDockState().publishPreferenceId || protoDockState().projectId, {
         productName: els.product.value,
         version: els.version.value,
         syncGithub: githubConfig?.configured ? !!els.syncGithub?.checked : true

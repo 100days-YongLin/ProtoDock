@@ -81,6 +81,59 @@ def archive_project(root: Path, archive_path: Path):
 
 
 class PackageValidatorTests(unittest.TestCase):
+    def test_accepts_workspace_shared_document_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(root, '<button data-protodock-page="detail">查看详情</button>')
+            data["workspaceSnapshot"] = {
+                "product": {"id": "youerjia", "name": "优儿嘉", "version": "v1.2.0"},
+                "project": {"id": "parent", "name": "家长端"},
+                "sharedDocs": [{
+                    "id": "overview", "title": "产品概述", "path": "docs/_shared/overview.md"
+                }],
+            }
+            (root / server.MANIFEST_FILE).write_text(json.dumps(data), encoding="utf-8")
+            (root / "docs/_shared").mkdir()
+            (root / "docs/_shared/overview.md").write_text("# 产品概述", encoding="utf-8")
+
+            result = server.validate_project_manifest_files(root)
+
+        self.assertEqual(result["workspaceSharedDocCount"], 1)
+
+    def test_rejects_missing_workspace_shared_document_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(root, '<button data-protodock-page="detail">查看详情</button>')
+            data["workspaceSnapshot"] = {
+                "product": {"id": "youerjia", "name": "优儿嘉", "version": "v1.2.0"},
+                "project": {"id": "parent", "name": "家长端"},
+                "sharedDocs": [{
+                    "id": "overview", "title": "产品概述", "path": "docs/_shared/overview.md"
+                }],
+            }
+            (root / server.MANIFEST_FILE).write_text(json.dumps(data), encoding="utf-8")
+
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.validate_project_manifest_files(root)
+
+        self.assertIn("缺少共享产品文档", " ".join(context.exception.details))
+
+    def test_rejects_workspace_snapshot_without_product_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = write_project(root, '<button data-protodock-page="detail">查看详情</button>')
+            data["workspaceSnapshot"] = {
+                "product": {"id": "youerjia", "name": "优儿嘉", "version": ""},
+                "project": {"id": "parent", "name": "家长端"},
+                "sharedDocs": [],
+            }
+            (root / server.MANIFEST_FILE).write_text(json.dumps(data), encoding="utf-8")
+
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.validate_project_manifest_files(root)
+
+        self.assertIn("id、name 和 version", " ".join(context.exception.details))
+
     def test_accepts_explicit_control_and_returns_route_table(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

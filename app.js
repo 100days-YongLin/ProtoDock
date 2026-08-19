@@ -50,6 +50,10 @@ const els = {
   openProductDocument: document.getElementById('openProductDocument'),
   productSelect: document.getElementById('productSelect'),
   currentProjectName: document.getElementById('currentProjectName'),
+  workspaceProjectSwitcher: document.getElementById('workspaceProjectSwitcher'),
+  workspaceSharedDocsSection: document.getElementById('workspaceSharedDocsSection'),
+  workspaceSharedDocsHint: document.getElementById('workspaceSharedDocsHint'),
+  workspaceSharedDocList: document.getElementById('workspaceSharedDocList'),
   pageList: document.getElementById('pageList'),
   pageSearchInput: document.getElementById('pageSearchInput'),
   pageSearchClear: document.getElementById('pageSearchClear'),
@@ -233,6 +237,13 @@ const state = {
   dirty: false,
   docCache: new Map(),
   docDirty: new Set(),
+  sharedDocCache: new Map(),
+  sharedDocDirty: new Set(),
+  workspace: null,
+  workspaceManifestHash: null,
+  activeWorkspaceProjectId: null,
+  activeSharedDocId: null,
+  workspaceSwitching: false,
   previewUrls: new Map(),
   previewJobs: new Map(),
   previewResetNodeIds: new Set(),
@@ -716,6 +727,41 @@ function activePage() {
   return node ? state.manifest.pages[node.pageId] : null;
 }
 
+function activeWorkspaceProject() {
+  return state.workspace?.projects?.find((project) => project.id === state.activeWorkspaceProjectId) || null;
+}
+
+function sharedDocumentRecords() {
+  if (state.workspace) {
+    return state.workspace.sharedDocuments || [];
+  }
+  return (state.manifest?.workspaceSnapshot?.sharedDocs || []).map((document) => ({
+    id: document.id,
+    title: document.title,
+    path: document.path,
+    releasePath: document.path,
+    readOnly: true
+  }));
+}
+
+function activeSharedDocument() {
+  return sharedDocumentRecords().find((document) => document.id === state.activeSharedDocId) || null;
+}
+
+function hasUnsavedProjectChanges() {
+  return !!state.dirty || state.docDirty.size > 0 || state.sharedDocDirty.size > 0;
+}
+
+function clearWorkspaceState() {
+  state.workspace = null;
+  state.workspaceManifestHash = null;
+  state.activeWorkspaceProjectId = null;
+  state.activeSharedDocId = null;
+  state.workspaceSwitching = false;
+  state.sharedDocCache.clear();
+  state.sharedDocDirty.clear();
+}
+
 function pageForNode(node) {
   return state.manifest?.pages[node.pageId] || buildPageRecord(node.pageId, node.pageId);
 }
@@ -896,15 +942,33 @@ async function createShareArchive(options = {}) {
   if (!window.ProtoDockZip?.createZipFile) {
     throw new Error('当前页面缺少 zip 打包模块');
   }
-  if (state.dirty || state.docDirty.size) {
+  if (hasUnsavedProjectChanges()) {
     throw new Error('当前项目有未保存修改，请先保存并填写本次变更记录');
   }
 
   await checkExternalManifestChange('manual');
 
-  const archiveManifest = options.release
+  const archiveManifest = structuredClone(options.release
     ? window.ProtoDockChangeLog.releaseSnapshot(state.manifest, options.release).manifest
-    : state.manifest;
+    : state.manifest);
+  const workspaceDocumentEntries = [];
+  if (state.workspace) {
+    const activeProject = activeWorkspaceProject();
+    const sharedDocuments = state.workspace.sharedDocuments || [];
+    archiveManifest.workspaceSnapshot = window.ProtoDockProductWorkspace.snapshot(
+      state.workspace.config,
+      activeProject,
+      options.release?.version || state.workspace.config.product.version,
+      sharedDocuments
+    );
+    sharedDocuments.forEach((document) => {
+      workspaceDocumentEntries.push({
+        path: document.releasePath,
+        data: state.sharedDocCache.get(document.id) ?? document.text ?? '',
+        lastModified: Date.now()
+      });
+    });
+  }
 
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : () => {};
   const diskFiles = [];
@@ -926,13 +990,16 @@ async function createShareArchive(options = {}) {
     path: MANIFEST_FILE,
     data: manifestText(archiveManifest),
     lastModified: Date.now()
-  }];
+  }, ...workspaceDocumentEntries];
   const dirtyDocs = dirtyDocArchiveEntries();
-  const includedPaths = new Set([MANIFEST_FILE]);
+  const includedPaths = new Set(entries.map((entry) => entry.path));
 
   for (let index = 0; index < diskFiles.length; index += 1) {
     const item = diskFiles[index];
     if (!isAllowedShareArchivePath(item.path)) {
+      continue;
+    }
+    if (includedPaths.has(item.path)) {
       continue;
     }
     const overrideText = dirtyDocs.get(item.path);
@@ -976,18 +1043,39 @@ async function finalizePublishedVersion(release) {
     throw new Error('发布期间本地清单被其他工具修改，请读取本地变更后再处理版本记录');
   }
   const result = window.ProtoDockChangeLog.releaseSnapshot(state.manifest, release);
-  if (!result.changed) {
-    return result.entry;
+  if (result.changed) {
+    const text = manifestText(result.manifest);
+    const writable = await state.manifestHandle.createWritable();
+    await writable.write(text);
+    await writable.close();
+    state.manifest = result.manifest;
+    state.manifestHash = await hashText(text);
+    state.ignoredExternalManifestHash = null;
   }
-  const text = manifestText(result.manifest);
-  const writable = await state.manifestHandle.createWritable();
-  await writable.write(text);
-  await writable.close();
-  state.manifest = result.manifest;
-  state.manifestHash = await hashText(text);
-  state.ignoredExternalManifestHash = null;
+  await finalizeWorkspaceVersion(release.version);
   renderProjectActions();
   return result.entry;
+}
+
+async function finalizeWorkspaceVersion(version) {
+  if (!state.workspace?.manifestHandle || !version) {
+    return;
+  }
+  const currentText = await (await state.workspace.manifestHandle.getFile()).text();
+  const currentHash = await hashText(currentText);
+  if (state.workspaceManifestHash && currentHash !== state.workspaceManifestHash) {
+    throw new Error('发布期间产品工作区清单被其他工具修改，请重新读取本地变更');
+  }
+  if (state.workspace.config.product.version === version) {
+    return;
+  }
+  state.workspace.config.product.version = version;
+  const text = `${JSON.stringify(state.workspace.config, null, 2)}\n`;
+  const writable = await state.workspace.manifestHandle.createWritable();
+  await writable.write(text);
+  await writable.close();
+  state.workspace.manifestText = text;
+  state.workspaceManifestHash = await hashText(text);
 }
 
 function safePngFileName(page, captureMode = 'frame') {
@@ -1289,9 +1377,20 @@ async function openFullProductDocument() {
     });
     const screenshotCache = window.ProtoDockProductDocumentCache.screenshotCache;
     const captureAssetCache = new Map();
+    const sharedDocuments = await Promise.all(sharedDocumentRecords().map(async (document) => ({
+      id: document.id,
+      title: document.title,
+      path: document.path || document.releasePath || '',
+      markdown: await loadSharedDocument(document)
+    })));
+    const workspaceProduct = state.workspace?.config?.product || state.manifest.workspaceSnapshot?.product || null;
+    const workspaceProject = activeWorkspaceProject() || state.manifest.workspaceSnapshot?.project || null;
     const result = await window.ProtoDockProductDocument.generate({
       viewerUrl: appUrl('/product-document.html'),
       manifest: state.manifest,
+      product: workspaceProduct,
+      endpoint: workspaceProject,
+      sharedDocuments,
       concurrency: PRODUCT_DOCUMENT_CAPTURE_CONCURRENCY,
       loadMarkdown(descriptor) {
         return loadDocForPage(descriptor.id, state.manifest.pages[descriptor.id]);
@@ -2029,7 +2128,7 @@ function renderProjectActions() {
   els.productSelect?.setAttribute('title', canEdit ? '修改项目名称' : (hasProject ? '当前项目（只读）' : '未打开项目'));
   els.productSelect?.setAttribute('aria-label', canEdit ? '修改项目名称' : '当前项目');
   els.nodeInspectorPanel?.classList.toggle('is-readonly', hasProject && state.readOnly);
-  syncMarkdownReadOnlyState(hasProject && state.readOnly);
+  syncMarkdownReadOnlyState(hasProject && (state.readOnly || (!!activeSharedDocument() && !state.workspace)));
 }
 
 function syncSafeAreaInputs() {
@@ -2182,6 +2281,40 @@ function savePageSettings() {
   }
 }
 
+function renderWorkspaceNavigation() {
+  const projects = state.workspace?.projects || [];
+  if (els.workspaceProjectSwitcher) {
+    els.workspaceProjectSwitcher.hidden = !projects.length;
+    els.workspaceProjectSwitcher.innerHTML = projects.map((project) => `
+      <button type="button" role="tab" data-workspace-project="${escapeHtml(project.id)}"
+        aria-selected="${project.id === state.activeWorkspaceProjectId}"
+        ${state.workspaceSwitching ? 'disabled' : ''}>${escapeHtml(project.name)}</button>
+    `).join('');
+  }
+
+  const documents = sharedDocumentRecords();
+  if (els.workspaceSharedDocsSection) {
+    els.workspaceSharedDocsSection.hidden = !documents.length;
+  }
+  if (els.workspaceSharedDocsHint) {
+    const productName = state.workspace?.config?.product?.name
+      || state.manifest?.workspaceSnapshot?.product?.name
+      || '当前产品';
+    els.workspaceSharedDocsHint.textContent = `${productName} · 所有端共用`;
+  }
+  if (els.workspaceSharedDocList) {
+    els.workspaceSharedDocList.innerHTML = documents.map((document) => `
+      <li class="doc-item ${document.id === state.activeSharedDocId ? 'active' : ''}">
+        <button type="button" data-shared-document="${escapeHtml(document.id)}" title="${escapeHtml(document.title)}">
+          <i data-lucide="book-open"></i>
+          <strong>${escapeHtml(document.title)}</strong>
+        </button>
+      </li>
+    `).join('');
+  }
+  window.lucide?.createIcons();
+}
+
 function renderChrome() {
   const hasProject = !!state.manifest;
   els.workspace.classList.toggle('is-empty', !hasProject);
@@ -2194,12 +2327,17 @@ function renderChrome() {
     els.canvasPresetName.textContent = '未选择';
     els.canvasPresetDesc.textContent = '打开项目后显示设备壳';
     els.currentProjectName.textContent = '未打开项目';
+    renderWorkspaceNavigation();
     renderSafeAreaSettingsControls();
     return;
   }
 
   const preset = presetFor();
-  els.canvasProductName.textContent = state.manifest.project.name;
+  const productName = state.workspace?.config?.product?.name
+    || state.manifest.workspaceSnapshot?.product?.name;
+  els.canvasProductName.textContent = productName
+    ? `${productName} · ${state.manifest.project.name}`
+    : state.manifest.project.name;
   els.canvasProductDesc.textContent = state.manifest.project.description || '本地原型工作台';
   els.canvasPresetName.textContent = preset.label;
   els.canvasPresetDesc.textContent = preset.desc;
@@ -2208,6 +2346,7 @@ function renderChrome() {
   }
   renderSafeAreaSettingsControls();
   els.currentProjectName.textContent = state.manifest.project.name;
+  renderWorkspaceNavigation();
   renderPageList();
 }
 
@@ -2624,6 +2763,7 @@ function selectNode(id) {
     exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   }
   state.selectedNodeId = id;
+  state.activeSharedDocId = null;
   state.selectedEdgeId = null;
   state.selectedNoteId = null;
   document.querySelectorAll('.page-node').forEach((node) => {
@@ -2641,6 +2781,7 @@ function selectEdge(id) {
   }
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.selectedEdgeId = id;
+  state.activeSharedDocId = null;
   state.selectedNodeId = null;
   state.selectedNoteId = null;
   document.querySelectorAll('.page-node').forEach((node) => node.classList.remove('selected'));
@@ -2655,6 +2796,7 @@ function selectNote(id) {
   }
   exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
   state.selectedNoteId = id;
+  state.activeSharedDocId = null;
   state.selectedNodeId = null;
   state.selectedEdgeId = null;
   document.querySelectorAll('.page-node').forEach((node) => node.classList.remove('selected'));
@@ -2675,6 +2817,7 @@ function clearSelection(options = {}) {
   state.selectedNodeId = null;
   state.selectedEdgeId = null;
   state.selectedNoteId = null;
+  state.activeSharedDocId = null;
   document.querySelectorAll('.page-node').forEach((node) => node.classList.remove('selected'));
   document.querySelectorAll('.text-note').forEach((note) => note.classList.remove('selected'));
   renderEdges();
@@ -2686,6 +2829,20 @@ function clearSelection(options = {}) {
 }
 
 async function updateInspector() {
+  const sharedDocument = activeSharedDocument();
+  if (sharedDocument) {
+    els.inspectorName.textContent = sharedDocument.title;
+    els.inspectorType.textContent = '产品级共享文档';
+    els.sourcePath.textContent = state.workspace?.config?.sharedDocs || '发布快照';
+    els.entryPath.textContent = '-';
+    els.docPath.textContent = sharedDocument.path || sharedDocument.releasePath || '-';
+    renderPageSettingsControls();
+    const content = await loadSharedDocument(sharedDocument);
+    if (state.activeSharedDocId === sharedDocument.id) {
+      setEditorValue(content);
+    }
+    return;
+  }
   const node = activeNode();
   const page = activePage();
   if (!node || !page) {
@@ -2710,6 +2867,23 @@ async function updateInspector() {
   if (state.selectedNodeId === node.id) {
     setEditorValue(content);
   }
+}
+
+async function loadSharedDocument(document) {
+  if (state.sharedDocCache.has(document.id)) {
+    return state.sharedDocCache.get(document.id);
+  }
+  let content = document.text || '';
+  if (!content && document.path) {
+    try {
+      content = await readTextFile(document.path);
+    } catch (error) {
+      console.warn(`ProtoDock: shared document missing ${document.path}`, error);
+      content = `# ${document.title}\n\n共享产品文档暂时无法读取。`;
+    }
+  }
+  state.sharedDocCache.set(document.id, content);
+  return content;
 }
 
 async function loadDocForPage(pageId, page) {
@@ -2780,12 +2954,22 @@ function setEditorValue(value) {
   } else {
     els.markdownFallback.value = value || '';
   }
-  syncMarkdownReadOnlyState(!!state.manifest && state.readOnly);
+  syncMarkdownReadOnlyState(!!state.manifest && (state.readOnly || (!!activeSharedDocument() && !state.workspace)));
   state.isSettingEditorValue = false;
 }
 
 function handleEditorChange() {
   if (state.isSettingEditorValue || state.readOnly) {
+    return;
+  }
+  const sharedDocument = activeSharedDocument();
+  if (sharedDocument) {
+    if (!state.workspace) {
+      return;
+    }
+    state.sharedDocCache.set(sharedDocument.id, getEditorValue());
+    state.sharedDocDirty.add(sharedDocument.id);
+    markDirty('共享产品文档已修改');
     return;
   }
   const node = activeNode();
@@ -3424,6 +3608,7 @@ async function loadBundledExample() {
 }
 
 function showStartScreen(message = '选择工作目录开始') {
+  clearWorkspaceState();
   state.manifest = null;
   state.projectHandle = null;
   state.manifestHandle = null;
@@ -3529,6 +3714,13 @@ async function loadManifestText(text, options = {}) {
   state.canvasBackupCreated = false;
   state.docCache.clear();
   state.docDirty.clear();
+  if (options.workspace) {
+    state.workspace = options.workspace;
+    state.activeWorkspaceProjectId = options.workspaceProjectId || state.activeWorkspaceProjectId;
+    state.activeSharedDocId = null;
+  } else {
+    clearWorkspaceState();
+  }
   state.manifest = normalizeManifest(JSON.parse(text));
   state.projectHandle = options.projectHandle || null;
   state.manifestHandle = options.manifestHandle || null;
@@ -3569,6 +3761,15 @@ async function loadLocalProjectHandle(handle) {
     error.name = 'NotAllowedError';
     throw error;
   }
+  try {
+    await handle.getFileHandle(window.ProtoDockProductWorkspace?.FILE_NAME || 'protodock.workspace.json');
+    await loadLocalWorkspaceHandle(handle);
+    return;
+  } catch (error) {
+    if (error?.name !== 'NotFoundError') {
+      throw error;
+    }
+  }
   const manifestHandle = await handle.getFileHandle(MANIFEST_FILE);
   const text = await (await manifestHandle.getFile()).text();
   const parsedManifest = JSON.parse(text);
@@ -3590,6 +3791,68 @@ async function loadLocalProjectHandle(handle) {
     readOnly: false
   });
   setStatus(`已打开 ${handle.name}`);
+}
+
+async function loadLocalWorkspaceHandle(handle) {
+  if (!window.ProtoDockProductWorkspace?.load) {
+    throw new Error('产品工作区模块未加载');
+  }
+  const workspace = await window.ProtoDockProductWorkspace.load(handle);
+  for (const project of workspace.projects) {
+    const validation = await window.ProtoDockProjectDrop?.validateProjectDirectory?.(project.handle, project.manifest);
+    if (validation?.missingPaths.length) {
+      const examples = validation.missingPaths.slice(0, 3).join('、');
+      throw new Error(`${project.name} 不是完整项目，缺少 ${examples}`);
+    }
+  }
+  clearWorkspaceState();
+  state.workspace = workspace;
+  state.workspaceManifestHash = await hashText(workspace.manifestText);
+  workspace.sharedDocuments.forEach((document) => state.sharedDocCache.set(document.id, document.text));
+  const storageKey = `protodock.workspace.${workspace.config.product.id}.activeProject`;
+  const remembered = localStorage.getItem(storageKey);
+  const firstProject = workspace.projects.find((project) => project.id === remembered) || workspace.projects[0];
+  await switchWorkspaceProject(firstProject.id, { initial: true });
+  setStatus(`已打开产品工作区 ${workspace.config.product.name}`);
+}
+
+async function switchWorkspaceProject(projectId, options = {}) {
+  if (!state.workspace || state.workspaceSwitching) {
+    return false;
+  }
+  if (!options.initial && projectId === state.activeWorkspaceProjectId) {
+    return true;
+  }
+  if (!options.initial && hasUnsavedProjectChanges()) {
+    setStatus('请先保存当前端和共享文档，再切换到其他端');
+    return false;
+  }
+  const project = state.workspace.projects.find((item) => item.id === projectId);
+  if (!project) {
+    setStatus('目标原型不在当前产品工作区中');
+    return false;
+  }
+  state.workspaceSwitching = true;
+  renderWorkspaceNavigation();
+  try {
+    const text = await (await project.manifestHandle.getFile()).text();
+    project.manifestText = text;
+    project.manifest = JSON.parse(text);
+    await loadManifestText(text, {
+      projectHandle: project.handle,
+      manifestHandle: project.manifestHandle,
+      projectDirectoryName: `${state.workspace.rootHandle.name}/${project.path}`,
+      readOnly: false,
+      workspace: state.workspace,
+      workspaceProjectId: project.id
+    });
+    localStorage.setItem(`protodock.workspace.${state.workspace.config.product.id}.activeProject`, project.id);
+    setStatus(`已切换到 ${project.name}`);
+    return true;
+  } finally {
+    state.workspaceSwitching = false;
+    renderWorkspaceNavigation();
+  }
 }
 
 async function openProjectDirectory() {
@@ -3665,7 +3928,7 @@ function openProjectMenuModal() {
     els.githubOpenStatus.textContent = '等待填写仓库地址和分支';
   }
   if (els.openLocalProjectStatus) {
-    els.openLocalProjectStatus.textContent = '选择或拖入完整项目根目录，根下须直接包含清单、pages 和 docs。';
+    els.openLocalProjectStatus.textContent = '选择或拖入单端项目根目录，或包含 protodock.workspace.json 的产品工作区。';
   }
   buttons.openLocalProjectFromMenu?.classList.remove('is-drag-over', 'is-loading', 'is-error');
   els.openProjectModal.hidden = false;
@@ -3701,7 +3964,7 @@ function updateLocalProjectDropState(status, message = '') {
   } else if (status === 'error') {
     els.openLocalProjectStatus.textContent = `打开失败：${message}`;
   } else if (status === 'idle') {
-    els.openLocalProjectStatus.textContent = '选择或拖入完整项目根目录，根下须直接包含清单、pages 和 docs。';
+    els.openLocalProjectStatus.textContent = '选择或拖入单端项目根目录，或包含 protodock.workspace.json 的产品工作区。';
   }
 }
 
@@ -4266,6 +4529,29 @@ function selectPageFromList(nodeId) {
   centerNode(nodeId);
 }
 
+function selectSharedDocument(documentId) {
+  const sharedDocument = sharedDocumentRecords().find((item) => item.id === documentId);
+  if (!sharedDocument) {
+    return;
+  }
+  if (state.editingEdgeLabelId) {
+    commitEdgeLabelEdit();
+  }
+  exitPreviewInteraction(state.activePreviewNodeId, { silent: true });
+  state.activeSharedDocId = sharedDocument.id;
+  state.selectedNodeId = null;
+  state.selectedEdgeId = null;
+  state.selectedNoteId = null;
+  document.querySelectorAll('.page-node').forEach((node) => node.classList.remove('selected'));
+  document.querySelectorAll('.text-note').forEach((note) => note.classList.remove('selected'));
+  renderEdges();
+  renderPageList();
+  renderWorkspaceNavigation();
+  updateInspector();
+  renderProjectActions();
+  setStatus(`${sharedDocument.title} · 共享产品文档`);
+}
+
 async function saveProject() {
   if (!state.manifest || state.readOnly || !state.manifestHandle) {
     const message = state.readOnly ? readonlyProjectMessage() : '没有可保存的项目';
@@ -4299,7 +4585,7 @@ async function saveProject() {
     }
 
     let pendingChange = null;
-    if (state.dirty || state.docDirty.size) {
+    if (hasUnsavedProjectChanges()) {
       pendingChange = await window.ProtoDockChangeLogDialog.open(state.manifest);
       if (!pendingChange) {
         setStatus('已取消保存');
@@ -4313,6 +4599,18 @@ async function saveProject() {
         await writeTextFile(page.doc, state.docCache.get(pageId) || '');
       }
     }
+    for (const documentId of state.sharedDocDirty) {
+      const sharedDocument = state.workspace?.sharedDocuments?.find((item) => item.id === documentId);
+      if (!sharedDocument?.fileHandle) {
+        throw new Error(`共享产品文档无法写入：${documentId}`);
+      }
+      const content = state.sharedDocCache.get(documentId) || '';
+      const writable = await sharedDocument.fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      sharedDocument.text = content;
+      sharedDocument.title = window.ProtoDockProductWorkspace.titleFromMarkdown(content, sharedDocument.title);
+    }
     if (pendingChange) {
       window.ProtoDockChangeLog.appendPending(state.manifest, pendingChange);
     }
@@ -4324,6 +4622,7 @@ async function saveProject() {
     state.ignoredExternalManifestHash = null;
     state.dirty = false;
     state.docDirty.clear();
+    state.sharedDocDirty.clear();
     const pendingCount = state.manifest.pendingChanges.length;
     setStatus(`已保存到本地文件，累计 ${pendingCount} 条待发布变更`);
     renderProjectActions();
@@ -4342,6 +4641,11 @@ async function saveProject() {
 async function reloadProject() {
   if (state.shareId) {
     await loadSharedProject(state.shareId);
+    return;
+  }
+  if (state.workspace?.rootHandle) {
+    await loadLocalWorkspaceHandle(state.workspace.rootHandle);
+    setStatus('已读取产品工作区本地变更');
     return;
   }
   if (state.projectHandle && state.manifestHandle) {
@@ -4665,7 +4969,7 @@ function endPageSortDrag(event) {
 }
 
 async function goHome() {
-  if (state.dirty) {
+  if (hasUnsavedProjectChanges()) {
     const confirmed = await showUnsavedHomeDialog();
     if (!confirmed) {
       setStatus('已取消返回首页');
@@ -4684,6 +4988,7 @@ async function goHome() {
   state.previewJobs.clear();
   state.docCache.clear();
   state.docDirty.clear();
+  clearWorkspaceState();
   state.manifest = null;
   state.projectHandle = null;
   state.manifestHandle = null;
@@ -4896,6 +5201,18 @@ function bindGlobalEvents() {
       selectPageFromList(item.dataset.pageNode);
     }
   });
+  els.workspaceProjectSwitcher?.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-workspace-project]');
+    if (button) {
+      await switchWorkspaceProject(button.dataset.workspaceProject);
+    }
+  });
+  els.workspaceSharedDocList?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-shared-document]');
+    if (button) {
+      selectSharedDocument(button.dataset.sharedDocument);
+    }
+  });
   els.pageList?.addEventListener('pointerdown', beginPageSortDrag);
   els.pageSearchInput?.addEventListener('input', (event) => {
     state.pageSearchQuery = event.currentTarget.value;
@@ -5013,9 +5330,22 @@ window.ProtoDock = {
     const changeLog = Array.isArray(state.manifest?.changelog) ? state.manifest.changelog : [];
     const currentChange = changeLog[changeLog.length - 1] || null;
     const pendingChanges = window.ProtoDockChangeLog?.normalizePending?.(state.manifest?.pendingChanges) || [];
+    const workspaceProduct = state.workspace?.config?.product || state.manifest?.workspaceSnapshot?.product || null;
+    const workspaceProject = activeWorkspaceProject() || state.manifest?.workspaceSnapshot?.project || null;
+    const publishProductId = state.workspace
+      ? window.ProtoDockProductWorkspace?.publishProductId?.(state.workspace.config, workspaceProject)
+      : '';
     return {
       projectId: state.manifest?.project?.id || null,
       projectName: state.manifest?.project?.name || null,
+      workspaceProductId: workspaceProduct?.id || null,
+      workspaceProductName: workspaceProduct?.name || null,
+      workspaceVersion: workspaceProduct?.version || null,
+      workspaceProjectId: workspaceProject?.id || null,
+      workspaceProjectName: workspaceProject?.name || null,
+      workspaceSharedDocumentCount: sharedDocumentRecords().length,
+      publishProductId: publishProductId || null,
+      publishPreferenceId: publishProductId || state.manifest?.project?.id || null,
       lastPublishedVersion: currentChange?.version || null,
       currentVersion: currentChange?.version || window.ProtoDockChangeLog?.inferredVersion?.(state.manifest) || null,
       currentChangeDescription: currentChange?.description || null,

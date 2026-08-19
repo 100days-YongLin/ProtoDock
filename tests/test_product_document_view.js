@@ -116,6 +116,9 @@ const fakeController = {
   const result = await ProtoDockProductDocument.generate({
     viewerUrl: 'http://localhost/product-document.html',
     manifest,
+    product: { id: 'product-demo', name: '产品工作区', description: '跨端产品', version: 'v2' },
+    endpoint: { id: 'parent', name: '家长端' },
+    sharedDocuments: [{ id: 'overview', title: '产品概述', path: 'shared-docs/overview.md', markdown: '# 产品概述' }],
     concurrency: 2,
     openViewer: () => fakeController,
     loadMarkdown: async (page) => `# ${page.title}`,
@@ -144,6 +147,12 @@ const fakeController = {
   assert.deepEqual(result, { total: 4, failed: 1, cached: 1 });
   assert.equal(maxActiveBuilds, 2);
   assert.equal(sentMessages[0].action, 'start');
+  assert.equal(sentMessages[0].payload.project.name, '产品工作区');
+  assert.equal(sentMessages[0].payload.project.endpointName, '家长端');
+  assert.equal(sentMessages[0].payload.project.version, 'v2');
+  assert.deepEqual(sentMessages[0].payload.sharedDocuments, [{
+    id: 'overview', title: '产品概述', path: 'shared-docs/overview.md', markdown: '# 产品概述'
+  }]);
   assert.deepEqual(sentMessages[0].payload.project.changelog, manifest.changelog);
   assert.equal(sentMessages[0].payload.project.devicePreset, 'iphone-portrait');
   assert.deepEqual(Object.keys(sentMessages[0].payload.navigationManifest.pages), Object.keys(manifest.pages));

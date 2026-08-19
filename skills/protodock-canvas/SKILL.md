@@ -30,6 +30,30 @@ Before editing, read:
 - the current `protodock.project.json`;
 - only the relevant files under `pages/`, `docs/`, and `assets/`.
 
+## Multi-Endpoint Product Workspace
+
+Use one optional product workspace when several complete ProtoDock projects are endpoints of the same product and need a small shared documentation pool:
+
+```text
+product-workspace/
+├── protodock.workspace.json
+├── shared-docs/*.md
+└── prototypes/<endpoint>/
+    ├── protodock.project.json
+    ├── pages/
+    ├── docs/
+    └── assets/                 # optional
+```
+
+1. Keep every endpoint independently valid and openable. Do not replace child manifests with one combined manifest and do not merge endpoint Canvas data.
+2. `protodock.workspace.json` may contain only `schemaVersion`, product identity/version, `sharedDocs`, and endpoint `id`/`name`/`path` records. Every path is relative to the workspace root and must not contain `..`.
+3. Store only truly cross-end product material in direct `shared-docs/*.md` files: product overview, roles and permissions, shared business rules, common data meaning, and terminology. Keep endpoint/page behavior in the owning `docs/<page-id>.md`.
+4. Update one shared document instead of copying the same rule into multiple endpoint PRDs. Do not create a feature database, relation graph, cross-end Canvas, or synchronization service unless the user explicitly asks for one.
+5. Open the workspace root in ProtoDock for endpoint switching and shared docs. Open a child project root when working on only that endpoint. Never open or recommend a wrapper that has neither workspace nor project manifest.
+6. Validate the workspace with `scripts/protodock-validate <workspace-root>` and validate every final endpoint ZIP separately.
+7. Publishing remains endpoint-scoped. ProtoDock copies shared docs into `docs/_shared/` and generates `workspaceSnapshot` only inside the release artifact. Agents must not add `workspaceSnapshot` to editable child manifests or copy `docs/_shared/` back into source projects.
+8. Use one coordinated product version from `product.version`. When a release changes several endpoints, publish each affected endpoint with that same version. Endpoint-specific publish identifiers prevent one endpoint from overwriting another.
+
 ## Agent Workflow
 
 1. Inspect the current files and Git state before editing.

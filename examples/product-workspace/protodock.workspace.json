@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "product": {
+    "id": "workspace-demo",
+    "name": "多端产品示例",
+    "description": "演示共享产品文档与多个独立原型端",
+    "version": "v1.0.0"
+  },
+  "sharedDocs": "shared-docs",
+  "projects": [
+    { "id": "mobile", "name": "移动端", "path": "prototypes/mobile" },
+    { "id": "admin", "name": "Web 管理端", "path": "prototypes/admin" }
+  ]
+}

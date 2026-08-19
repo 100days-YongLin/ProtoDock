@@ -1,0 +1,88 @@
+---
+title: 多端产品工作区
+description: 用一个轻量工作区管理同一产品的多个原型端和共享产品文档。
+icon: panels-top-left
+---
+
+同一个产品包含家长端、教师端、Web 管理端等多个原型时，不需要把它们合并成一个巨型项目。保留每个端原有的完整 ProtoDock 项目，再在外层增加一个产品工作区即可。
+
+## 目录结构
+
+```text
+product-workspace/
+├── protodock.workspace.json
+├── shared-docs/
+│   ├── 01-product-overview.md
+│   ├── 02-roles-and-permissions.md
+│   └── 03-shared-business-rules.md
+└── prototypes/
+    ├── parent/
+    ├── teacher/
+    └── admin/
+```
+
+每个 `prototypes/<endpoint>/` 仍须直接包含自己的 `protodock.project.json`、`pages/`、`docs/` 和可选 `assets/`，所以它既能从工作区进入，也能像旧项目一样单独打开。
+
+## 工作区清单
+
+```json
+{
+  "schemaVersion": 1,
+  "product": {
+    "id": "youerjia",
+    "name": "优儿嘉",
+    "description": "幼儿园家园协同产品",
+    "version": "v1.2.0"
+  },
+  "sharedDocs": "shared-docs",
+  "projects": [
+    { "id": "parent", "name": "家长端", "path": "prototypes/parent" },
+    { "id": "teacher", "name": "教师端", "path": "prototypes/teacher" },
+    { "id": "admin", "name": "Web 管理端", "path": "prototypes/admin" }
+  ]
+}
+```
+
+所有路径都相对于工作区根目录，不允许使用绝对路径或 `..`。端标识和项目路径不能重复。
+
+## 打开与编辑
+
+点击 **打开本地项目**，选择直接包含 `protodock.workspace.json` 的目录。ProtoDock 会先检查全部子项目，再打开上次使用的端：
+
+- 顶部切换当前端；
+- Canvas 始终完整显示当前端的页面、分组和连线；
+- 左侧“共享产品文档”打开产品级 Markdown；
+- 有未保存修改时，必须先保存才能切换端；
+- 普通旧项目没有工作区清单时，界面和行为保持不变。
+
+`shared-docs/` 当前只读取直属 `.md` 文件，并按文件名排序。一级标题会显示为文档名称。适合写产品概述、角色权限、跨端公共业务规则、数据口径和术语；端内页面交互仍写在对应 `docs/<page-id>.md`。
+
+## 完整产品文档
+
+工作区模式下，“完整产品文档”和发布后的公开 Share 产品文档都按以下顺序汇总：
+
+1. 产品封面与当前产品版本；
+2. 共享产品文档；
+3. 当前端的页面 PRD 与可操作原型。
+
+它不会创建第二套总 PRD、功能数据库、跨端 Canvas 或关系图。共享规则只维护一份，页面规则仍跟着页面走。
+
+## 发布
+
+发布仍以当前端为单位，并显示“当前原型 + 共享产品文档”的范围。ProtoDock 会：
+
+- 在临时 ZIP 的 `docs/_shared/` 中固化共享文档；
+- 在发布清单中生成只读 `workspaceSnapshot`；
+- 使用 `<产品标识>-<端标识>` 作为公开与 GitHub 发布标识，避免不同端覆盖；
+- 使用工作区 `product.version` 作为统一产品版本；
+- 成功后把版本写回工作区和当前端正式变更历史。
+
+如果一次产品发布同时修改多个端，依次发布这些端，并填写同一个产品版本号。子项目源目录不会出现 `docs/_shared/` 或 `workspaceSnapshot`。
+
+## 校验
+
+```bash
+scripts/protodock-validate /absolute/path/to/product-workspace
+```
+
+工作区校验会检查清单、共享文档目录和全部子项目。每个最终发布 ZIP 仍需单独校验，因为最终归档才是交付门槛。

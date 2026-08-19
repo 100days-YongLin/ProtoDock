@@ -732,6 +732,57 @@ def validate_project_manifest_files(
         )
 
     issues = []
+    workspace_snapshot = manifest.get("workspaceSnapshot")
+    workspace_shared_doc_count = 0
+    if workspace_snapshot is not None:
+        if not isinstance(workspace_snapshot, dict):
+            issues.append("workspaceSnapshot 必须是对象")
+        else:
+            product = workspace_snapshot.get("product")
+            project = workspace_snapshot.get("project")
+            shared_docs = workspace_snapshot.get("sharedDocs")
+            if (
+                not isinstance(product, dict)
+                or not str(product.get("id") or "").strip()
+                or not str(product.get("name") or "").strip()
+                or not str(product.get("version") or "").strip()
+            ):
+                issues.append("workspaceSnapshot.product 必须包含非空 id、name 和 version")
+            if not isinstance(project, dict) or not str(project.get("id") or "").strip() or not str(project.get("name") or "").strip():
+                issues.append("workspaceSnapshot.project 必须包含非空 id 和 name")
+            if not isinstance(shared_docs, list):
+                issues.append("workspaceSnapshot.sharedDocs 必须是数组")
+            else:
+                seen_ids = set()
+                seen_paths = set()
+                for index, document in enumerate(shared_docs):
+                    label = f"workspaceSnapshot.sharedDocs[{index}]"
+                    if not isinstance(document, dict):
+                        issues.append(f"{label} 必须是对象")
+                        continue
+                    document_id = str(document.get("id") or "").strip()
+                    if not document_id or not str(document.get("title") or "").strip():
+                        issues.append(f"{label} 必须包含非空 id 和 title")
+                    elif document_id in seen_ids:
+                        issues.append(f"共享文档标识重复：{document_id}")
+                    else:
+                        seen_ids.add(document_id)
+                    try:
+                        path = manifest_relative_path(document.get("path"), f"{label}.path", "docs")
+                    except ValueError as error:
+                        issues.append(str(error))
+                        continue
+                    if len(path.parts) < 3 or path.parts[:2] != ("docs", "_shared"):
+                        issues.append(f"{label}.path 必须位于 docs/_shared/：{path.as_posix()}")
+                        continue
+                    if path.as_posix() in seen_paths:
+                        issues.append(f"共享文档路径重复：{path.as_posix()}")
+                        continue
+                    seen_paths.add(path.as_posix())
+                    if not safe_target_path(project_dir, path).is_file():
+                        issues.append(f"缺少共享产品文档：{path.as_posix()}")
+                        continue
+                    workspace_shared_doc_count += 1
     entry_count = 0
     doc_count = 0
     for page_id, page in pages.items():
@@ -817,6 +868,7 @@ def validate_project_manifest_files(
         "pageCount": len(pages),
         "entryCount": entry_count,
         "docCount": doc_count,
+        "workspaceSharedDocCount": workspace_shared_doc_count,
         "canvas": canvas_validation["stats"],
         "navigation": {
             "stats": navigation_validation["stats"],

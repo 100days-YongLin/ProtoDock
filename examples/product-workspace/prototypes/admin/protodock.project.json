@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "workspace-demo-admin",
+    "name": "Web 管理端",
+    "description": "内容维护原型",
+    "devicePreset": "web-landscape"
+  },
+  "changelog": [],
+  "pendingChanges": [],
+  "pages": {
+    "content": {
+      "title": "内容管理",
+      "kind": "原型页面",
+      "entry": "pages/content/index.html",
+      "doc": "docs/content.md"
+    }
+  },
+  "canvas": {
+    "nodes": [{ "id": "node-content", "pageId": "content", "x": 160, "y": 160 }],
+    "edges": [],
+    "notes": [],
+    "groups": []
+  }
+}

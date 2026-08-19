@@ -22,6 +22,9 @@ from protodock_validation import (  # noqa: E402
 )
 
 
+WORKSPACE_FILE = "protodock.workspace.json"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Validate a ProtoDock project directory or final upload ZIP.",
@@ -32,7 +35,97 @@ def parse_args():
     return parser.parse_args()
 
 
+def inspect_workspace_target(target: Path) -> dict:
+    errors = []
+    warnings = []
+    routes = []
+    try:
+        config = json.loads((target / WORKSPACE_FILE).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return {
+            "ok": False,
+            "target": str(target.resolve()),
+            "sourceType": "workspace",
+            "errors": [f"{WORKSPACE_FILE} 无法读取：{error}"],
+            "warnings": [],
+            "routes": [],
+            "stats": {},
+        }
+    product = config.get("product") if isinstance(config, dict) else None
+    projects = config.get("projects") if isinstance(config, dict) else None
+    if config.get("schemaVersion") != 1:
+        errors.append(f"{WORKSPACE_FILE} 的 schemaVersion 必须为 1")
+    if not isinstance(product, dict) or not str(product.get("id") or "").strip() or not str(product.get("name") or "").strip():
+        errors.append("product 必须包含非空 id 和 name")
+    if not isinstance(projects, list) or not projects:
+        errors.append("projects 必须是非空数组")
+        projects = []
+
+    shared_path = Path(str(config.get("sharedDocs") or "shared-docs"))
+    if shared_path.is_absolute() or ".." in shared_path.parts or "." in shared_path.parts:
+        errors.append("sharedDocs 必须是工作区根目录内的相对路径")
+        shared_dir = None
+    else:
+        shared_dir = (target / shared_path).resolve()
+        if target.resolve() not in shared_dir.parents or not shared_dir.is_dir():
+            errors.append(f"共享文档目录不存在：{shared_path.as_posix()}")
+            shared_dir = None
+    shared_docs = sorted(shared_dir.glob("*.md")) if shared_dir else []
+
+    seen_ids = set()
+    seen_paths = set()
+    child_reports = []
+    for index, project in enumerate(projects):
+        label = f"projects[{index}]"
+        if not isinstance(project, dict):
+            errors.append(f"{label} 必须是对象")
+            continue
+        project_id = str(project.get("id") or "").strip()
+        name = str(project.get("name") or project_id or label).strip()
+        raw_path = str(project.get("path") or "").strip()
+        path = Path(raw_path)
+        if not project_id or project_id in seen_ids:
+            errors.append(f"{label}.id 为空或重复：{project_id or '(空)'}")
+            continue
+        if not raw_path or path.is_absolute() or ".." in path.parts or "." in path.parts or raw_path in seen_paths:
+            errors.append(f"{label}.path 为空、重复或越出工作区：{raw_path or '(空)'}")
+            continue
+        seen_ids.add(project_id)
+        seen_paths.add(raw_path)
+        project_dir = (target / path).resolve()
+        if target.resolve() not in project_dir.parents or not project_dir.is_dir():
+            errors.append(f"{name} 项目目录不存在：{raw_path}")
+            continue
+        child = inspect_target(project_dir)
+        child_reports.append(child)
+        errors.extend(f"{name} · {issue}" for issue in child["errors"])
+        warnings.extend(f"{name} · {warning}" for warning in child["warnings"])
+        routes.extend({**route, "workspaceProjectId": project_id} for route in child["routes"])
+
+    return {
+        "ok": not errors,
+        "target": str(target.resolve()),
+        "sourceType": "workspace",
+        "errors": errors,
+        "warnings": warnings,
+        "routes": routes,
+        "stats": {
+            "workspaceProjectCount": len(child_reports),
+            "workspaceSharedDocCount": len(shared_docs),
+            "pageCount": sum(report["stats"].get("pageCount", 0) for report in child_reports),
+            "nodeCount": sum(report["stats"].get("nodeCount", 0) for report in child_reports),
+            "routeCount": len(routes),
+            "scannedDocumentCount": sum(report["stats"].get("scannedDocumentCount", 0) for report in child_reports),
+            "compliantDocumentCount": sum(report["stats"].get("compliantDocumentCount", 0) for report in child_reports),
+            "uiCopyIssueCount": sum(report["stats"].get("uiCopyIssueCount", 0) for report in child_reports),
+            "uiCopyWarningCount": sum(report["stats"].get("uiCopyWarningCount", 0) for report in child_reports),
+        },
+    }
+
+
 def inspect_target(target: Path) -> dict:
+    if target.is_dir() and (target / WORKSPACE_FILE).is_file():
+        return inspect_workspace_target(target)
     errors = []
     result = None
     temporary = None

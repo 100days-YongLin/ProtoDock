@@ -290,6 +290,14 @@
     const manifest = options.manifest;
     const sections = buildDocumentOutline(manifest);
     const pages = sections.flatMap((section) => section.pages);
+    const sharedDocuments = (options.sharedDocuments || []).map((document) => ({
+      id: String(document.id || ''),
+      title: String(document.title || document.id || '共享文档'),
+      path: String(document.path || ''),
+      markdown: String(document.markdown || '')
+    }));
+    const product = options.product || {};
+    const endpoint = options.endpoint || {};
     const controller = (options.openViewer || openViewer)(options.viewerUrl);
     let failedCaptureCount = 0;
     let cachedCaptureCount = 0;
@@ -301,8 +309,11 @@
       controller.send('start', {
         project: {
           id: manifest.project?.id || '',
-          name: manifest.project?.name || '未命名项目',
-          description: manifest.project?.description || '',
+          name: product.name || manifest.project?.name || '未命名项目',
+          description: product.description || manifest.project?.description || '',
+          version: product.version || '',
+          endpointId: endpoint.id || '',
+          endpointName: endpoint.name || manifest.project?.name || '',
           devicePreset: manifest.project?.devicePreset || 'iphone-portrait',
           safeAreaEnabled: manifest.project?.safeAreaEnabled,
           safeAreaTop: manifest.project?.safeAreaTop,
@@ -317,6 +328,7 @@
           }
         },
         generatedAt: new Date().toISOString(),
+        sharedDocuments,
         sections
       });
 

@@ -250,6 +250,26 @@ button {
   line-height: 1.4;
 }
 
+.outline-shared-group a[data-outline-shared] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6px;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border-radius: 5px;
+  color: #41464e;
+  padding: 6px 8px 6px 14px;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.outline-shared-group a[data-outline-shared]:hover,
+.outline-shared-group a[data-outline-shared]:focus-visible {
+  background: #e5effb;
+  color: #075fad;
+  outline: none;
+}
+
 .outline-subgroup a[data-outline-page] {
   padding-left: 25px;
 }
@@ -485,6 +505,44 @@ button {
 
 .product-group {
   scroll-margin-top: calc(var(--header-height) + 24px);
+}
+
+.product-shared-documents {
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.product-shared-document {
+  scroll-margin-top: calc(var(--header-height) + 16px);
+  border-bottom: 1px solid var(--line);
+  padding: 42px clamp(32px, 8vw, 96px) 54px;
+}
+
+.product-shared-document:last-child {
+  border-bottom: 0;
+}
+
+.product-shared-document > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(920px, 100%);
+  margin: 0 auto 24px;
+}
+
+.product-shared-document > header svg {
+  width: 21px;
+  height: 21px;
+  color: var(--blue);
+}
+
+.product-shared-document > header h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.product-shared-document .product-markdown {
+  width: min(920px, 100%);
+  margin: 0 auto;
 }
 
 .product-group-header {

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "workspace-demo-mobile",
+    "name": "移动端",
+    "description": "内容查看原型",
+    "devicePreset": "iphone-portrait"
+  },
+  "changelog": [],
+  "pendingChanges": [],
+  "pages": {
+    "home": {
+      "title": "内容首页",
+      "kind": "原型页面",
+      "entry": "pages/home/index.html",
+      "doc": "docs/home.md"
+    }
+  },
+  "canvas": {
+    "nodes": [{ "id": "node-home", "pageId": "home", "x": 160, "y": 160 }],
+    "edges": [],
+    "notes": [],
+    "groups": []
+  }
+}

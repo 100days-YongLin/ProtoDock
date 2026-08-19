@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="./styles.css?v=12">
   <link rel="stylesheet" href="./canvas-groups.css">
   <link rel="stylesheet" href="./canvas-minimap.css">
+  <link rel="stylesheet" href="./product-workspace.css">
 </head>
 <body>
   <main class="app">
@@ -43,6 +44,7 @@
         <i data-lucide="file-text"></i>
         <span>完整产品文档</span>
       </button>
+      <div class="workspace-project-switcher" id="workspaceProjectSwitcher" role="tablist" aria-label="切换产品端" hidden></div>
       <button class="project-display" id="productSelect" type="button" title="修改项目名称" aria-label="修改项目名称" disabled>
         <span id="currentProjectName">未打开项目</span>
         <i data-lucide="pencil"></i>
@@ -59,6 +61,16 @@
 
     <section class="workspace">
       <aside class="sidebar">
+        <section class="panel-section workspace-shared-docs" id="workspaceSharedDocsSection" hidden>
+          <div class="panel-heading-row">
+            <div>
+              <h2 class="panel-heading">共享产品文档</h2>
+              <span class="workspace-shared-docs-hint" id="workspaceSharedDocsHint">所有端共用</span>
+            </div>
+          </div>
+          <ul class="doc-list workspace-shared-doc-list" id="workspaceSharedDocList"></ul>
+        </section>
+
         <section class="panel-section">
           <h2 class="panel-heading">画布规格</h2>
           <div class="doc-list">
@@ -459,7 +471,7 @@
         <button class="open-project-option" id="openLocalProjectFromMenu" type="button">
           <i data-lucide="folder-open"></i>
           <strong>打开本地项目</strong>
-          <span id="openLocalProjectStatus">选择或拖入完整项目根目录，根下须直接包含清单、pages 和 docs。</span>
+          <span id="openLocalProjectStatus">选择或拖入单端项目根目录，或包含 protodock.workspace.json 的产品工作区。</span>
         </button>
         <button class="open-project-option" id="openPublicPreviewFromMenu" type="button">
           <i data-lucide="globe-2"></i>
@@ -595,6 +607,21 @@
         </div>
       </div>
 
+      <section class="workspace-publish-snapshot" id="workspacePublishSnapshot" hidden>
+        <header>
+          <strong>产品工作区快照</strong>
+          <span>本次只发布当前端，共享文档随版本固化。</span>
+        </header>
+        <div>
+          <span>当前原型</span>
+          <strong id="workspacePublishProject">-</strong>
+        </div>
+        <div>
+          <span>共享产品文档</span>
+          <strong id="workspacePublishDocs">0 份</strong>
+        </div>
+      </section>
+
       <details class="share-manual-upload" id="shareManualUpload">
         <summary>
           <strong>改用 ZIP 发布</strong>
@@ -716,6 +743,7 @@
   <script src="./publish-summary.js?v=4"></script>
   <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=2"></script>
+  <script src="./product-workspace.js?v=1"></script>
   <script src="./project-changelog.js?v=6"></script>
   <script src="./project-changelog-dialog.js?v=4"></script>
   <script src="./local-resource-paths.js?v=1"></script>

@@ -86,6 +86,7 @@
     shareBaseUrl: '',
     manifest: null,
     sections: [],
+    sharedDocuments: [],
     pages: [],
     pageById: new Map(),
     articleByPageId: new Map(),
@@ -200,11 +201,14 @@
     }).join('');
   }
 
-  function renderChangeLog(entries, manifest) {
+  function renderChangeLog(entries, manifest, workspaceProduct = null) {
     const items = window.ProtoDockChangeLog?.normalize(entries) || [];
     const displayedItems = window.ProtoDockChangeLog?.newestFirst(items) || [...items].reverse();
     const current = items[items.length - 1] || null;
-    const currentVersion = current?.version || window.ProtoDockChangeLog?.inferredVersion(manifest) || '';
+    const currentVersion = String(workspaceProduct?.version || '').trim()
+      || current?.version
+      || window.ProtoDockChangeLog?.inferredVersion(manifest)
+      || '';
     els.coverCurrentVersion.hidden = !currentVersion;
     els.coverCurrentVersion.textContent = currentVersion ? `当前版本 ${currentVersion}` : '';
     els.coverChangeLogList.innerHTML = displayedItems.length
@@ -223,27 +227,62 @@
 
   function renderStructure() {
     const project = state.manifest.project || {};
+    const workspaceSnapshot = state.manifest.workspaceSnapshot || {};
+    const workspaceProduct = workspaceSnapshot.product || null;
+    const workspaceProject = workspaceSnapshot.project || null;
+    const productName = workspaceProduct?.name || project.name || '未命名项目';
+    const endpointName = workspaceProject?.name || (workspaceProduct ? project.name : '');
+    const endpointLabel = endpointName ? ` · ${endpointName}` : '';
     const groupedCount = state.sections.filter((section) => !section.ungrouped).length;
     window.ProtoDockProductDocument?.applyDocumentLayout?.(document.body, project);
-    document.title = `${project.name || '公开预览'} · ProtoDock`;
-    els.projectName.textContent = project.name || '未命名项目';
-    els.coverTitle.textContent = project.name || '未命名项目';
-    els.coverDescription.textContent = project.description || '可操作原型与页面 PRD 汇总文档。';
+    document.title = `${productName}${endpointLabel} · ProtoDock`;
+    els.projectName.textContent = `${productName}${endpointLabel}`;
+    els.coverTitle.textContent = productName;
+    els.coverDescription.textContent = [
+      workspaceProduct?.description || project.description || '可操作原型与页面 PRD 汇总文档。',
+      endpointName ? `当前原型：${endpointName}` : ''
+    ].filter(Boolean).join(' · ');
     els.coverPageCount.textContent = `${state.pages.length} 页`;
     els.coverGroupCount.textContent = `${groupedCount} 组`;
-    renderChangeLog(state.manifest.changelog, state.manifest);
-    els.outlinePageCount.textContent = `${state.pages.length} 个页面`;
+    renderChangeLog(state.manifest.changelog, state.manifest, workspaceProduct);
+    els.outlinePageCount.textContent = state.sharedDocuments.length
+      ? `${state.sharedDocuments.length} 份共享 · ${state.pages.length} 个页面`
+      : `${state.pages.length} 个页面`;
     els.loading.hidden = true;
     els.cover.hidden = false;
 
-    els.outlineNavigation.innerHTML = state.sections.map((section) => `
+    const sharedOutline = state.sharedDocuments.length ? `
+      <section class="outline-group outline-shared-group">
+        <span class="outline-group-link">共享产品文档</span>
+        ${state.sharedDocuments.map((document) => `
+          <a href="#${escapeHtml(domId('shared', document.id))}" data-outline-shared="${escapeHtml(document.id)}">
+            <span>${escapeHtml(document.title)}</span><i></i>
+          </a>
+        `).join('')}
+      </section>
+    ` : '';
+    els.outlineNavigation.innerHTML = sharedOutline + state.sections.map((section) => `
       <section class="outline-group">
         <a class="outline-group-link" href="#${escapeHtml(domId('group', section.id))}">${escapeHtml(section.title)}</a>
         ${renderOutlineEntries(section)}
       </section>
     `).join('');
 
-    els.sections.innerHTML = state.sections.map((section) => `
+    const sharedContent = state.sharedDocuments.length ? `
+      <section class="product-shared-documents" aria-labelledby="sharedDocumentsTitle">
+        <header class="product-group-header">
+          <div><span>产品级说明</span><h2 id="sharedDocumentsTitle">共享产品文档</h2></div>
+          <strong>${state.sharedDocuments.length} 份文档</strong>
+        </header>
+        ${state.sharedDocuments.map((document) => `
+          <article class="product-shared-document" id="${escapeHtml(domId('shared', document.id))}" data-shared-id="${escapeHtml(document.id)}">
+            <header><i data-lucide="book-open"></i><h3>${escapeHtml(document.title)}</h3></header>
+            <section class="product-markdown" data-shared-document="${escapeHtml(document.id)}" aria-label="${escapeHtml(document.title)}"></section>
+          </article>
+        `).join('')}
+      </section>
+    ` : '';
+    els.sections.innerHTML = sharedContent + state.sections.map((section) => `
       <section class="product-group" id="${escapeHtml(domId('group', section.id))}">
         <header class="product-group-header">
           <div><span>业务模块</span><h2>${escapeHtml(section.title)}</h2></div>
@@ -275,6 +314,7 @@
         state.articleByPageId.set(page.id, article);
       }
     });
+    window.lucide?.createIcons();
     mountPrototype(state.pages[0]);
     state.presentation?.destroy();
     state.presentation = window.ProtoDockPresentation?.create?.({
@@ -290,6 +330,15 @@
       },
       onPageChange: setActivePage
     }) || null;
+  }
+
+  function renderSharedDocument(document, markdown, error = '') {
+    const mount = els.sections.querySelector(`[data-shared-document="${CSS.escape(document.id)}"]`);
+    if (!mount) {
+      return;
+    }
+    renderMarkdown(mount, error ? `# ${document.title}\n\n${error}` : markdown);
+    els.outlineNavigation.querySelector(`[data-outline-shared="${CSS.escape(document.id)}"]`)?.classList.add('is-ready');
   }
 
   function renderDocument(page, markdown, error = '') {
@@ -900,6 +949,20 @@
     await Promise.all(Array.from({ length: Math.min(DOC_CONCURRENCY, total) }, worker));
   }
 
+  async function loadSharedDocuments() {
+    await Promise.all(state.sharedDocuments.map(async (document) => {
+      try {
+        const response = await fetch(projectFileUrl(document.path), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`共享文档不存在：${document.path}`);
+        }
+        renderSharedDocument(document, await response.text());
+      } catch (error) {
+        renderSharedDocument(document, '', error.message || '无法读取共享产品文档。');
+      }
+    }));
+  }
+
   function bindEvents() {
     els.print.addEventListener('click', printDocument);
     els.toggleOutline.addEventListener('click', () => {
@@ -988,6 +1051,13 @@
         response.headers.get('content-length') || '',
         JSON.stringify(state.manifest)
       ].join('|');
+      state.sharedDocuments = Array.isArray(state.manifest.workspaceSnapshot?.sharedDocs)
+        ? state.manifest.workspaceSnapshot.sharedDocs.map((document) => ({
+          id: String(document.id || ''),
+          title: String(document.title || document.id || '共享文档'),
+          path: String(document.path || '')
+        })).filter((document) => document.id && document.path)
+        : [];
       state.sections = buildSections(state.manifest);
       state.pages = state.sections.flatMap((section) => section.pages || []);
       state.pages.forEach((page) => state.pageById.set(page.id, page));
@@ -995,7 +1065,7 @@
         throw new Error('项目中没有可预览页面。');
       }
       renderStructure();
-      await loadDocuments();
+      await Promise.all([loadSharedDocuments(), loadDocuments()]);
       state.documentReady = true;
       els.print.disabled = false;
       installObservers();
