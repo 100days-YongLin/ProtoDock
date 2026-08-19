@@ -213,6 +213,66 @@ class UploadPackageTests(unittest.TestCase):
         self.assertEqual(result["stats"]["groupCount"], 1)
         self.assertEqual(result["stats"]["groupedNodeCount"], 1)
 
+    def test_reports_sparse_groups_outliers_and_long_edges(self):
+        manifest = {
+            "project": {"devicePreset": "iphone-portrait"},
+            "pages": {page_id: {} for page_id in ("a", "b", "c")},
+            "canvas": {
+                "nodes": [
+                    {"id": "a", "pageId": "a", "x": 0, "y": 0},
+                    {"id": "b", "pageId": "b", "x": 5000, "y": 0},
+                    {"id": "c", "pageId": "c", "x": 10000, "y": 0},
+                ],
+                "edges": [
+                    {"id": "ab", "from": "a", "to": "b"},
+                    {"id": "bc", "from": "b", "to": "c"},
+                ],
+                "groups": [{
+                    "id": "sparse",
+                    "title": "Sparse",
+                    "rootNodeId": "a",
+                    "nodeIds": ["a", "b", "c"],
+                }],
+                "notes": [{"id": "far-note", "text": "Detached", "x": 30000, "y": 30000}],
+            },
+        }
+
+        result = server.validate_canvas_layout(manifest)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["stats"]["outlierNodeCount"], 3)
+        self.assertEqual(result["stats"]["excessiveGapCount"], 1)
+        self.assertEqual(result["stats"]["longEdgeCount"], 2)
+        self.assertEqual(result["stats"]["oversizedGroupCount"], 1)
+        self.assertEqual(result["stats"]["noteOrphanCount"], 1)
+        self.assertLess(result["stats"]["minimumGroupCompactness"], 0.12)
+        self.assertTrue(any("分组离群节点" in warning for warning in result["warnings"]))
+
+    def test_reports_overlapping_group_bounds_without_node_overlap(self):
+        manifest = {
+            "project": {"devicePreset": "iphone-portrait"},
+            "pages": {page_id: {} for page_id in ("a", "b", "c", "d")},
+            "canvas": {
+                "nodes": [
+                    {"id": "a", "pageId": "a", "x": 0, "y": 0},
+                    {"id": "b", "pageId": "b", "x": 2000, "y": 0},
+                    {"id": "c", "pageId": "c", "x": 900, "y": -800},
+                    {"id": "d", "pageId": "d", "x": 900, "y": 800},
+                ],
+                "edges": [],
+                "groups": [
+                    {"id": "horizontal", "title": "Horizontal", "rootNodeId": "a", "nodeIds": ["a", "b"]},
+                    {"id": "vertical", "title": "Vertical", "rootNodeId": "c", "nodeIds": ["c", "d"]},
+                ],
+            },
+        }
+
+        result = server.validate_canvas_layout(manifest)
+
+        self.assertEqual(result["stats"]["nodeOverlapCount"], 0)
+        self.assertEqual(result["stats"]["groupOverlapCount"], 1)
+        self.assertTrue(any("分组边界重叠" in warning for warning in result["warnings"]))
+
     def test_rejects_invalid_group_membership_and_root(self):
         manifest = {
             "project": {"devicePreset": "iphone-portrait"},

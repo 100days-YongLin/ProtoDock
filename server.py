@@ -378,6 +378,15 @@ def validate_canvas_layout(manifest: dict) -> dict:
                 "unrelatedEdgeCrossingCount": 0,
                 "edgeThroughNodeCount": 0,
                 "insufficientSpacingCount": 0,
+                "outlierNodeCount": 0,
+                "excessiveGapCount": 0,
+                "longEdgeCount": 0,
+                "groupOverlapCount": 0,
+                "oversizedGroupCount": 0,
+                "noteOrphanCount": 0,
+                "groupCompactness": 1.0,
+                "minimumGroupCompactness": 1.0,
+                "canvasCompactness": 1.0,
                 "groupCount": 0,
                 "groupedNodeCount": 0,
                 "duplicateGroupMembershipCount": 0,
@@ -438,6 +447,7 @@ def validate_canvas_layout(manifest: dict) -> dict:
     group_id_counts = {}
     claimed_node_ids = {}
     grouped_node_ids = set()
+    valid_group_records = []
     duplicate_group_membership_count = 0
     for index, group in enumerate(groups):
         label = f"canvas.groups[{index}]"
@@ -477,6 +487,15 @@ def validate_canvas_layout(manifest: dict) -> dict:
                 continue
             claimed_node_ids[node_id] = group_id or label
             grouped_node_ids.add(node_id)
+        valid_member_ids = list(dict.fromkeys(
+            node_id for node_id in normalized_node_ids if node_id in node_by_id
+        ))
+        if valid_member_ids:
+            valid_group_records.append({
+                "id": group_id or label,
+                "title": title or group_id or label,
+                "nodeIds": valid_member_ids,
+            })
     duplicate_group_ids = sorted(group_id for group_id, count in group_id_counts.items() if count > 1)
     if duplicate_group_ids:
         issues.append(f"存在重复页面组 id：{', '.join(duplicate_group_ids)}")
@@ -563,6 +582,94 @@ def validate_canvas_layout(manifest: dict) -> dict:
     if insufficient_spacing_count:
         warnings.append(f"检测到 {insufficient_spacing_count} 组节点间距不足 80px")
 
+    node_area = float(node_size[0] * node_size[1])
+    outlier_node_count = 0
+    excessive_gap_count = 0
+    oversized_group_count = 0
+    group_compactness_values = []
+    group_rects = []
+    outlier_threshold = max(node_size) * 2.5
+    for group in valid_group_records:
+        member_ids = [node_id for node_id in group["nodeIds"] if node_id in rects]
+        if not member_ids:
+            continue
+        member_rects = [rects[node_id] for node_id in member_ids]
+        left = min(rect[0] for rect in member_rects) - 34
+        top = min(rect[1] for rect in member_rects) - 66
+        right = max(rect[2] for rect in member_rects) + 34
+        bottom = max(rect[3] for rect in member_rects) + 34
+        group_rect = (left, top, right, bottom)
+        group_rects.append((group["id"], group_rect))
+        group_area = max(1.0, (right - left) * (bottom - top))
+        compactness = min(1.0, len(member_ids) * node_area / group_area)
+        group_compactness_values.append(compactness)
+        aspect_ratio = max((right - left) / max(1.0, bottom - top), (bottom - top) / max(1.0, right - left))
+        if len(member_ids) >= 3 and (compactness < 0.12 or aspect_ratio > 8):
+            oversized_group_count += 1
+        if len(member_ids) > 1:
+            group_has_outlier = False
+            for node_id in member_ids:
+                nearest = min(
+                    math.dist(centers[node_id], centers[other_id])
+                    for other_id in member_ids if other_id != node_id
+                )
+                if nearest > outlier_threshold:
+                    outlier_node_count += 1
+                    group_has_outlier = True
+            if group_has_outlier:
+                excessive_gap_count += 1
+
+    group_overlap_count = 0
+    for index, (_, first_rect) in enumerate(group_rects):
+        for _, second_rect in group_rects[index + 1:]:
+            if rects_overlap(first_rect, second_rect):
+                group_overlap_count += 1
+
+    long_edge_threshold = max(node_size) * 2.5
+    long_edge_count = sum(
+        1 for _, from_id, to_id in valid_edges
+        if math.dist(centers[from_id], centers[to_id]) > long_edge_threshold
+    )
+
+    note_orphan_count = 0
+    notes = canvas.get("notes", [])
+    if isinstance(notes, list) and centers:
+        note_threshold = long_edge_threshold * 1.5
+        for note in notes:
+            if not isinstance(note, dict) or not finite_number(note.get("x")) or not finite_number(note.get("y")):
+                continue
+            note_point = (float(note["x"]), float(note["y"]))
+            if min(math.dist(note_point, center) for center in centers.values()) > note_threshold:
+                note_orphan_count += 1
+
+    if rects:
+        canvas_left = min(rect[0] for rect in rects.values())
+        canvas_top = min(rect[1] for rect in rects.values())
+        canvas_right = max(rect[2] for rect in rects.values())
+        canvas_bottom = max(rect[3] for rect in rects.values())
+        canvas_area = max(1.0, (canvas_right - canvas_left) * (canvas_bottom - canvas_top))
+        canvas_compactness = min(1.0, len(rects) * node_area / canvas_area)
+    else:
+        canvas_compactness = 1.0
+    group_compactness = (
+        sum(group_compactness_values) / len(group_compactness_values)
+        if group_compactness_values else 1.0
+    )
+    minimum_group_compactness = min(group_compactness_values, default=1.0)
+
+    if outlier_node_count:
+        warnings.append(f"检测到 {outlier_node_count} 个分组离群节点，建议使用智能布局或移回所属流程")
+    if oversized_group_count:
+        warnings.append(f"检测到 {oversized_group_count} 个分组存在异常空白或过长宽高比")
+    if group_overlap_count:
+        warnings.append(f"检测到 {group_overlap_count} 处分组边界重叠")
+    if long_edge_count:
+        warnings.append(f"检测到 {long_edge_count} 条超长连线，建议收紧节点或只保留关键业务路径")
+    if note_orphan_count:
+        warnings.append(f"检测到 {note_orphan_count} 个远离页面流程的备注")
+    if len(rects) >= 6 and canvas_compactness < 0.035:
+        warnings.append(f"画布空间利用率仅 {canvas_compactness:.1%}，建议预览智能布局")
+
     duplicate_node_count = sum(max(0, count - 1) for count in node_id_counts.values())
     duplicate_page_node_count = sum(max(0, count - 1) for count in page_node_counts.values())
     duplicate_edge_count = (
@@ -584,6 +691,15 @@ def validate_canvas_layout(manifest: dict) -> dict:
             "unrelatedEdgeCrossingCount": crossing_count,
             "edgeThroughNodeCount": edge_through_node_count,
             "insufficientSpacingCount": insufficient_spacing_count,
+            "outlierNodeCount": outlier_node_count,
+            "excessiveGapCount": excessive_gap_count,
+            "longEdgeCount": long_edge_count,
+            "groupOverlapCount": group_overlap_count,
+            "oversizedGroupCount": oversized_group_count,
+            "noteOrphanCount": note_orphan_count,
+            "groupCompactness": round(group_compactness, 4),
+            "minimumGroupCompactness": round(minimum_group_compactness, 4),
+            "canvasCompactness": round(canvas_compactness, 4),
             "groupCount": len(groups),
             "groupedNodeCount": len(grouped_node_ids),
             "duplicateGroupMembershipCount": duplicate_group_membership_count,

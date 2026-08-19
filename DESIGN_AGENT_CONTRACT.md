@@ -157,10 +157,12 @@ Canvas quality is part of the prototype deliverable:
 
 - `pageCount` must equal the number of unique node `pageId` values.
 - Every edge endpoint must exist; duplicate or dangling edges are invalid.
-- Nodes must not overlap. Recommended origin spacing is `480-600px` horizontally and `600-700px` vertically.
+- Nodes must not overlap. Calculate layout from rendered node dimensions and keep approximately `120px` horizontal and `150px` vertical clear space between neighboring nodes.
+- Re-layout uses a stable layered graph procedure: root-first vertical levels, barycenter ordering within each level, disconnected-component packing, then whole-group rectangle packing. It must not place all unreachable nodes in one wide row.
+- Group bounds are derived from member nodes plus fixed padding. Outliers, excessive empty group area, overlapping group bounds, long edges, orphaned notes, and low canvas compactness must produce explicit warnings.
 - Non-shared-endpoint edge crossings should be zero. Unavoidable crossings, tight spacing, and paths through unrelated nodes must produce explicit warnings.
 - A layout tool may modify only `canvas`; it must preserve `pages`, `project.id`, and unknown fields.
-- Upload must never trigger an automatic re-layout.
+- Layout must be previewed before confirmation. Group-local layout changes only that group's node coordinates; whole-canvas smart layout may change all node coordinates but must preserve node order, edges, anchors, groups, notes, and unknown fields. Upload must never trigger an automatic re-layout.
 
 ## Canvas Groups
 

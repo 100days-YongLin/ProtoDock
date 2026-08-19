@@ -321,10 +321,26 @@ Do not combine group migration with re-layout. A later group-local layout remain
 
 ### Geometry and connections
 
-- Keep nodes at the same level aligned in one direction with consistent spacing. Recommended origin spacing is `480-600px` horizontally and `600-700px` vertically.
+- Keep the main task flow top-to-bottom and nodes at the same level left-to-right. Compute spacing from rendered node dimensions; use approximately `120px` horizontal clear space and `150px` vertical clear space instead of fixed origin-to-origin distances.
 - State pages stay close to their owning entry and must not cross unrelated module regions. Negative coordinates are valid.
+- Keep modal, drawer, confirmation, success, failure, and other secondary states adjacent to the page that opens them. Do not give a small overlay its own distant column.
+- Split disconnected subflows into weakly connected components and pack them below the primary component. Never collect every unreachable node into one extremely wide final row.
+- Derive each group frame from its member nodes plus fixed padding. A single outlier must not create a mostly empty group frame; move the outlier back into the local flow or leave an explicit validation warning.
 - Use the nearest directionally sensible anchors: vertical flow prefers `bottom -> top`; same-level flow prefers `right -> left`.
 - Non-shared-endpoint edge crossings should be zero. Edges must not pass through unrelated nodes or preview areas. Reduce non-core paths or split a crowded flow when a node has too many edges.
+
+### Deterministic re-layout procedure
+
+Use this procedure only after the user explicitly requests layout work:
+
+1. Back up the manifest and record the pre-layout node, edge, group, and note identities.
+2. Choose either one group or the whole canvas as the scope. Never mix a group migration with a re-layout.
+3. For each group, start from `rootNodeId`, form weakly connected components, assign outgoing task steps to successive vertical layers, and keep reverse-only or cyclic members in the nearest reachable layer.
+4. Order each layer with repeated predecessor/successor barycenter sweeps so important edges cross as little as possible. Stable manifest order is the tie-breaker.
+5. Center sibling rows, pack disconnected components below the primary flow, then compute the minimum group rectangle from node bounds plus fixed padding.
+6. For a whole-canvas layout, treat every completed group as one rectangle and use row/shelf packing in manifest group order. Put ungrouped nodes in a final compact region rather than scattering them around the canvas.
+7. Preview before writing and report changed node count, group count, ungrouped count, disconnected component count, crossings, long edges, outliers, group overlaps, and compactness.
+8. After confirmation, update only `canvas.nodes[].x/y`. Preserve node order, edges, anchors, groups, notes, pages, project identity, and unknown fields. Do not move notes automatically because the manifest does not declare note ownership.
 
 ### State protection and layout tools
 
@@ -332,12 +348,13 @@ Do not combine group migration with re-layout. A later group-local layout remain
 - Only an explicit `--relayout`, `--reset-canvas`, or direct user request may update canvas layout. Back up the manifest first and modify only `canvas`; preserve `pages`, `project.id`, and unknown fields.
 - Layout automation must provide a preview before writing. Never silently re-layout during upload.
 - Group layout may update only member node coordinates after preview and confirmation; it must not move nodes in other groups.
+- Whole-canvas smart layout may update all node coordinates only after explicit preview confirmation. It must retain group membership and leave notes unchanged.
 
 ### Upload gate
 
 Validate the final extracted ZIP and require: `pageCount === uniqueNodeCount`, zero duplicate or missing nodes, zero dangling or duplicate edges, zero node overlaps, valid edge endpoints, valid group IDs/members/root nodes, and all declared entry/doc files present.
 
-Block upload for integrity failures. Report edge crossings, edges through unrelated nodes, and insufficient spacing as explicit layout warnings. “Every page previews” is not sufficient unless the canvas is also complete and readable.
+Block upload for integrity failures. Report edge crossings, edges through unrelated nodes, insufficient spacing, outlier nodes, excessive group gaps, overlapping group bounds, oversized sparse groups, long edges, orphaned notes, and low canvas compactness as explicit layout warnings. Review `outlierNodeCount`, `excessiveGapCount`, `longEdgeCount`, `groupOverlapCount`, `oversizedGroupCount`, `noteOrphanCount`, `groupCompactness`, `minimumGroupCompactness`, and `canvasCompactness`; “every page previews” is not sufficient unless the canvas is also complete and readable.
 
 ## ProtoDock Upload Package Rules
 
@@ -393,7 +410,7 @@ After packaging, extract the final ZIP into a new temporary directory and valida
 - every visible back control uses the ProtoDock back protocol; no `history.back()`, `history.go(-1)`, or unbound back icon remains;
 - every icon-like control or status mark uses a bundled mature SVG; no emoji, Unicode glyph, punctuation, letter, icon-font character, or CSS approximation is used as a pseudo-icon;
 - every page has exactly one node, all edge endpoints exist, and no nodes overlap;
-- edge crossings, paths through unrelated nodes, and tight spacing are surfaced as layout warnings.
+- edge crossings, paths through unrelated nodes, tight spacing, outliers, excessive gaps, sparse oversized groups, overlapping group bounds, long edges, orphaned notes, and low compactness are surfaced as layout warnings.
 
 Do not mark delivery complete until the extracted final upload ZIP passes the executable validator. Source-directory-only validation or a manually written checklist does not count.
 

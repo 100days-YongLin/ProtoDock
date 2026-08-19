@@ -54,6 +54,7 @@ const els = {
   pageSearchInput: document.getElementById('pageSearchInput'),
   pageSearchClear: document.getElementById('pageSearchClear'),
   addGroupButton: document.getElementById('addGroupButton'),
+  smartLayoutButton: document.getElementById('smartLayoutButton'),
   sortPagesButton: document.getElementById('sortPagesButton'),
   canvasPresetName: document.getElementById('canvasPresetName'),
   canvasPresetDesc: document.getElementById('canvasPresetDesc'),
@@ -2015,6 +2016,7 @@ function renderProjectActions() {
     els.safeAreaSettingsButton,
     els.saveSafeAreaSettings,
     els.addGroupButton,
+    els.smartLayoutButton,
     els.sortPagesButton,
     els.savePageSettings
   ].forEach((control) => {
@@ -2265,6 +2267,21 @@ function renderGroupLayoutReview() {
     return;
   }
   const preview = state.groupLayoutPreview;
+  if (preview?.scope === 'canvas') {
+    const parts = [`预览全画布智能布局：${Object.keys(preview.positions).length} 个页面`];
+    if (preview.summary?.groupCount) {
+      parts.push(`${preview.summary.groupCount} 个分组`);
+    }
+    if (preview.summary?.ungroupedNodeCount) {
+      parts.push(`${preview.summary.ungroupedNodeCount} 个未分组页面`);
+    }
+    if (preview.summary?.componentCount) {
+      parts.push(`${preview.summary.componentCount} 个局部流程`);
+    }
+    els.groupLayoutReviewText.textContent = parts.join('，');
+    els.groupLayoutReview.hidden = false;
+    return;
+  }
   const group = preview ? canvasGroups().find((item) => item.id === preview.groupId) : null;
   if (!group) {
     els.groupLayoutReview.hidden = true;
@@ -4169,22 +4186,60 @@ function previewGroupLayout(groupId) {
   const positions = window.ProtoDockGroups?.layoutGroup(
     group,
     state.manifest.canvas.nodes,
-    state.manifest.canvas.edges
+    state.manifest.canvas.edges,
+    { nodeSize: estimatedNodeSize() }
   ) || {};
-  state.groupLayoutPreview = { groupId, positions };
+  state.groupLayoutPreview = { scope: 'group', groupId, positions };
   state.selectedNodeId = group.rootNodeId;
   renderCanvas();
   centerNode(group.rootNodeId);
   setStatus(`正在预览「${group.title}」组内布局`);
 }
 
+function previewSmartCanvasLayout() {
+  if (!state.manifest || state.readOnly) {
+    if (state.readOnly) {
+      setStatus(readonlyProjectMessage());
+    }
+    return;
+  }
+  const plan = window.ProtoDockGroups?.layoutCanvas(
+    canvasGroups(),
+    state.manifest.canvas.nodes,
+    state.manifest.canvas.edges,
+    { nodeSize: estimatedNodeSize() }
+  );
+  if (!plan || !Object.keys(plan.positions || {}).length) {
+    setStatus('当前画布没有可排列的页面');
+    return;
+  }
+  state.groupLayoutPreview = {
+    scope: 'canvas',
+    positions: plan.positions,
+    summary: {
+      groupCount: plan.groupCount,
+      ungroupedNodeCount: plan.ungroupedNodeCount,
+      componentCount: plan.componentCount
+    }
+  };
+  renderCanvas();
+  window.requestAnimationFrame(() => fitCanvasToBounds({
+    x: plan.bounds.x - 100,
+    y: plan.bounds.y - 100,
+    width: plan.bounds.width + 200,
+    height: plan.bounds.height + 200
+  }));
+  setStatus('正在预览全画布智能布局，确认前不会修改项目');
+}
+
 function cancelGroupLayoutPreview() {
-  if (!state.groupLayoutPreview) {
+  const preview = state.groupLayoutPreview;
+  if (!preview) {
     return;
   }
   state.groupLayoutPreview = null;
   renderCanvas();
-  setStatus('已取消组内布局预览');
+  setStatus(preview.scope === 'canvas' ? '已取消智能布局预览' : '已取消组内布局预览');
 }
 
 async function applyGroupLayoutPreview() {
@@ -4201,7 +4256,9 @@ async function applyGroupLayoutPreview() {
   });
   state.groupLayoutPreview = null;
   renderCanvas();
-  markDirty('组内布局已应用，仅更新当前组节点');
+  markDirty(preview.scope === 'canvas'
+    ? '智能布局已应用，仅更新页面节点坐标'
+    : '组内布局已应用，仅更新当前组节点');
 }
 
 function selectPageFromList(nodeId) {
@@ -4700,6 +4757,10 @@ function bindGlobalEvents() {
   els.savePageSettings?.addEventListener('click', savePageSettings);
   els.sortPagesButton?.addEventListener('click', () => {
     setPageSortMode(!state.pageSortMode);
+  });
+  els.smartLayoutButton?.addEventListener('click', () => {
+    els.smartLayoutButton.closest('details')?.removeAttribute('open');
+    previewSmartCanvasLayout();
   });
   els.addGroupButton?.addEventListener('click', () => openGroupModal());
   els.closeGroupModal?.addEventListener('click', closeGroupModal);
