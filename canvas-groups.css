@@ -218,13 +218,13 @@
 
 .page-group-title strong {
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--sidebar-primary-size, 13px);
   font-weight: 700;
 }
 
 .page-group-title span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--sidebar-secondary-size, 12px);
 }
 
 .page-group-pages {

@@ -347,6 +347,12 @@ select {
   background: var(--bg);
 }
 
+.sidebar {
+  --sidebar-section-title-size: 14px;
+  --sidebar-primary-size: 13px;
+  --sidebar-secondary-size: 12px;
+}
+
 .inspector {
   border-right: 0;
   border-left: 0;
@@ -413,9 +419,9 @@ select {
 .panel-heading {
   margin: 0 0 14px;
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--sidebar-section-title-size, 14px);
   font-weight: 600;
-  letter-spacing: -0.224px;
+  letter-spacing: 0;
 }
 
 .panel-heading-row {
@@ -428,6 +434,53 @@ select {
 
 .panel-heading-row .panel-heading {
   margin: 0;
+}
+
+.panel-section-toggle {
+  display: grid;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.panel-section-toggle:hover,
+.panel-section-toggle:focus-visible {
+  background: var(--soft);
+  color: var(--primary);
+}
+
+.panel-section-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.collapsible-panel-section.is-collapsed {
+  padding-bottom: 12px;
+}
+
+.collapsible-panel-section.is-collapsed .panel-heading-row {
+  margin-bottom: 0;
+}
+
+.panel-section-body[hidden] {
+  display: none;
+}
+
+.sidebar .doc-item strong {
+  font-size: var(--sidebar-primary-size);
+  letter-spacing: 0;
+}
+
+.sidebar .doc-item > span,
+.sidebar .page-list-copy > span {
+  font-size: var(--sidebar-secondary-size);
 }
 
 .panel-icon-button {

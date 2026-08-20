@@ -1,5 +1,6 @@
 const MANIFEST_FILE = 'protodock.project.json';
 const INSPECTOR_WIDTH_STORAGE_KEY = 'protodock.inspectorWidth';
+const SIDEBAR_SECTION_STORAGE_KEY = 'protodock.sidebarSections.v1';
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
 const VIRTUAL_CANVAS_LIMIT = 100000;
@@ -30,6 +31,7 @@ function appUrl(path = '/') {
 
 const els = {
   workspace: document.querySelector('.workspace'),
+  sidebar: document.querySelector('.sidebar'),
   inspector: document.querySelector('.inspector'),
   canvasShell: document.getElementById('canvasShell'),
   canvasTransform: document.getElementById('canvasTransform'),
@@ -5410,6 +5412,12 @@ window.ProtoDock = {
 
 initMarkdownEditor();
 bindGlobalEvents();
+window.ProtoDockSidebarSections?.create({
+  rootElement: els.sidebar,
+  storage: window.localStorage,
+  storageKey: SIDEBAR_SECTION_STORAGE_KEY,
+  renderIcons: () => window.lucide?.createIcons()
+});
 restoreInspectorWidth();
 renderToolMode();
 const initialShareId = shareIdFromLocation();

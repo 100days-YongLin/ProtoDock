@@ -8,10 +8,10 @@
   <link rel="apple-touch-icon" href="./assets/protodock-icon.png">
   <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
   <link rel="stylesheet" href="./vendor/devices.css">
-  <link rel="stylesheet" href="./styles.css?v=12">
-  <link rel="stylesheet" href="./canvas-groups.css">
+  <link rel="stylesheet" href="./styles.css?v=13">
+  <link rel="stylesheet" href="./canvas-groups.css?v=4">
   <link rel="stylesheet" href="./canvas-minimap.css">
-  <link rel="stylesheet" href="./product-workspace.css">
+  <link rel="stylesheet" href="./product-workspace.css?v=2">
 </head>
 <body>
   <main class="app">
@@ -61,51 +61,63 @@
 
     <section class="workspace">
       <aside class="sidebar">
-        <section class="panel-section workspace-shared-docs" id="workspaceSharedDocsSection" hidden>
+        <section class="panel-section collapsible-panel-section workspace-shared-docs" id="workspaceSharedDocsSection" data-sidebar-section="shared-docs" data-sidebar-section-label="共享产品文档" hidden>
           <div class="panel-heading-row">
             <div>
               <h2 class="panel-heading">共享产品文档</h2>
               <span class="workspace-shared-docs-hint" id="workspaceSharedDocsHint">所有端共用</span>
             </div>
+            <button class="panel-section-toggle" type="button" data-sidebar-section-toggle="shared-docs" title="收起共享产品文档" aria-label="收起共享产品文档" aria-expanded="true" aria-controls="workspaceSharedDocsBody">
+              <i data-lucide="chevron-down"></i>
+            </button>
           </div>
-          <ul class="doc-list workspace-shared-doc-list" id="workspaceSharedDocList"></ul>
+          <div class="panel-section-body" id="workspaceSharedDocsBody" data-sidebar-section-body>
+            <ul class="doc-list workspace-shared-doc-list" id="workspaceSharedDocList"></ul>
+          </div>
         </section>
 
-        <section class="panel-section">
-          <h2 class="panel-heading">画布规格</h2>
-          <div class="doc-list">
-            <div class="doc-item active">
-              <strong id="canvasPresetName">iPhone 竖版</strong>
-              <span id="canvasPresetDesc">390 × 844，移动端小程序外壳</span>
-            </div>
-          </div>
-          <div class="setting-toggle safe-area-toggle-control">
-            <label class="setting-copy" for="safeAreaToggle">
-              <strong>安全区</strong>
-              <small>按项目自定义刘海和手势条</small>
-            </label>
-            <button class="setting-icon-button" id="safeAreaSettingsButton" type="button" title="设置安全区" aria-label="设置安全区" aria-expanded="false" aria-controls="safeAreaPanel" data-requires-project>
-              <i data-lucide="settings-2"></i>
+        <section class="panel-section collapsible-panel-section" data-sidebar-section="canvas-settings" data-sidebar-section-label="画布规格">
+          <div class="panel-heading-row">
+            <h2 class="panel-heading">画布规格</h2>
+            <button class="panel-section-toggle" type="button" data-sidebar-section-toggle="canvas-settings" title="收起画布规格" aria-label="收起画布规格" aria-expanded="true" aria-controls="canvasSettingsBody">
+              <i data-lucide="chevron-down"></i>
             </button>
-            <label class="toggle-switch" for="safeAreaToggle">
-              <input id="safeAreaToggle" type="checkbox" data-requires-project>
-              <i aria-hidden="true"></i>
-            </label>
           </div>
-          <div class="safe-area-panel" id="safeAreaPanel" hidden>
-            <div class="safe-area-fields" aria-label="安全区尺寸">
-              <label class="safe-area-field" for="safeAreaTopInput">
-                <span>刘海</span>
-                <input id="safeAreaTopInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
-                <small>px</small>
+          <div class="panel-section-body canvas-settings-body" id="canvasSettingsBody" data-sidebar-section-body>
+            <div class="doc-list">
+              <div class="doc-item active">
+                <strong id="canvasPresetName">iPhone 竖版</strong>
+                <span id="canvasPresetDesc">390 × 844，移动端小程序外壳</span>
+              </div>
+            </div>
+            <div class="setting-toggle safe-area-toggle-control">
+              <label class="setting-copy" for="safeAreaToggle">
+                <strong>安全区</strong>
+                <small>按项目自定义刘海和手势条</small>
               </label>
-              <label class="safe-area-field" for="safeAreaBottomInput">
-                <span>手势条</span>
-                <input id="safeAreaBottomInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
-                <small>px</small>
+              <button class="setting-icon-button" id="safeAreaSettingsButton" type="button" title="设置安全区" aria-label="设置安全区" aria-expanded="false" aria-controls="safeAreaPanel" data-requires-project>
+                <i data-lucide="settings-2"></i>
+              </button>
+              <label class="toggle-switch" for="safeAreaToggle">
+                <input id="safeAreaToggle" type="checkbox" data-requires-project>
+                <i aria-hidden="true"></i>
               </label>
             </div>
-            <button class="safe-area-save" id="saveSafeAreaSettings" type="button" data-requires-project>保存</button>
+            <div class="safe-area-panel" id="safeAreaPanel" hidden>
+              <div class="safe-area-fields" aria-label="安全区尺寸">
+                <label class="safe-area-field" for="safeAreaTopInput">
+                  <span>刘海</span>
+                  <input id="safeAreaTopInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
+                  <small>px</small>
+                </label>
+                <label class="safe-area-field" for="safeAreaBottomInput">
+                  <span>手势条</span>
+                  <input id="safeAreaBottomInput" type="number" min="0" max="240" step="1" inputmode="numeric" data-requires-project>
+                  <small>px</small>
+                </label>
+              </div>
+              <button class="safe-area-save" id="saveSafeAreaSettings" type="button" data-requires-project>保存</button>
+            </div>
           </div>
         </section>
 
@@ -744,13 +756,14 @@
   <script src="./project-notifications.js?v=1"></script>
   <script src="./project-drop.js?v=2"></script>
   <script src="./product-workspace.js?v=1"></script>
+  <script src="./sidebar-sections.js?v=1"></script>
   <script src="./project-changelog.js?v=6"></script>
   <script src="./project-changelog-dialog.js?v=4"></script>
   <script src="./local-resource-paths.js?v=1"></script>
   <script src="./local-preview-assets.js?v=1"></script>
   <script src="./product-document-cache.js?v=4"></script>
   <script src="./product-document.js?v=8"></script>
-  <script src="./app.js?v=20"></script>
+  <script src="./app.js?v=21"></script>
   <script src="./project-name.js"></script>
   <script src="./share.js?v=12"></script>
 </body>

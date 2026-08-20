@@ -61,7 +61,7 @@
   display: block;
   margin-top: 3px;
   color: #85858b;
-  font-size: 12px;
+  font-size: var(--sidebar-secondary-size, 12px);
 }
 
 .workspace-shared-doc-list {
@@ -109,7 +109,7 @@
 
 .workspace-shared-doc-list strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--sidebar-primary-size, 13px);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
