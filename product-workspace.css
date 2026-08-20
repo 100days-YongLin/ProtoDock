@@ -4,9 +4,10 @@
   gap: 2px;
   min-width: 0;
   max-width: 420px;
-  padding: 3px;
+  height: var(--topbar-control-height, 34px);
+  padding: 2px;
   border: 1px solid #3a3a3c;
-  border-radius: 8px;
+  border-radius: var(--topbar-control-radius, 8px);
   background: #202022;
   overflow-x: auto;
   scrollbar-width: none;
@@ -22,14 +23,14 @@
 
 .workspace-project-switcher button {
   flex: 0 0 auto;
-  min-height: 30px;
+  height: calc(var(--topbar-control-height, 34px) - 6px);
   padding: 0 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--topbar-item-radius, 6px);
   color: #a9a9ae;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
 }
 
