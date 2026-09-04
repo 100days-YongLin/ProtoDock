@@ -1696,7 +1696,7 @@ function enforceLocalPreviewRuntime(iframe, mount, node, page, jobId) {
   if (state.projectBaseUrl) {
     return;
   }
-  const verify = () => {
+  const verify = (deadline) => {
     if (state.previewJobs.get(node.id) !== jobId || !iframe.isConnected) {
       return;
     }
@@ -1708,6 +1708,10 @@ function enforceLocalPreviewRuntime(iframe, mount, node, page, jobId) {
       iframe.dataset.previewReady = 'true';
       return;
     }
+    if (Date.now() < deadline) {
+      window.setTimeout(() => verify(deadline), 250);
+      return;
+    }
     mount.innerHTML = `
       <div class="preview-error">
         <strong>本地预览未渲染</strong>
@@ -1716,7 +1720,10 @@ function enforceLocalPreviewRuntime(iframe, mount, node, page, jobId) {
     `;
     console.error(`ProtoDock: local preview runtime did not mount for ${page.entry || node.pageId}`);
   };
-  iframe.addEventListener('load', () => window.setTimeout(verify, 300), { once: true });
+  iframe.dataset.previewReady = 'pending';
+  iframe.addEventListener('load', () => {
+    verify(Date.now() + CAPTURE_PREVIEW_READY_TIMEOUT_MS);
+  }, { once: true });
 }
 
 async function hydratePreview(node) {

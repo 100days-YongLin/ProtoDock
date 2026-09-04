@@ -102,10 +102,12 @@ const files = {
 </html>`,
   [`${projectPrefix}pages/_wechat-runtime/runtime.css`]: 'body { background: rgb(246, 247, 248); }',
   [`${projectPrefix}pages/_wechat-runtime/runtime.js`]: `(() => {
-    const root = document.createElement('glass-easel-root');
-    root.innerHTML = '<main id="local-preview-content">本地微信页面已渲染<img id="dynamic-asset" src="asset.svg" alt=""></main>';
-    document.body.append(root);
-    window.__PROTODOCK_WECHAT_ROOT__ = { mounted: true };
+    window.setTimeout(() => {
+      const root = document.createElement('glass-easel-root');
+      root.innerHTML = '<main id="local-preview-content">本地微信页面已渲染<img id="dynamic-asset" src="asset.svg" alt=""></main>';
+      document.body.append(root);
+      window.__PROTODOCK_WECHAT_ROOT__ = { mounted: true };
+    }, 800);
   })();`,
   [`${projectPrefix}pages/_wechat-runtime/asset.svg`]: '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="#198754"/></svg>'
 };
