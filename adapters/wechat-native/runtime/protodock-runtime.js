@@ -179,7 +179,9 @@
 
   function mountTabBar() {
     const tabBar = config.tabBar;
-    if (!tabBar?.list?.length || global.document.querySelector('.protodock-wechat-tabbar')) return;
+    const currentRoute = cleanRoute(config.route);
+    const isTabRoute = tabBar?.list?.some((item) => cleanRoute(item.pagePath) === currentRoute);
+    if (!isTabRoute || global.document.querySelector('.protodock-wechat-tabbar')) return;
     const element = global.document.createElement('nav');
     element.className = 'protodock-wechat-tabbar';
     tabBar.list.forEach((item) => {
@@ -204,10 +206,42 @@
     }, 50);
   }
 
+  function mountNativeNavBar() {
+    const windowConfig = config.window || {};
+    if (windowConfig.navigationStyle === 'custom' || global.document.querySelector('.protodock-wechat-navbar')) return;
+    const currentRoute = cleanRoute(config.route);
+    const isTabRoute = config.tabBar?.list?.some((item) => cleanRoute(item.pagePath) === currentRoute);
+    const element = global.document.createElement('header');
+    element.className = 'protodock-wechat-navbar';
+    element.style.setProperty('--protodock-navbar-background', windowConfig.navigationBarBackgroundColor || '#000000');
+    element.style.setProperty('--protodock-navbar-color', windowConfig.navigationBarTextStyle === 'black' ? '#111111' : '#ffffff');
+    const status = global.document.createElement('div');
+    status.className = 'protodock-wechat-navbar__status';
+    const bar = global.document.createElement('div');
+    bar.className = 'protodock-wechat-navbar__bar';
+    if (!isTabRoute) {
+      const back = global.document.createElement('button');
+      back.type = 'button';
+      back.className = 'protodock-wechat-navbar__back';
+      back.setAttribute('aria-label', '返回');
+      back.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>返回</span>';
+      back.addEventListener('click', () => wxMock.navigateBack({}));
+      bar.append(back);
+    }
+    const title = global.document.createElement('strong');
+    title.className = 'protodock-wechat-navbar__title';
+    title.textContent = windowConfig.navigationBarTitleText || '';
+    bar.append(title);
+    element.append(status, bar);
+    global.document.body.prepend(element);
+    global.document.documentElement.dataset.protodockHasNavbar = 'true';
+  }
+
   global.ProtoDockWechatRuntime = {
     cleanRoute,
     pageIdForUrl,
     navigate,
+    mountNativeNavBar,
     mountTabBar,
     startApp() {
       const app = global.getApp();

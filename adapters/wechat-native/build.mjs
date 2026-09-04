@@ -216,7 +216,7 @@ async function main() {
       path.join(runtimeOutput, 'glass-easel.js'),
     );
     await normalizeCompiledCss(path.join(runtimeOutput, 'index.css'));
-    await writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute });
+    await writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute, sourceStage });
     const report = await buildReport({ source, stage: sourceStage, output, pageMap, routes });
     await writeFile(path.join(output, '_wechat-adapter-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
@@ -404,15 +404,19 @@ async function runWebpack(stage, output) {
 
 export function normalizeCompiledCssContent(css) {
   const root = postcss.parse(css);
-  const rewritePageSelector = selectorParser((selectors) => {
+  const rewriteWechatSelectors = selectorParser((selectors) => {
     selectors.walkTags((tag) => {
-      if (tag.value === 'wx-page') tag.value = 'wx-glass-easel-root';
+      if (tag.value === 'wx-page') {
+        tag.value = 'wx-glass-easel-root';
+      } else if (NATIVE_COMPONENTS.has(tag.value)) {
+        tag.value = `wx-${tag.value}`;
+      }
     });
   });
 
   root.walkRules((rule) => {
-    if (!rule.selector?.includes('wx-page')) return;
-    rule.selector = rewritePageSelector.processSync(rule.selector);
+    if (!rule.selector) return;
+    rule.selector = rewriteWechatSelectors.processSync(rule.selector);
   });
 
   return root.toString().replace(/url\((['"]?)\//g, 'url($1');
@@ -423,18 +427,34 @@ async function normalizeCompiledCss(file) {
   await writeFile(file, normalizeCompiledCssContent(css));
 }
 
-async function writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute }) {
+async function readPageConfig(sourceStage, route) {
+  try {
+    return JSON.parse(await readFile(path.join(sourceStage, `${route}.json`), 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') return {};
+    throw error;
+  }
+}
+
+async function writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute, sourceStage }) {
   const entryUrls = Object.fromEntries(Object.values(pageMap).map((pageId) => [pageId, `../${pageId}/index.html`]));
   for (const route of routes) {
     const pageId = pageMap[route];
     const directory = path.join(output, pageId);
     await mkdir(directory, { recursive: true });
+    const pageWindow = { ...(appJson.window || {}), ...await readPageConfig(sourceStage, route) };
     const pageConfig = {
       route,
       pageId,
       pageMap,
       entryUrls,
       tabBar: appJson.tabBar || null,
+      window: {
+        navigationStyle: pageWindow.navigationStyle || 'default',
+        navigationBarTitleText: pageWindow.navigationBarTitleText || '',
+        navigationBarBackgroundColor: pageWindow.navigationBarBackgroundColor || '#000000',
+        navigationBarTextStyle: pageWindow.navigationBarTextStyle || 'white',
+      },
       storage: config.storage || {},
       fixtures,
       scanResult: config.scanResult || '',

@@ -85,6 +85,7 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     const address = server.address();
     await page.goto(`http://127.0.0.1:${address.port}/wx-pages-index-index/index.html`, { waitUntil: 'networkidle' });
     await page.waitForSelector('wx-glass-easel-root [data-style-probe="panel"]');
+    await page.waitForSelector('.protodock-wechat-tabbar');
 
     const styles = await page.evaluate(() => {
       const root = document.querySelector('wx-glass-easel-root');
@@ -115,6 +116,10 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
         scrollContainerScrollTop: scrollContainer.scrollTop,
         pageCanScroll: document.documentElement.scrollHeight > window.innerHeight,
         pageScrollTop: window.scrollY,
+        tabbarMounted: !!document.querySelector('.protodock-wechat-tabbar'),
+        navbarMounted: !!document.querySelector('.protodock-wechat-navbar'),
+        navbarTitle: document.querySelector('.protodock-wechat-navbar__title')?.textContent || '',
+        navbarHasBack: !!document.querySelector('.protodock-wechat-navbar__back'),
       };
     });
 
@@ -133,6 +138,53 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     assert.ok(styles.scrollContainerScrollTop > 0);
     assert.equal(styles.pageCanScroll, true);
     assert.ok(styles.pageScrollTop > 0);
+    assert.equal(styles.tabbarMounted, true);
+    assert.equal(styles.navbarMounted, true);
+    assert.equal(styles.navbarTitle, '适配器测试');
+    assert.equal(styles.navbarHasBack, false);
+
+    await page.goto(`http://127.0.0.1:${address.port}/wx-packages-facebank-add-index/index.html`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('.protodock-wechat-navbar');
+    await page.waitForSelector('[data-gender-option="true"]');
+    const addPage = await page.evaluate(() => {
+      const navbar = document.querySelector('.protodock-wechat-navbar');
+      const content = document.querySelector('[data-add-page="true"]');
+      const genderOption = document.querySelector('[data-gender-option="true"]');
+      const formLabelText = document.querySelector('[data-form-label="true"] > wx-text');
+      const selectControl = document.querySelector('[data-select-control="true"]');
+      const fieldNote = document.querySelector('[data-field-note="true"]');
+      const genderStyle = getComputedStyle(genderOption);
+      return {
+        title: document.querySelector('.protodock-wechat-navbar__title')?.textContent || '',
+        hasBack: !!document.querySelector('.protodock-wechat-navbar__back'),
+        hasTabbar: !!document.querySelector('.protodock-wechat-tabbar'),
+        bodyPaddingTop: getComputedStyle(document.body).paddingTop,
+        navbarBottom: navbar.getBoundingClientRect().bottom,
+        contentTop: content.getBoundingClientRect().top,
+        genderDisplay: genderStyle.display,
+        genderAlign: genderStyle.alignItems,
+        genderJustify: genderStyle.justifyContent,
+        genderMinHeight: genderStyle.minHeight,
+        labelWeight: getComputedStyle(formLabelText).fontWeight,
+        selectDisplay: getComputedStyle(selectControl).display,
+        selectWidth: getComputedStyle(selectControl).width,
+        noteColor: getComputedStyle(fieldNote).color,
+      };
+    });
+    assert.equal(addPage.title, '新增人脸');
+    assert.equal(addPage.hasBack, true);
+    assert.equal(addPage.hasTabbar, false);
+    assert.equal(addPage.bodyPaddingTop, '88px');
+    assert.ok(addPage.contentTop >= addPage.navbarBottom);
+    assert.equal(addPage.genderDisplay, 'flex');
+    assert.equal(addPage.genderAlign, 'center');
+    assert.equal(addPage.genderJustify, 'center');
+    assert.ok(Number.parseFloat(addPage.genderMinHeight) > 30);
+    assert.equal(addPage.labelWeight, '700');
+    assert.equal(addPage.selectDisplay, 'block');
+    assert.ok(Number.parseFloat(addPage.selectWidth) > 15);
+    assert.ok(Number.parseFloat(addPage.selectWidth) < 25);
+    assert.equal(addPage.noteColor, 'rgb(22, 130, 232)');
   } finally {
     await browser?.close();
     if (server.listening) await new Promise((resolve) => server.close(resolve));

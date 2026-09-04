@@ -50,12 +50,20 @@ test('compiled page selectors target the real glass-easel page root', () => {
   const css = normalizeCompiledCssContent(`
     wx-page { --hm-color-mask: rgba(26, 28, 35, 0.42); min-height: 100vh; }
     wx-page[data-theme="warm"] .panel, .untouched { background: white; }
+    .gender-control view, .form-label > text, .select-control + image { display: flex; }
+    input.form-control, wx-button, custom-card { color: black; }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
     .wx-page-label { color: red; }
   `);
 
   assert.match(css, /wx-glass-easel-root\s*\{/);
   assert.match(css, /wx-glass-easel-root\[data-theme="warm"\]\s+\.panel/);
   assert.match(css, /\.wx-page-label\s*\{/);
+  assert.match(css, /\.gender-control wx-view/);
+  assert.match(css, /\.form-label\s*>\s*wx-text/);
+  assert.match(css, /\.select-control\s*\+\s*wx-image/);
+  assert.match(css, /wx-input\.form-control, wx-button, custom-card/);
+  assert.match(css, /@keyframes fade\s*\{\s*from\s*\{/);
   assert.doesNotMatch(css, /(^|[\s,>+~])wx-page(?=[\s.{[:])/m);
 });
 
@@ -92,12 +100,14 @@ test('builds an interactive browser entry from a native mini program', { timeout
   ]);
 
   const report = JSON.parse(await readFile(path.join(output, '_wechat-adapter-report.json'), 'utf8'));
-  assert.equal(report.pageCount, 1);
+  assert.equal(report.pageCount, 2);
   assert.equal(report.pages[0].pageId, 'wx-pages-index-index');
+  assert.equal(report.pages[1].pageId, 'wx-packages-facebank-add-index');
   assert.deepEqual(report.compatibility.unsupportedWxApis, []);
   const html = await readFile(path.join(output, 'wx-pages-index-index', 'index.html'), 'utf8');
   assert.match(html, /protodock-bootstrap\.js/);
   assert.match(html, /pages\/index\/index/);
+  assert.match(html, /"navigationBarTitleText":"适配器测试"/);
   assert.match(html, /"runtimeCollections":\[\]/);
 });
 

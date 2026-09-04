@@ -73,6 +73,7 @@
   root.getComponent()?.triggerPageLifetime?.('show', [{ path: config.route || '', query: config.query || {} }]);
   page?.onShow?.();
   page?.onReady?.();
+  window.ProtoDockWechatRuntime?.mountNativeNavBar();
   window.ProtoDockWechatRuntime?.mountTabBar();
   window.__PROTODOCK_WECHAT_ROOT__ = root;
 })();

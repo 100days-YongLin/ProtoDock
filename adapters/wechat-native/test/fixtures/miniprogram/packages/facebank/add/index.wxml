@@ -1,0 +1,9 @@
+<view class="add-page" data-add-page="true">
+  <view class="form-label" data-form-label="true"><text>性别</text></view>
+  <view class="gender-control">
+    <view class="gender-option" data-gender-option="true"><text>男</text></view>
+    <view class="gender-option"><text>女</text></view>
+  </view>
+  <image class="select-control" data-select-control="true" src="/assets/probe.svg" mode="aspectFit" />
+  <text class="field-note" data-field-note="true">请选择性别</text>
+</view>

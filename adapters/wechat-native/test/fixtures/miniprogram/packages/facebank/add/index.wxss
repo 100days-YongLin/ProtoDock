@@ -1,0 +1,35 @@
+.add-page {
+  min-height: 100vh;
+  padding: 24rpx;
+  background: #fffaf2;
+}
+
+.form-label > text {
+  font-weight: 700;
+}
+
+.gender-control {
+  display: flex;
+  gap: 16rpx;
+}
+
+.gender-control view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gender-control > view {
+  width: 120rpx;
+  min-height: 72rpx;
+}
+
+.gender-control + image {
+  display: block;
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.select-control + text {
+  color: #1682e8;
+}

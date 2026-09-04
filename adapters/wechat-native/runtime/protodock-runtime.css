@@ -50,6 +50,68 @@ html[data-protodock-has-tabbar="true"] body {
   padding-bottom: 64px;
 }
 
+html[data-protodock-has-navbar="true"] body {
+  padding-top: 88px;
+}
+
+.protodock-wechat-navbar {
+  position: fixed;
+  z-index: 10001;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 88px;
+  color: var(--protodock-navbar-color);
+  background: var(--protodock-navbar-background);
+}
+
+.protodock-wechat-navbar__status {
+  height: 44px;
+}
+
+.protodock-wechat-navbar__bar {
+  position: relative;
+  display: flex;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 72px;
+}
+
+.protodock-wechat-navbar__title {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.protodock-wechat-navbar__back {
+  position: absolute;
+  left: 8px;
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+}
+
+.protodock-wechat-navbar__back svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 .protodock-wechat-tabbar {
   position: fixed;
   z-index: 10000;
