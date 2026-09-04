@@ -5,7 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { assertCompatible, collectPageRuntimeCollections, collectRoutes, pageIdForRoute, parseArguments } from '../build.mjs';
+import {
+  assertCompatible,
+  collectPageRuntimeCollections,
+  collectRoutes,
+  normalizeCompiledCssContent,
+  pageIdForRoute,
+  parseArguments,
+} from '../build.mjs';
 
 const TEST_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const ADAPTER_ROOT = path.dirname(TEST_ROOT);
@@ -37,6 +44,19 @@ test('compatibility gate rejects unsupported runtime features', () => {
       unsupportedNativeTags: [],
     },
   }), /WXS is not supported; unsupported wx APIs: openDocument/);
+});
+
+test('compiled page selectors target the real glass-easel page root', () => {
+  const css = normalizeCompiledCssContent(`
+    wx-page { --hm-color-mask: rgba(26, 28, 35, 0.42); min-height: 100vh; }
+    wx-page[data-theme="warm"] .panel, .untouched { background: white; }
+    .wx-page-label { color: red; }
+  `);
+
+  assert.match(css, /wx-glass-easel-root\s*\{/);
+  assert.match(css, /wx-glass-easel-root\[data-theme="warm"\]\s+\.panel/);
+  assert.match(css, /\.wx-page-label\s*\{/);
+  assert.doesNotMatch(css, /(^|[\s,>+~])wx-page(?=[\s.{[:])/m);
 });
 
 test('runtime collection scan only captures Page instance fields and nested fields', () => {

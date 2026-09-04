@@ -18,6 +18,8 @@
     "less": "^4.2.2",
     "less-loader": "^12.2.0",
     "mini-css-extract-plugin": "^2.9.2",
+    "postcss": "^8.4.47",
+    "postcss-selector-parser": "^7.1.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.9.3",
     "webpack": "^5.101.3",

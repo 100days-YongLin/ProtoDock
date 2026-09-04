@@ -19,7 +19,8 @@ body {
   overflow-x: hidden;
 }
 
-glass-easel-root {
+glass-easel-root,
+wx-glass-easel-root {
   display: block;
   min-height: 100vh;
 }

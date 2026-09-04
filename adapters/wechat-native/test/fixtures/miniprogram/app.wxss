@@ -1,3 +1,8 @@
 page {
-  background: #ffffff;
+  --hm-color-mask: rgba(26, 28, 35, 0.42);
+  --hm-color-surface-warm: #fff6e6;
+  --hm-color-text: #1a1c23;
+  min-height: 100vh;
+  background: #fffaf2;
+  color: var(--hm-color-text);
 }

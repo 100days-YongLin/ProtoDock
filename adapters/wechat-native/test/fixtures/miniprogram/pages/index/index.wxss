@@ -6,3 +6,12 @@
   flex-direction: column;
   gap: 24rpx;
 }
+
+.bottom-sheet-mask {
+  background: var(--hm-color-mask);
+}
+
+.bottom-sheet-panel {
+  background: var(--hm-color-surface-warm);
+  color: var(--hm-color-text);
+}

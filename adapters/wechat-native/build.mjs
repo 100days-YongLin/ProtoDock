@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import postcss from 'postcss';
+import selectorParser from 'postcss-selector-parser';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 
@@ -400,9 +402,25 @@ async function runWebpack(stage, output) {
   await cp(path.join(stage, 'dist'), output, { recursive: true });
 }
 
+export function normalizeCompiledCssContent(css) {
+  const root = postcss.parse(css);
+  const rewritePageSelector = selectorParser((selectors) => {
+    selectors.walkTags((tag) => {
+      if (tag.value === 'wx-page') tag.value = 'wx-glass-easel-root';
+    });
+  });
+
+  root.walkRules((rule) => {
+    if (!rule.selector?.includes('wx-page')) return;
+    rule.selector = rewritePageSelector.processSync(rule.selector);
+  });
+
+  return root.toString().replace(/url\((['"]?)\//g, 'url($1');
+}
+
 async function normalizeCompiledCss(file) {
   const css = await readFile(file, 'utf8');
-  await writeFile(file, css.replace(/url\((['"]?)\//g, 'url($1'));
+  await writeFile(file, normalizeCompiledCssContent(css));
 }
 
 async function writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute }) {
