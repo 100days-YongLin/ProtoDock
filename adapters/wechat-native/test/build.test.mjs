@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { assertCompatible, collectRoutes, pageIdForRoute, parseArguments } from '../build.mjs';
+import { assertCompatible, collectPageRuntimeCollections, collectRoutes, pageIdForRoute, parseArguments } from '../build.mjs';
 
 const TEST_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const ADAPTER_ROOT = path.dirname(TEST_ROOT);
@@ -39,6 +39,30 @@ test('compatibility gate rejects unsupported runtime features', () => {
   }), /WXS is not supported; unsupported wx APIs: openDocument/);
 });
 
+test('runtime collection scan only captures Page instance fields and nested fields', () => {
+  const source = `
+    const unrelated = new Set(['keep']);
+    Page<Model, Methods>({
+      cache: new Map<string, string>(),
+      nested: { visited: new Set<number>() },
+      onLoad() { const local = new Map(); },
+    });
+  `;
+  const result = collectPageRuntimeCollections(source);
+  assert.deepEqual(result.collections, [
+    { path: ['cache'], type: 'Map' },
+    { path: ['nested', 'visited'], type: 'Set' },
+  ]);
+  assert.equal(result.replacements.length, 2);
+});
+
+test('runtime collection scan rejects non-empty instance initializers', () => {
+  assert.throws(
+    () => collectPageRuntimeCollections(`Page({ cache: new Set(['value']) })`),
+    /initialize cache in onLoad/,
+  );
+});
+
 test('builds an interactive browser entry from a native mini program', { timeout: 30000 }, async () => {
   const output = await mkdtemp(path.join(os.tmpdir(), 'protodock-wechat-test-'));
   await run(process.execPath, [
@@ -54,6 +78,7 @@ test('builds an interactive browser entry from a native mini program', { timeout
   const html = await readFile(path.join(output, 'wx-pages-index-index', 'index.html'), 'utf8');
   assert.match(html, /protodock-bootstrap\.js/);
   assert.match(html, /pages\/index\/index/);
+  assert.match(html, /"runtimeCollections":\[\]/);
 });
 
 function run(command, args) {

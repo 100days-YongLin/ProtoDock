@@ -387,6 +387,41 @@ class PackageValidatorTests(unittest.TestCase):
         self.assertEqual(result["resources"]["staticResourceCompatibilityIssueCount"], 0)
         self.assertEqual(result["resources"]["missingStaticResourceCount"], 0)
 
+    def test_resolves_html_resources_against_local_base_href(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_project(
+                root,
+                """
+                <base href="../_wechat-runtime/">
+                <link rel="stylesheet" href="index.css">
+                <script src="runtime.js"></script>
+                """,
+            )
+            runtime = root / "pages/_wechat-runtime"
+            runtime.mkdir()
+            (root / "pages/_wechat-adapter-report.json").write_text("{}", encoding="utf-8")
+            (runtime / "index.css").write_text("body { color: black; }", encoding="utf-8")
+            (runtime / "runtime.js").write_text(
+                "history.back(); const generatedRoute = '/pages/generated/index';",
+                encoding="utf-8",
+            )
+
+            result = server.validate_project_manifest_files(root)
+
+        self.assertEqual(result["resources"]["missingStaticResourceCount"], 0)
+        self.assertEqual(result["resources"]["staticResourceReferenceCount"], 2)
+
+    def test_rejects_base_href_outside_project_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_project(root, '<base href="../../../../"><script src="runtime.js"></script>')
+
+            with self.assertRaises(server.ProtoDockError) as context:
+                server.validate_project_manifest_files(root)
+
+        self.assertTrue(any("base href 越过项目根目录" in issue for issue in context.exception.details))
+
     def test_rejects_dynamic_relative_image_paths_in_scripts(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

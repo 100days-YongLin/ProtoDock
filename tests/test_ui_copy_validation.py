@@ -87,6 +87,36 @@ class UserFacingCopyValidationTests(unittest.TestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["warnings"], [])
 
+    def test_ignores_wechat_adapter_inline_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = write_project(
+                root,
+                '<script>window.__PROTODOCK_WECHAT__ = {'
+                '"pageId":"system-boundary-v7","route":"pages/private/index"};</script>'
+                '<h1>班级设置</h1>',
+            )
+
+            result = validate_user_facing_copy(root, manifest)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["warnings"], [])
+
+    def test_ignores_generated_adapter_runtime_strings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = write_project(
+                root,
+                '<script data-protodock-adapter-runtime src="../../assets/app.js"></script>'
+                '<h1>班级设置</h1>',
+                "const internal = 'system-boundary-v7';",
+            )
+
+            result = validate_user_facing_copy(root, manifest)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["warnings"], [])
+
     def test_warns_about_runtime_and_review_copy(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

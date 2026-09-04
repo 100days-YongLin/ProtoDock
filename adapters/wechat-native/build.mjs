@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 
 const ADAPTER_ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -34,7 +35,7 @@ const COMPONENT_TEMPLATES = {
   'scroll-view': '<div class="pd-scroll"><slot /></div>\n',
   swiper: '<div class="pd-swiper"><slot /></div>\n',
   'swiper-item': '<div class="pd-swiper-item"><slot /></div>\n',
-  picker: '<div class="pd-picker"><slot /><select value="{{value}}" disabled="{{disabled}}" bindchange="onPickerChange"><option wx:for="{{range}}" wx:key="index" value="{{index}}">{{item}}</option></select></div>\n',
+  picker: '<div class="pd-picker"><slot /><select value="{{value}}" disabled="{{disabled}}" bindchange="onPickerChange"><option wx:for="{{displayRange}}" wx:key="index" value="{{index}}">{{item}}</option></select></div>\n',
   slider: '<input class="pd-slider" type="range" min="{{min}}" max="{{max}}" step="{{step}}" value="{{value}}" disabled="{{disabled}}" bindinput="onSliderChange" bindchange="onSliderChange" />\n',
   video: '<video class="pd-control" src="{{resolvedSrc}}" poster="{{resolvedPoster}}" controls="{{controls}}"></video>\n',
   'rich-text': '<div class="pd-rich-text">{{displayText}}</div>\n',
@@ -45,7 +46,7 @@ const COMPONENT_TEMPLATES = {
 
 const BASE_COMPONENT_SCRIPT = `
 export default Component({
-  properties: { role: String, ariaLabel: String, ariaDisabled: Boolean },
+  properties: { type: String, role: String, ariaLabel: String, ariaHidden: Boolean, ariaDisabled: Boolean, ariaChecked: Boolean, ariaExpanded: Boolean, ariaPressed: Boolean, ariaBusy: Boolean, ariaLive: String },
   data: {},
 });
 `.trimStart();
@@ -54,36 +55,52 @@ const FORM_COMPONENT_SCRIPT = `
 function valueFromEvent(event) {
   return event?.detail?.value ?? event?.target?.value ?? '';
 }
+function markNativeEventHandled(event) {
+  if (event?.originalEvent) event.originalEvent.__protodockWechatHandled = true;
+}
 export default Component({
   properties: {
     value: null, placeholder: String, placeholderClass: String, disabled: Boolean, password: Boolean,
     maxlength: Number, confirmType: String, confirmHold: Boolean, cursor: Number,
     selectionStart: Number, selectionEnd: Number, adjustPosition: Boolean, holdKeyboard: Boolean,
-    role: String, ariaLabel: String, ariaDisabled: Boolean,
+    role: String, ariaLabel: String, ariaHidden: Boolean, ariaDisabled: Boolean, ariaChecked: Boolean, ariaExpanded: Boolean, ariaPressed: Boolean, ariaBusy: Boolean, ariaLive: String,
   },
   data: {},
   methods: {
-    onInput(event) { this.triggerEvent('input', { value: valueFromEvent(event) }); },
-    onChange(event) { this.triggerEvent('change', { value: valueFromEvent(event) }); },
-    onFocus(event) { this.triggerEvent('focus', { value: valueFromEvent(event) }); },
-    onBlur(event) { this.triggerEvent('blur', { value: valueFromEvent(event) }); },
+    onInput(event) { markNativeEventHandled(event); this.triggerEvent('input', { value: valueFromEvent(event) }); },
+    onChange(event) { markNativeEventHandled(event); this.triggerEvent('change', { value: valueFromEvent(event) }); },
+    onFocus(event) { markNativeEventHandled(event); this.triggerEvent('focus', { value: valueFromEvent(event) }); },
+    onBlur(event) { markNativeEventHandled(event); this.triggerEvent('blur', { value: valueFromEvent(event) }); },
   },
 });
 `.trimStart();
 
 const COMPONENT_SCRIPTS = {
-  view: `export default Component({ properties: { hoverClass: String, hoverStopPropagation: Boolean, hoverStartTime: Number, hoverStayTime: Number, role: String, ariaLabel: String, ariaDisabled: Boolean }, data: {} });\n`,
-  image: assetComponentScript(['src', 'alt', 'mode', 'lazyLoad', 'showMenuByLongpress']),
+  view: `export default Component({ properties: { type: String, hoverClass: String, hoverStopPropagation: Boolean, hoverStartTime: Number, hoverStayTime: Number, role: String, ariaLabel: String, ariaHidden: Boolean, ariaDisabled: Boolean, ariaChecked: Boolean, ariaExpanded: Boolean, ariaPressed: Boolean, ariaBusy: Boolean, ariaLive: String }, data: {} });\n`,
+  image: assetComponentScript(['src', 'alt', 'mode', 'lazyLoad', 'showMenuByLongpress', 'loading', 'ariaHidden']),
   'cover-image': assetComponentScript(['src']),
   video: assetComponentScript(['src', 'poster', 'controls']),
-  button: `export default Component({ properties: { disabled: Boolean, hoverClass: String, hoverStopPropagation: Boolean, hoverStartTime: Number, hoverStayTime: Number, formType: String, openType: String, role: String, ariaLabel: String, ariaDisabled: Boolean }, data: {} });\n`,
+  button: `export default Component({ properties: { type: String, disabled: Boolean, loading: Boolean, hoverClass: String, hoverStopPropagation: Boolean, hoverStartTime: Number, hoverStayTime: Number, formType: String, openType: String, role: String, ariaLabel: String, ariaHidden: Boolean, ariaDisabled: Boolean, ariaChecked: Boolean, ariaExpanded: Boolean, ariaPressed: Boolean }, data: {} });\n`,
+  swiper: `export default Component({ properties: { current: Number, circular: Boolean, duration: Number, autoplay: Boolean, interval: Number, vertical: Boolean, role: String, ariaLabel: String, ariaHidden: Boolean }, data: {} });\n`,
   input: FORM_COMPONENT_SCRIPT,
   textarea: FORM_COMPONENT_SCRIPT,
+  'scroll-view': `export default Component({ properties: { scrollX: Boolean, scrollY: Boolean, enhanced: Boolean, showScrollbar: Boolean, enableBackToTop: Boolean, scrollTop: Number, scrollLeft: Number, scrollIntoView: String, scrollWithAnimation: Boolean, scrollAnchoring: Boolean, bounces: Boolean, lowerThreshold: Number, upperThreshold: Number, role: String, ariaLabel: String, ariaHidden: Boolean }, data: {} });\n`,
   picker: `
 export default Component({
-  properties: { range: Array, value: null, disabled: Boolean },
-  data: {},
-  methods: { onPickerChange(event) { this.triggerEvent('change', { value: event?.detail?.value ?? event?.target?.value ?? '' }); } },
+  properties: { range: Array, rangeKey: String, value: null, disabled: Boolean, mode: String, start: String, end: String, fields: String, role: String, ariaLabel: String, ariaHidden: Boolean, ariaDisabled: Boolean },
+  data: { displayRange: [] },
+  observers: {
+    'range, rangeKey': function(range, rangeKey) {
+      const items = Array.isArray(range) ? range : [];
+      this.setData({ displayRange: items.map((item) => rangeKey && item && typeof item === 'object' ? String(item[rangeKey] ?? '') : String(item ?? '')) });
+    },
+  },
+  methods: {
+    onPickerChange(event) {
+      if (event?.originalEvent) event.originalEvent.__protodockWechatHandled = true;
+      this.triggerEvent('change', { value: event?.detail?.value ?? event?.target?.value ?? '' });
+    },
+  },
 });
 `.trimStart(),
   slider: `
@@ -122,8 +139,10 @@ const COMPONENT_STYLES = {
 };
 
 function assetComponentScript(properties) {
-  const propertyEntries = properties.map((name) => `${name}: ${name === 'controls' ? 'Boolean' : 'String'}`).join(', ');
-  const assetNames = properties.filter((name) => name !== 'controls');
+  const booleanProperties = new Set(['controls', 'lazyLoad', 'showMenuByLongpress', 'ariaHidden', 'ariaDisabled']);
+  const allProperties = [...new Set([...properties, 'role', 'ariaLabel', 'ariaHidden', 'ariaDisabled'])];
+  const propertyEntries = allProperties.map((name) => `${name}: ${booleanProperties.has(name) ? 'Boolean' : 'String'}`).join(', ');
+  const assetNames = properties.filter((name) => ['src', 'poster'].includes(name));
   const dataEntries = assetNames.map((name) => `resolved${capitalize(name)}: ''`).join(', ');
   const observers = assetNames.map((name) => `${name}(value) { this.setData({ resolved${capitalize(name)}: String(value || '').replace(/^\\/+/, '') }); }`).join(',\n    ');
   return `export default Component({\n  properties: { ${propertyEntries} },\n  data: { ${dataEntries} },\n  observers: {\n    ${observers}\n  },\n});\n`;
@@ -185,6 +204,7 @@ async function main() {
     if (includeNativeShims) await installNativeComponents(sourceStage);
     await patchComponentMappings(sourceStage, includeNativeShims);
     await mkdir(output, { recursive: true });
+    const runtimeCollectionsByRoute = await normalizePageRuntimeCollections(sourceStage, routes);
     await runWebpack(stage, runtimeOutput);
     await cp(path.join(RUNTIME_ROOT, 'protodock-runtime.css'), path.join(runtimeOutput, 'protodock-runtime.css'));
     await cp(path.join(RUNTIME_ROOT, 'protodock-runtime.js'), path.join(runtimeOutput, 'protodock-runtime.js'));
@@ -194,7 +214,7 @@ async function main() {
       path.join(runtimeOutput, 'glass-easel.js'),
     );
     await normalizeCompiledCss(path.join(runtimeOutput, 'index.css'));
-    await writeEntries({ appJson, config, fixtures, output, pageMap, routes });
+    await writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute });
     const report = await buildReport({ source, stage: sourceStage, output, pageMap, routes });
     await writeFile(path.join(output, '_wechat-adapter-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
@@ -269,6 +289,75 @@ async function patchComponentMappings(stage, includeNativeShims) {
   }
 }
 
+async function normalizePageRuntimeCollections(stage, routes) {
+  const collectionTypes = new Map();
+  // Page definitions can live in shared registration modules, so every entry receives the safe union.
+  const sourceFiles = await filesRecursively(stage, (file) => /\.(?:js|ts)$/i.test(file) && !file.includes(`${path.sep}__protodock${path.sep}`));
+  for (const sourceFile of sourceFiles) {
+    const content = await readFile(sourceFile, 'utf8');
+    const { collections, replacements } = collectPageRuntimeCollections(content, sourceFile);
+    for (const collection of collections) {
+      const key = collection.path.join('.');
+      const previous = collectionTypes.get(key);
+      if (previous && previous !== collection.type) {
+        throw new Error(`ProtoDock WeChat page field ${key} is declared as both ${previous} and ${collection.type}.`);
+      }
+      collectionTypes.set(key, collection.type);
+    }
+    if (replacements.length) {
+      let normalized = content;
+      for (const replacement of replacements.sort((left, right) => right.start - left.start)) {
+        normalized = `${normalized.slice(0, replacement.start)}null${normalized.slice(replacement.end)}`;
+      }
+      await writeFile(sourceFile, normalized);
+    }
+  }
+  const collections = [...collectionTypes].map(([fieldPath, type]) => ({ path: fieldPath.split('.'), type }));
+  return Object.fromEntries(routes.map((route) => [route, collections]));
+}
+
+export function collectPageRuntimeCollections(content, fileName = 'page.ts') {
+  const sourceFile = ts.createSourceFile(fileName, content, ts.ScriptTarget.Latest, true, fileName.endsWith('.js') ? ts.ScriptKind.JS : ts.ScriptKind.TS);
+  const collections = [];
+  const replacements = [];
+
+  const propertyName = (node) => {
+    if (ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNumericLiteral(node)) return node.text;
+    return null;
+  };
+  const inspectValue = (node, fieldPath) => {
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && ['Set', 'Map'].includes(node.expression.text)) {
+      if (node.arguments?.length) {
+        throw new Error(`ProtoDock WeChat only supports empty ${node.expression.text} page fields; initialize ${fieldPath.join('.')} in onLoad instead.`);
+      }
+      collections.push({ path: fieldPath, type: node.expression.text });
+      replacements.push({ start: node.getStart(sourceFile), end: node.getEnd() });
+      return;
+    }
+    if (!ts.isObjectLiteralExpression(node)) return;
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property)) continue;
+      const name = propertyName(property.name);
+      if (name) inspectValue(property.initializer, [...fieldPath, name]);
+    }
+  };
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Page') {
+      const definition = node.arguments[0];
+      if (definition && ts.isObjectLiteralExpression(definition)) {
+        for (const property of definition.properties) {
+          if (!ts.isPropertyAssignment(property)) continue;
+          const name = propertyName(property.name);
+          if (name && name !== 'data') inspectValue(property.initializer, [name]);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return { collections, replacements };
+}
+
 async function filesRecursively(root, predicate) {
   const result = [];
   async function visit(directory) {
@@ -316,7 +405,7 @@ async function normalizeCompiledCss(file) {
   await writeFile(file, css.replace(/url\((['"]?)\//g, 'url($1'));
 }
 
-async function writeEntries({ appJson, config, fixtures, output, pageMap, routes }) {
+async function writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute }) {
   const entryUrls = Object.fromEntries(Object.values(pageMap).map((pageId) => [pageId, `../${pageId}/index.html`]));
   for (const route of routes) {
     const pageId = pageMap[route];
@@ -333,6 +422,7 @@ async function writeEntries({ appJson, config, fixtures, output, pageMap, routes
       scanResult: config.scanResult || '',
       fallbackPageId: config.fallbackPages?.[route] || null,
       query: config.query?.[route] || {},
+      runtimeCollections: runtimeCollectionsByRoute?.[route] || [],
     };
     await writeFile(path.join(directory, 'index.html'), pageHtml(pageConfig));
   }
@@ -350,12 +440,12 @@ function pageHtml(config) {
   <link rel="stylesheet" href="index.css">
   <link rel="stylesheet" href="protodock-runtime.css">
   <script>window.__PROTODOCK_WECHAT__ = ${serialized};</script>
-  <script src="glass-easel.js"></script>
-  <script src="protodock-runtime.js"></script>
+  <script data-protodock-adapter-runtime src="glass-easel.js"></script>
+  <script data-protodock-adapter-runtime src="protodock-runtime.js"></script>
 </head>
 <body>
-  <script src="index.js"></script>
-  <script src="protodock-bootstrap.js"></script>
+  <script data-protodock-adapter-runtime src="index.js"></script>
+  <script data-protodock-adapter-runtime src="protodock-bootstrap.js"></script>
 </body>
 </html>
 `;

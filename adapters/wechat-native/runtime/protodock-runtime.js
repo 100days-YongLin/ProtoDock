@@ -69,9 +69,9 @@
       in() { return query; },
       select() { return query; },
       selectAll() { return query; },
-      boundingClientRect(callback) { callbacks.push(callback); return query; },
-      scrollOffset(callback) { callbacks.push(callback); return query; },
-      fields(_fields, callback) { callbacks.push(callback); return query; },
+      boundingClientRect(callback) { if (typeof callback === 'function') callbacks.push(callback); return query; },
+      scrollOffset(callback) { if (typeof callback === 'function') callbacks.push(callback); return query; },
+      fields(_fields, callback) { if (typeof callback === 'function') callbacks.push(callback); return query; },
       exec(callback) {
         const empty = { width: 0, height: 0, top: 0, left: 0, scrollTop: 0, scrollLeft: 0 };
         callbacks.forEach((item) => item(empty));
@@ -198,8 +198,10 @@
       button.addEventListener('click', () => navigate(route, true));
       element.append(button);
     });
-    global.document.body.append(element);
-    global.document.documentElement.dataset.protodockHasTabbar = 'true';
+    global.setTimeout(() => {
+      global.document.body.append(element);
+      global.document.documentElement.dataset.protodockHasTabbar = 'true';
+    }, 50);
   }
 
   global.ProtoDockWechatRuntime = {

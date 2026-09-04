@@ -469,14 +469,18 @@ class PrototypeHTMLParser(HTMLParser):
         self.controls = []
         self.inline_scripts = []
         self.script_sources = []
+        self.generated_script_sources = set()
         self.resource_references = []
         self.copy_candidates = []
+        self.base_href = ""
         self._control_stack = []
         self._copy_stack = []
         self._script = None
 
     def handle_starttag(self, tag, attrs):
         attributes = {str(name).lower(): value or "" for name, value in attrs}
+        if tag == "base" and not self.base_href:
+            self.base_href = attributes.get("href", "").strip()
         parent_excluded = any(excluded for _, excluded in self._copy_stack)
         inline_style = attributes.get("style", "").replace(" ", "").lower()
         copy_excluded = parent_excluded or tag in UI_COPY_EXCLUDED_TAGS or (
@@ -557,7 +561,10 @@ class PrototypeHTMLParser(HTMLParser):
         if tag == "script":
             source = attributes.get("src", "").strip()
             if source:
-                self.script_sources.append((source, self.getpos()[0]))
+                record = (source, self.getpos()[0])
+                self.script_sources.append(record)
+                if "data-protodock-adapter-runtime" in attributes:
+                    self.generated_script_sources.add(record)
             else:
                 self._script = {"line": self.getpos()[0], "text": []}
 
@@ -592,7 +599,12 @@ class PrototypeHTMLParser(HTMLParser):
                 control["text"].append(data)
 
 
-def static_resource_target(source_path: Path, reference: str, project_root: Path) -> tuple[Path | None, str | None]:
+def static_resource_target(
+    source_path: Path,
+    reference: str,
+    project_root: Path,
+    base_href: str = "",
+) -> tuple[Path | None, str | None]:
     value = str(reference or "").strip()
     if not value or value.startswith(("#", "data:", "blob:", "protodock:")):
         return None, None
@@ -603,10 +615,35 @@ def static_resource_target(source_path: Path, reference: str, project_root: Path
         return None, None
     if parsed.path.startswith("/"):
         return None, "使用了脱离项目根目录的绝对资源路径"
-    target = (source_path.parent / unquote(parsed.path)).resolve()
+    base_dir = source_path.parent
+    if base_href:
+        parsed_base = urlsplit(base_href)
+        if parsed_base.scheme or parsed_base.netloc:
+            return None, None
+        base_path = unquote(parsed_base.path)
+        if base_path.startswith("/"):
+            return None, "HTML base href 使用了脱离项目根目录的绝对路径"
+        resolved_base = (source_path.parent / base_path).resolve()
+        if resolved_base != project_root and project_root not in resolved_base.parents:
+            return None, "HTML base href 越过项目根目录"
+        base_dir = resolved_base if base_path.endswith("/") else resolved_base.parent
+    target = (base_dir / unquote(parsed.path)).resolve()
     if target != project_root and project_root not in target.parents:
         return None, "资源路径越过项目根目录"
     return target, None
+
+
+def is_generated_adapter_runtime(target: Path, project_root: Path) -> bool:
+    try:
+        relative = target.resolve().relative_to(project_root.resolve())
+    except ValueError:
+        return False
+    parts = relative.parts
+    if "_wechat-runtime" not in parts:
+        return False
+    runtime_index = parts.index("_wechat-runtime")
+    output_root = project_root.joinpath(*parts[:runtime_index])
+    return (output_root / "_wechat-adapter-report.json").is_file()
 
 
 def validate_user_facing_copy(project_dir: Path, manifest: dict) -> dict:
@@ -692,15 +729,22 @@ def validate_user_facing_copy(project_dir: Path, manifest: dict) -> dict:
                 dynamic=False,
             )
         for inline_script in parser.inline_scripts:
+            inline_source = "".join(inline_script["text"])
+            if "__PROTODOCK_WECHAT__" in inline_source:
+                continue
             inspect_script(
                 page_id,
                 entry,
-                "".join(inline_script["text"]),
+                inline_source,
                 inline_script["line"],
             )
         for script_source, script_line in parser.script_sources:
-            script_path, path_issue = static_resource_target(entry_path, script_source, project_root)
+            if (script_source, script_line) in parser.generated_script_sources:
+                continue
+            script_path, path_issue = static_resource_target(entry_path, script_source, project_root, parser.base_href)
             if path_issue or script_path is None or not script_path.is_file() or script_path.suffix.lower() not in {".js", ".mjs"}:
+                continue
+            if is_generated_adapter_runtime(script_path, project_root):
                 continue
             if script_path in scanned_scripts:
                 continue
@@ -748,9 +792,9 @@ def validate_static_resource_references(project_dir: Path, manifest: dict) -> di
     missing_count = 0
     dynamic_issue_count = 0
 
-    def inspect_reference(page_id: str, source_path: Path, source_label: str, line: int, reference: str):
+    def inspect_reference(page_id: str, source_path: Path, source_label: str, line: int, reference: str, base_href: str = ""):
         nonlocal reference_count, incompatible_count, missing_count
-        target, path_issue = static_resource_target(source_path, reference, project_root)
+        target, path_issue = static_resource_target(source_path, reference, project_root, base_href)
         if target is None and path_issue is None:
             return None
         reference_count += 1
@@ -851,19 +895,24 @@ def validate_static_resource_references(project_dir: Path, manifest: dict) -> di
             issues.append(f"{page_id} · {entry} 无法解析 HTML 资源引用：{error}")
             continue
         for inline_script in parser.inline_scripts:
+            inline_source = "".join(inline_script["text"])
+            if "__PROTODOCK_WECHAT__" in inline_source:
+                continue
             inspect_script(
                 page_id,
                 entry_path,
                 entry,
                 inline_script["line"],
-                "".join(inline_script["text"]),
+                inline_source,
             )
         for script_source, source_line in parser.script_sources:
-            script_target, path_issue = static_resource_target(entry_path, script_source, project_root)
+            script_target, path_issue = static_resource_target(entry_path, script_source, project_root, parser.base_href)
             if (path_issue
                 or not script_target
                 or not script_target.is_file()
                 or script_target in scanned_dynamic_scripts):
+                continue
+            if is_generated_adapter_runtime(script_target, project_root):
                 continue
             scanned_dynamic_scripts.add(script_target)
             try:
@@ -884,8 +933,12 @@ def validate_static_resource_references(project_dir: Path, manifest: dict) -> di
                 entry,
                 resource["line"],
                 resource["value"],
+                parser.base_href,
             )
-            if target and target.suffix.lower() == ".css" and "stylesheet" in resource["rel"]:
+            if (target
+                and target.suffix.lower() == ".css"
+                and "stylesheet" in resource["rel"]
+                and not is_generated_adapter_runtime(target, project_root)):
                 inspect_css(page_id, target)
 
     deduplicated_issues = list(dict.fromkeys(issues))
@@ -1010,25 +1063,32 @@ def collect_page_scripts(
     project_root: Path,
     scanned_script_contexts: set,
 ) -> dict:
-    records = [
-        {
-            "source": "".join(inline_script["text"]),
-            "file": entry,
-            "line": inline_script["line"],
-        }
-        for inline_script in parser.inline_scripts
-    ]
+    records = []
+    for inline_script in parser.inline_scripts:
+        source = "".join(inline_script["text"])
+        if "__PROTODOCK_WECHAT__" in source:
+            continue
+        records.append({"source": source, "file": entry, "line": inline_script["line"]})
     issues = []
     warnings = []
     files = set()
 
     for script_source, source_line in parser.script_sources:
+        if (script_source, source_line) in parser.generated_script_sources:
+            continue
         parsed_source = urlsplit(script_source)
         if parsed_source.scheme or parsed_source.netloc:
             if LOCAL_URL_PATTERN.search(script_source):
                 issues.append(f"{page_id} · {entry}:{source_line} 的脚本引用了本地 URL：{script_source}")
             continue
-        resolved = (entry_path.parent / unquote(parsed_source.path)).resolve()
+        resolved, path_issue = static_resource_target(entry_path, script_source, project_root, parser.base_href)
+        if path_issue:
+            issues.append(f"{page_id} · {entry}:{source_line} {path_issue}：{script_source}")
+            continue
+        if resolved is None:
+            continue
+        if is_generated_adapter_runtime(resolved, project_root):
+            continue
         script_context = (page_id, resolved)
         if project_root not in resolved.parents or not resolved.is_file() or script_context in scanned_script_contexts:
             continue
