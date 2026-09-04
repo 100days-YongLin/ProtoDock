@@ -1,10 +1,20 @@
 .page {
   display: flex;
-  min-height: 100vh;
+  min-height: 160vh;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   gap: 24rpx;
+}
+
+.scroll-probe {
+  display: block;
+  width: 160rpx;
+  height: 80rpx;
+}
+
+.scroll-probe-content {
+  height: 240rpx;
 }
 
 .bottom-sheet-mask {

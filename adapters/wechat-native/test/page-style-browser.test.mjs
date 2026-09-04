@@ -90,9 +90,15 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
       const root = document.querySelector('wx-glass-easel-root');
       const mask = document.querySelector('[data-style-probe="mask"]');
       const panel = document.querySelector('[data-style-probe="panel"]');
+      const scrollHost = document.querySelector('[data-scroll-probe="true"]');
+      const scrollContainer = scrollHost?.querySelector('.pd-scroll');
       const rootStyle = getComputedStyle(root);
       const maskStyle = getComputedStyle(mask);
       const panelStyle = getComputedStyle(panel);
+      const scrollStyle = getComputedStyle(scrollContainer);
+      const scrollbarStyle = getComputedStyle(scrollContainer, '::-webkit-scrollbar');
+      scrollContainer.scrollTop = 20;
+      window.scrollTo(0, 100);
       return {
         rootBackground: rootStyle.backgroundColor,
         rootMinHeight: rootStyle.minHeight,
@@ -102,6 +108,13 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
         maskBackground: maskStyle.backgroundColor,
         panelBackground: panelStyle.backgroundColor,
         panelColor: panelStyle.color,
+        documentScrollbarWidth: getComputedStyle(document.documentElement).scrollbarWidth,
+        scrollContainerScrollbarWidth: scrollStyle.scrollbarWidth,
+        scrollContainerWebkitDisplay: scrollbarStyle.display,
+        scrollContainerCanScroll: scrollContainer.scrollHeight > scrollContainer.clientHeight,
+        scrollContainerScrollTop: scrollContainer.scrollTop,
+        pageCanScroll: document.documentElement.scrollHeight > window.innerHeight,
+        pageScrollTop: window.scrollY,
       };
     });
 
@@ -113,6 +126,13 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     assert.equal(styles.maskBackground, 'rgba(26, 28, 35, 0.42)');
     assert.equal(styles.panelBackground, 'rgb(255, 246, 230)');
     assert.equal(styles.panelColor, 'rgb(26, 28, 35)');
+    assert.equal(styles.documentScrollbarWidth, 'none');
+    assert.equal(styles.scrollContainerScrollbarWidth, 'none');
+    assert.equal(styles.scrollContainerWebkitDisplay, 'none');
+    assert.equal(styles.scrollContainerCanScroll, true);
+    assert.ok(styles.scrollContainerScrollTop > 0);
+    assert.equal(styles.pageCanScroll, true);
+    assert.ok(styles.pageScrollTop > 0);
   } finally {
     await browser?.close();
     if (server.listening) await new Promise((resolve) => server.close(resolve));

@@ -25,6 +25,27 @@ wx-glass-easel-root {
   min-height: 100vh;
 }
 
+html,
+body,
+glass-easel-root,
+glass-easel-root *,
+wx-glass-easel-root,
+wx-glass-easel-root * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+glass-easel-root::-webkit-scrollbar,
+glass-easel-root *::-webkit-scrollbar,
+wx-glass-easel-root::-webkit-scrollbar,
+wx-glass-easel-root *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 html[data-protodock-has-tabbar="true"] body {
   padding-bottom: 64px;
 }
