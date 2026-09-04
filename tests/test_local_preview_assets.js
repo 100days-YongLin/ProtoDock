@@ -49,7 +49,13 @@ assert.deepEqual(
   { required: true, ready: false, reason: 'wechat-runtime-not-mounted' }
 );
 assert.deepEqual(
-  JSON.parse(JSON.stringify(previewRuntimeStatus({ body: {}, querySelector() { return {}; } }, {
+  JSON.parse(JSON.stringify(previewRuntimeStatus({
+    body: {},
+    querySelector(selector) {
+      assert.equal(selector, 'glass-easel-root, wx-glass-easel-root');
+      return {};
+    }
+  }, {
     __PROTODOCK_WECHAT__: { route: 'pages/home/index' },
     __PROTODOCK_WECHAT_ROOT__: {}
   }))),

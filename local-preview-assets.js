@@ -83,7 +83,7 @@
       return { required: false, ready: true, reason: '' };
     }
     const runtimeRoot = frameWindow.__PROTODOCK_WECHAT_ROOT__;
-    const renderedRoot = documentRef.querySelector?.('glass-easel-root');
+    const renderedRoot = documentRef.querySelector?.('glass-easel-root, wx-glass-easel-root');
     if (!runtimeRoot || !renderedRoot) {
       return { required: true, ready: false, reason: 'wechat-runtime-not-mounted' };
     }

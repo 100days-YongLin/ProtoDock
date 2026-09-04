@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,6 +24,7 @@ try {
 }
 const { chromium } = playwright;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const adapterRoot = path.join(repoRoot, 'adapters', 'wechat-native');
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -55,6 +58,34 @@ function staticServer() {
   });
 }
 
+function run(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.stderr.on('data', (chunk) => { output += chunk; });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Adapter build failed (${code}):\n${output}`));
+    });
+  });
+}
+
+async function readGeneratedFiles(root, prefix) {
+  const result = {};
+  async function visit(directory, relative = '') {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const entryRelative = path.posix.join(relative, entry.name);
+      const target = path.join(directory, entry.name);
+      if (entry.isDirectory()) await visit(target, entryRelative);
+      else if (!entry.name.endsWith('.map')) result[`${prefix}${entryRelative}`] = await readFile(target, 'utf8');
+    }
+  }
+  await visit(root);
+  return result;
+}
+
 const manifest = {
   version: 1,
   project: {
@@ -67,7 +98,7 @@ const manifest = {
     home: {
       title: '首页',
       kind: '微信原生页面',
-      entry: 'pages/home/index.html',
+      entry: 'pages/wx-pages-index-index/index.html',
       doc: 'docs/home.md'
     }
   },
@@ -80,6 +111,12 @@ const manifest = {
 };
 
 const projectPrefix = 'prototypes/mobile/';
+const adapterOutput = await mkdtemp(path.join(os.tmpdir(), 'protodock-local-wechat-preview-'));
+await run(process.execPath, [
+  path.join(adapterRoot, 'build.mjs'),
+  '--source', path.join(adapterRoot, 'test', 'fixtures', 'miniprogram'),
+  '--output', adapterOutput
+]);
 const files = {
   'protodock.workspace.json': `${JSON.stringify({
     schemaVersion: 1,
@@ -89,27 +126,7 @@ const files = {
   })}\n`,
   [`${projectPrefix}protodock.project.json`]: `${JSON.stringify(manifest)}\n`,
   [`${projectPrefix}docs/home.md`]: '# 首页\n\n本地微信预览浏览器门禁。\n',
-  [`${projectPrefix}pages/home/index.html`]: `<!doctype html>
-<html>
-  <head>
-    <base href="../_wechat-runtime/">
-    <link rel="stylesheet" href="runtime.css">
-  </head>
-  <body>
-    <script>window.__PROTODOCK_WECHAT__ = { route: 'pages/home/index' };</script>
-    <script src="runtime.js"></script>
-  </body>
-</html>`,
-  [`${projectPrefix}pages/_wechat-runtime/runtime.css`]: 'body { background: rgb(246, 247, 248); }',
-  [`${projectPrefix}pages/_wechat-runtime/runtime.js`]: `(() => {
-    window.setTimeout(() => {
-      const root = document.createElement('glass-easel-root');
-      root.innerHTML = '<main id="local-preview-content">本地微信页面已渲染<img id="dynamic-asset" src="asset.svg" alt=""></main>';
-      document.body.append(root);
-      window.__PROTODOCK_WECHAT_ROOT__ = { mounted: true };
-    }, 800);
-  })();`,
-  [`${projectPrefix}pages/_wechat-runtime/asset.svg`]: '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="#198754"/></svg>'
+  ...await readGeneratedFiles(adapterOutput, `${projectPrefix}pages/`)
 };
 
 const server = staticServer();
@@ -171,26 +188,30 @@ try {
 
   await page.waitForFunction(() => document.querySelector('iframe.prototype-frame')?.dataset.previewReady === 'true');
   await page.waitForFunction(() => document.querySelector('iframe.prototype-frame')?.contentDocument
-    ?.querySelector('#dynamic-asset')?.src.startsWith('blob:'));
+    ?.querySelector('img')?.src.startsWith('blob:'));
+  await page.waitForTimeout(21000);
   const result = await page.evaluate(() => {
     const frame = document.querySelector('iframe.prototype-frame');
     const frameDocument = frame.contentDocument;
     return {
       bodyText: frameDocument.body.innerText,
-      backgroundColor: frame.contentWindow.getComputedStyle(frameDocument.body).backgroundColor,
-      dynamicAssetUrl: frameDocument.querySelector('#dynamic-asset')?.src || '',
-      previewReady: frame.dataset.previewReady || ''
+      dynamicAssetUrl: frameDocument.querySelector('img')?.src || '',
+      previewReady: frame.dataset.previewReady || '',
+      runtimeRootTag: frameDocument.querySelector('wx-glass-easel-root')?.tagName || '',
+      previewError: document.querySelector('[data-preview-node] .preview-error')?.textContent || ''
     };
   });
 
-  assert.match(result.bodyText, /本地微信页面已渲染/);
-  assert.equal(result.backgroundColor, 'rgb(246, 247, 248)');
+  assert.match(result.bodyText, /适配前/);
   assert.match(result.dynamicAssetUrl, /^blob:/);
   assert.equal(result.previewReady, 'true');
+  assert.equal(result.runtimeRootTag, 'WX-GLASS-EASEL-ROOT');
+  assert.equal(result.previewError, '');
   const relevantConsoleErrors = consoleErrors.filter((message) => !message.includes('uicdn.toast.com'));
   assert.equal(relevantConsoleErrors.length, 0, [...relevantConsoleErrors, ...failedResponses].join('\n'));
   console.log('local workspace browser preview gate passed');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
+  await rm(adapterOutput, { recursive: true, force: true });
 }
