@@ -246,6 +246,7 @@ const state = {
   activeWorkspaceProjectId: null,
   activeSharedDocId: null,
   workspaceSwitching: false,
+  localFileCache: new Map(),
   previewUrls: new Map(),
   previewJobs: new Map(),
   previewResetNodeIds: new Set(),
@@ -819,10 +820,25 @@ async function getDirectoryHandleByPath(rootHandle, path, options = {}) {
   return handle;
 }
 
-async function readTextFile(path) {
+function localFileCacheKey(path) {
+  const filesystemPath = window.ProtoDockLocalResourcePaths?.filesystemPath?.(path) ?? path;
+  return splitPath(filesystemPath).join('/');
+}
+
+async function readLocalFile(path, options = {}) {
+  const cacheKey = localFileCacheKey(path);
+  if (options.preferCache && state.localFileCache.has(cacheKey)) {
+    return state.localFileCache.get(cacheKey);
+  }
+  const handle = await getFileHandleByPath(state.projectHandle, path);
+  const file = await handle.getFile();
+  state.localFileCache.set(cacheKey, file);
+  return file;
+}
+
+async function readTextFile(path, options = {}) {
   if (state.projectHandle) {
-    const handle = await getFileHandleByPath(state.projectHandle, path);
-    return (await handle.getFile()).text();
+    return (await readLocalFile(path, options)).text();
   }
   const response = await fetch(new URL(path, state.projectBaseUrl), { cache: 'no-store' });
   if (!response.ok) {
@@ -842,6 +858,7 @@ async function writeTextFile(path, text) {
   const writable = await fileHandle.createWritable();
   await writable.write(text);
   await writable.close();
+  state.localFileCache.delete(localFileCacheKey(path));
 }
 
 async function readProjectLocalSettings() {
@@ -1481,10 +1498,11 @@ async function openFullProductDocument() {
   }
 }
 
-async function createBlobUrlFromFile(path, baseDir = '') {
+async function createBlobUrlFromFile(path, baseDir = '', options = {}) {
   const resolvedPath = resolvePath(baseDir, path);
-  const fileHandle = await getFileHandleByPath(state.projectHandle, resolvedPath);
-  const file = await fileHandle.getFile();
+  const file = await readLocalFile(resolvedPath, {
+    preferCache: !!options.preferCachedLocalFiles
+  });
   const url = URL.createObjectURL(file);
   return { url, path: resolvedPath };
 }
@@ -1501,7 +1519,7 @@ function rememberPreviewUrl(nodeId, url) {
   state.previewUrls.set(nodeId, urls);
 }
 
-async function rewriteCssUrls(cssText, cssDir, nodeId) {
+async function rewriteCssUrls(cssText, cssDir, nodeId, options = {}) {
   const matches = Array.from(cssText.matchAll(/url\((["']?)([^"')]+)\1\)/g));
   let rewritten = cssText;
   for (const match of matches) {
@@ -1510,7 +1528,7 @@ async function rewriteCssUrls(cssText, cssDir, nodeId) {
       continue;
     }
     try {
-      const { url } = await createBlobUrlFromFile(raw, cssDir);
+      const { url } = await createBlobUrlFromFile(raw, cssDir, options);
       rememberPreviewUrl(nodeId, url);
       rewritten = rewritten.replace(match[0], `url("${url}")`);
     } catch (error) {
@@ -1520,11 +1538,13 @@ async function rewriteCssUrls(cssText, cssDir, nodeId) {
   return rewritten;
 }
 
-async function resolveLocalPreviewAttribute(element, attribute, value, baseDir, nodeId) {
+async function resolveLocalPreviewAttribute(element, attribute, value, baseDir, nodeId, options = {}) {
   const resolved = resolvePath(baseDir, value);
   const tagName = element.tagName?.toLowerCase() || '';
   if (tagName === 'script' && attribute === 'src') {
-    const jsText = await readTextFile(resolved);
+    const jsText = await readTextFile(resolved, {
+      preferCache: !!options.preferCachedLocalFiles
+    });
     const blobUrl = URL.createObjectURL(new Blob([jsText], { type: 'text/javascript' }));
     rememberPreviewUrl(nodeId, blobUrl);
     return blobUrl;
@@ -1532,23 +1552,25 @@ async function resolveLocalPreviewAttribute(element, attribute, value, baseDir, 
   if (tagName === 'link'
     && attribute === 'href'
     && (element.getAttribute('rel') || '').toLowerCase().includes('stylesheet')) {
-    const cssText = await readTextFile(resolved);
-    const rewritten = await rewriteCssUrls(cssText, dirname(resolved), nodeId);
+    const cssText = await readTextFile(resolved, {
+      preferCache: !!options.preferCachedLocalFiles
+    });
+    const rewritten = await rewriteCssUrls(cssText, dirname(resolved), nodeId, options);
     const blobUrl = URL.createObjectURL(new Blob([rewritten], { type: 'text/css' }));
     rememberPreviewUrl(nodeId, blobUrl);
     return blobUrl;
   }
-  const { url } = await createBlobUrlFromFile(value, baseDir);
+  const { url } = await createBlobUrlFromFile(value, baseDir, options);
   rememberPreviewUrl(nodeId, url);
   return url;
 }
 
-function bindLocalPreviewAssets(iframe, baseDir, nodeId) {
+function bindLocalPreviewAssets(iframe, baseDir, nodeId, options = {}) {
   window.ProtoDockLocalPreviewAssets?.bindFrame?.(iframe, {
     resolveAttribute: (element, attribute, value) => (
-      resolveLocalPreviewAttribute(element, attribute, value, baseDir, nodeId)
+      resolveLocalPreviewAttribute(element, attribute, value, baseDir, nodeId, options)
     ),
-    rewriteCss: (cssText) => rewriteCssUrls(cssText, baseDir, nodeId),
+    rewriteCss: (cssText) => rewriteCssUrls(cssText, baseDir, nodeId, options),
     onError(error) {
       console.warn('ProtoDock: dynamic local asset missing', error);
     }
@@ -1606,13 +1628,15 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
     try {
       const resolved = resolvePath(baseDir, href);
       if ((link.getAttribute('rel') || '').toLowerCase().includes('stylesheet')) {
-        const cssText = await readTextFile(resolved);
-        const rewritten = await rewriteCssUrls(cssText, dirname(resolved), nodeId);
+        const cssText = await readTextFile(resolved, {
+          preferCache: !!options.preferCachedLocalFiles
+        });
+        const rewritten = await rewriteCssUrls(cssText, dirname(resolved), nodeId, options);
         const blobUrl = URL.createObjectURL(new Blob([rewritten], { type: 'text/css' }));
         rememberPreviewUrl(nodeId, blobUrl);
         link.setAttribute('href', blobUrl);
       } else {
-        const { url } = await createBlobUrlFromFile(href, baseDir);
+        const { url } = await createBlobUrlFromFile(href, baseDir, options);
         rememberPreviewUrl(nodeId, url);
         link.setAttribute('href', url);
       }
@@ -1623,7 +1647,7 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
 
   const styleNodes = Array.from(documentForPreview.querySelectorAll('style'));
   for (const style of styleNodes) {
-    style.textContent = await rewriteCssUrls(style.textContent || '', baseDir, nodeId);
+    style.textContent = await rewriteCssUrls(style.textContent || '', baseDir, nodeId, options);
   }
 
   const attrMap = [
@@ -1645,12 +1669,14 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
       try {
         const resolved = resolvePath(baseDir, value);
         if (node.tagName.toLowerCase() === 'script') {
-          const jsText = await readTextFile(resolved);
+          const jsText = await readTextFile(resolved, {
+            preferCache: !!options.preferCachedLocalFiles
+          });
           const blobUrl = URL.createObjectURL(new Blob([jsText], { type: 'text/javascript' }));
           rememberPreviewUrl(nodeId, blobUrl);
           node.setAttribute(attr, blobUrl);
         } else {
-          const { url } = await createBlobUrlFromFile(value, baseDir);
+          const { url } = await createBlobUrlFromFile(value, baseDir, options);
           rememberPreviewUrl(nodeId, url);
           node.setAttribute(attr, url);
         }
@@ -1683,10 +1709,12 @@ async function buildPreviewIframe(node, className = 'prototype-frame', options =
     }
     iframe.src = entryUrl.toString();
   } else {
-    const html = await readTextFile(page.entry);
+    const html = await readTextFile(page.entry, {
+      preferCache: !!options.preferCachedLocalFiles
+    });
     const preview = await rewriteHtmlForLocalPreview(html, page.entry, node.id, options);
     iframe.srcdoc = preview.html;
-    bindLocalPreviewAssets(iframe, preview.baseDir, node.id);
+    bindLocalPreviewAssets(iframe, preview.baseDir, node.id, options);
   }
 
   return iframe;
@@ -1849,7 +1877,8 @@ async function hydratePlaybackPreview(node) {
 
   try {
     const iframe = await buildPreviewIframe(node, 'playback-frame', {
-      locationSuffix: state.playbackLocationSuffix
+      locationSuffix: state.playbackLocationSuffix,
+      preferCachedLocalFiles: true
     });
     window.ProtoDockNavigation?.bindFrame(iframe, {
       manifest: state.manifest,
@@ -3667,6 +3696,7 @@ function showStartScreen(message = '选择工作目录开始') {
   state.dirty = false;
   state.docCache.clear();
   state.docDirty.clear();
+  state.localFileCache.clear();
   state.previewUrls.forEach((urls) => urls.forEach((url) => URL.revokeObjectURL(url)));
   state.previewUrls.clear();
   state.previewJobs.clear();
@@ -3761,6 +3791,7 @@ async function loadManifestText(text, options = {}) {
   state.canvasBackupCreated = false;
   state.docCache.clear();
   state.docDirty.clear();
+  state.localFileCache.clear();
   if (options.workspace) {
     state.workspace = options.workspace;
     state.activeWorkspaceProjectId = options.workspaceProjectId || state.activeWorkspaceProjectId;

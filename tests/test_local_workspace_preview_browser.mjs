@@ -154,10 +154,16 @@ await page.route('https://uicdn.toast.com/**', (route) => route.fulfill({
 try {
   await page.goto(`http://127.0.0.1:${address.port}/index.html`, { waitUntil: 'domcontentloaded' });
   await page.evaluate(async (projectFiles) => {
-    const makeFileHandle = (name, text) => ({
+    const readCounts = new Map();
+    const makeFileHandle = (name, text, filePath) => ({
       kind: 'file',
       name,
       async getFile() {
+        const readCount = (readCounts.get(filePath) || 0) + 1;
+        readCounts.set(filePath, readCount);
+        if (filePath.endsWith('pages/wx-pages-index-index/index.html') && readCount > 1) {
+          throw new DOMException('Local file handle expired', 'NotFoundError');
+        }
         return new File([text], name, { type: name.endsWith('.json') ? 'application/json' : 'text/plain' });
       },
       async createWritable() {
@@ -180,7 +186,7 @@ try {
         if (!(filePath in projectFiles)) {
           throw new DOMException('Missing file', 'NotFoundError');
         }
-        return makeFileHandle(fileName, projectFiles[filePath]);
+        return makeFileHandle(fileName, projectFiles[filePath], filePath);
       }
     });
     await window.ProtoDock.openDroppedProjectDirectory(makeDirectoryHandle('local-workspace-preview-gate'));
@@ -207,6 +213,21 @@ try {
   assert.equal(result.previewReady, 'true');
   assert.equal(result.runtimeRootTag, 'WX-GLASS-EASEL-ROOT');
   assert.equal(result.previewError, '');
+
+  await page.click('#playFlow');
+  await page.waitForFunction(() => document.querySelector('iframe.playback-frame')?.contentDocument
+    ?.querySelector('wx-glass-easel-root'));
+  const playbackResult = await page.evaluate(() => {
+    const frame = document.querySelector('iframe.playback-frame');
+    return {
+      bodyText: frame?.contentDocument?.body?.innerText || '',
+      runtimeRootTag: frame?.contentDocument?.querySelector('wx-glass-easel-root')?.tagName || '',
+      previewError: document.querySelector('[data-playback-preview] .preview-error')?.textContent || ''
+    };
+  });
+  assert.match(playbackResult.bodyText, /适配前/);
+  assert.equal(playbackResult.runtimeRootTag, 'WX-GLASS-EASEL-ROOT');
+  assert.equal(playbackResult.previewError, '');
   const relevantConsoleErrors = consoleErrors.filter((message) => !message.includes('uicdn.toast.com'));
   assert.equal(relevantConsoleErrors.length, 0, [...relevantConsoleErrors, ...failedResponses].join('\n'));
   console.log('local workspace browser preview gate passed');
