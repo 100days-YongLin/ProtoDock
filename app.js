@@ -1412,8 +1412,9 @@ async function openFullProductDocument() {
         }
         const nodeId = `${livePreviewSessionId}-${descriptor.nodeId || descriptor.id}`;
         const html = await readTextFile(page.entry);
+        const preview = await rewriteHtmlForLocalPreview(html, page.entry, nodeId);
         return {
-          prototypeSrcdoc: await rewriteHtmlForLocalPreview(html, page.entry, nodeId)
+          prototypeSrcdoc: preview.html
         };
       },
       async buildPage(descriptor, context = {}) {
@@ -1519,8 +1520,8 @@ async function rewriteCssUrls(cssText, cssDir, nodeId) {
   return rewritten;
 }
 
-async function resolveLocalPreviewAttribute(element, attribute, value, entryDir, nodeId) {
-  const resolved = resolvePath(entryDir, value);
+async function resolveLocalPreviewAttribute(element, attribute, value, baseDir, nodeId) {
+  const resolved = resolvePath(baseDir, value);
   const tagName = element.tagName?.toLowerCase() || '';
   if (tagName === 'script' && attribute === 'src') {
     const jsText = await readTextFile(resolved);
@@ -1537,18 +1538,17 @@ async function resolveLocalPreviewAttribute(element, attribute, value, entryDir,
     rememberPreviewUrl(nodeId, blobUrl);
     return blobUrl;
   }
-  const { url } = await createBlobUrlFromFile(value, entryDir);
+  const { url } = await createBlobUrlFromFile(value, baseDir);
   rememberPreviewUrl(nodeId, url);
   return url;
 }
 
-function bindLocalPreviewAssets(iframe, entryPath, nodeId) {
-  const entryDir = dirname(entryPath);
+function bindLocalPreviewAssets(iframe, baseDir, nodeId) {
   window.ProtoDockLocalPreviewAssets?.bindFrame?.(iframe, {
     resolveAttribute: (element, attribute, value) => (
-      resolveLocalPreviewAttribute(element, attribute, value, entryDir, nodeId)
+      resolveLocalPreviewAttribute(element, attribute, value, baseDir, nodeId)
     ),
-    rewriteCss: (cssText) => rewriteCssUrls(cssText, entryDir, nodeId),
+    rewriteCss: (cssText) => rewriteCssUrls(cssText, baseDir, nodeId),
     onError(error) {
       console.warn('ProtoDock: dynamic local asset missing', error);
     }
@@ -1571,6 +1571,12 @@ function normalizedNavigationSuffix(value) {
 async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {}) {
   const entryDir = dirname(entryPath);
   const documentForPreview = new DOMParser().parseFromString(html, 'text/html');
+  const baseNode = documentForPreview.querySelector('base[href]');
+  const baseHref = baseNode?.getAttribute('href') || '';
+  const baseDir = window.ProtoDockLocalPreviewAssets?.documentBaseDirectory?.(entryPath, baseHref) || entryDir;
+  if (baseNode && window.ProtoDockLocalPreviewAssets?.isLocalReference?.(baseHref)) {
+    baseNode.setAttribute('href', 'about:blank');
+  }
   const head = documentForPreview.head || documentForPreview.documentElement;
   const guardStyle = documentForPreview.createElement('style');
   guardStyle.textContent = 'html,body{margin:0;}a{cursor:default;}';
@@ -1598,7 +1604,7 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
       continue;
     }
     try {
-      const resolved = resolvePath(entryDir, href);
+      const resolved = resolvePath(baseDir, href);
       if ((link.getAttribute('rel') || '').toLowerCase().includes('stylesheet')) {
         const cssText = await readTextFile(resolved);
         const rewritten = await rewriteCssUrls(cssText, dirname(resolved), nodeId);
@@ -1606,7 +1612,7 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
         rememberPreviewUrl(nodeId, blobUrl);
         link.setAttribute('href', blobUrl);
       } else {
-        const { url } = await createBlobUrlFromFile(href, entryDir);
+        const { url } = await createBlobUrlFromFile(href, baseDir);
         rememberPreviewUrl(nodeId, url);
         link.setAttribute('href', url);
       }
@@ -1617,7 +1623,7 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
 
   const styleNodes = Array.from(documentForPreview.querySelectorAll('style'));
   for (const style of styleNodes) {
-    style.textContent = await rewriteCssUrls(style.textContent || '', entryDir, nodeId);
+    style.textContent = await rewriteCssUrls(style.textContent || '', baseDir, nodeId);
   }
 
   const attrMap = [
@@ -1637,14 +1643,14 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
         continue;
       }
       try {
-        const resolved = resolvePath(entryDir, value);
+        const resolved = resolvePath(baseDir, value);
         if (node.tagName.toLowerCase() === 'script') {
           const jsText = await readTextFile(resolved);
           const blobUrl = URL.createObjectURL(new Blob([jsText], { type: 'text/javascript' }));
           rememberPreviewUrl(nodeId, blobUrl);
           node.setAttribute(attr, blobUrl);
         } else {
-          const { url } = await createBlobUrlFromFile(value, entryDir);
+          const { url } = await createBlobUrlFromFile(value, baseDir);
           rememberPreviewUrl(nodeId, url);
           node.setAttribute(attr, url);
         }
@@ -1654,7 +1660,10 @@ async function rewriteHtmlForLocalPreview(html, entryPath, nodeId, options = {})
     }
   }
 
-  return `<!doctype html>\n${documentForPreview.documentElement.outerHTML}`;
+  return {
+    baseDir,
+    html: `<!doctype html>\n${documentForPreview.documentElement.outerHTML}`
+  };
 }
 
 async function buildPreviewIframe(node, className = 'prototype-frame', options = {}) {
@@ -1675,11 +1684,39 @@ async function buildPreviewIframe(node, className = 'prototype-frame', options =
     iframe.src = entryUrl.toString();
   } else {
     const html = await readTextFile(page.entry);
-    iframe.srcdoc = await rewriteHtmlForLocalPreview(html, page.entry, node.id, options);
-    bindLocalPreviewAssets(iframe, page.entry, node.id);
+    const preview = await rewriteHtmlForLocalPreview(html, page.entry, node.id, options);
+    iframe.srcdoc = preview.html;
+    bindLocalPreviewAssets(iframe, preview.baseDir, node.id);
   }
 
   return iframe;
+}
+
+function enforceLocalPreviewRuntime(iframe, mount, node, page, jobId) {
+  if (state.projectBaseUrl) {
+    return;
+  }
+  const verify = () => {
+    if (state.previewJobs.get(node.id) !== jobId || !iframe.isConnected) {
+      return;
+    }
+    const status = window.ProtoDockLocalPreviewAssets?.previewRuntimeStatus?.(
+      iframe.contentDocument,
+      iframe.contentWindow
+    );
+    if (!status?.required || status.ready) {
+      iframe.dataset.previewReady = 'true';
+      return;
+    }
+    mount.innerHTML = `
+      <div class="preview-error">
+        <strong>本地预览未渲染</strong>
+        <span>${escapeHtml(page.entry || '微信运行时加载失败')}</span>
+      </div>
+    `;
+    console.error(`ProtoDock: local preview runtime did not mount for ${page.entry || node.pageId}`);
+  };
+  iframe.addEventListener('load', () => window.setTimeout(verify, 300), { once: true });
 }
 
 async function hydratePreview(node) {
@@ -1699,6 +1736,7 @@ async function hydratePreview(node) {
     if (state.previewJobs.get(node.id) !== jobId) {
       return;
     }
+    enforceLocalPreviewRuntime(iframe, mount, node, page, jobId);
     mount.replaceChildren(iframe);
   } catch (error) {
     if (state.previewJobs.get(node.id) !== jobId) {

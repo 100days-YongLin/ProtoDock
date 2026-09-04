@@ -53,6 +53,43 @@
     }).filter(Boolean);
   }
 
+  function documentBaseDirectory(entryPath, baseHref) {
+    const normalizedEntry = String(entryPath || '').replace(/^\/+/, '');
+    const entryDirectory = normalizedEntry.split('/').slice(0, -1).join('/');
+    const href = String(baseHref || '').trim();
+    if (!href || !isLocalReference(href)) {
+      return entryDirectory;
+    }
+    try {
+      const origin = 'https://protodock.local/';
+      const resolved = new URL(href, new URL(normalizedEntry, origin));
+      if (resolved.origin !== new URL(origin).origin) {
+        return entryDirectory;
+      }
+      const resolvedPath = decodeURIComponent(resolved.pathname).replace(/^\/+/, '');
+      return resolved.pathname.endsWith('/')
+        ? resolvedPath.replace(/\/+$/, '')
+        : resolvedPath.split('/').slice(0, -1).join('/');
+    } catch (error) {
+      return entryDirectory;
+    }
+  }
+
+  function previewRuntimeStatus(documentRef, frameWindow) {
+    if (!documentRef?.body || !frameWindow) {
+      return { required: false, ready: false, reason: 'preview-document-unavailable' };
+    }
+    if (!frameWindow.__PROTODOCK_WECHAT__) {
+      return { required: false, ready: true, reason: '' };
+    }
+    const runtimeRoot = frameWindow.__PROTODOCK_WECHAT_ROOT__;
+    const renderedRoot = documentRef.querySelector?.('glass-easel-root');
+    if (!runtimeRoot || !renderedRoot) {
+      return { required: true, ready: false, reason: 'wechat-runtime-not-mounted' };
+    }
+    return { required: true, ready: true, reason: '' };
+  }
+
   async function replaceAttribute(element, attribute, value, options) {
     if (!isLocalReference(value) || !reserve(element, attribute, value)) {
       return;
@@ -173,6 +210,8 @@
   global.ProtoDockLocalPreviewAssets = {
     isLocalReference,
     srcsetCandidates,
+    documentBaseDirectory,
+    previewRuntimeStatus,
     bindFrame
   };
 })(window);
