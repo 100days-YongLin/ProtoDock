@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "适配器测试",
+  "usingComponents": {
+    "view": "/components/view/view"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@protodock/wechat-native-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build native WeChat Mini Program pages into browser-readable ProtoDock entries.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "glass-easel": "1.1.0",
+    "glass-easel-miniprogram-adapter": "1.1.0"
+  },
+  "devDependencies": {
+    "css-loader": "^6.11.0",
+    "glass-easel-miniprogram-webpack-plugin": "1.1.0",
+    "less": "^4.2.2",
+    "less-loader": "^12.2.0",
+    "mini-css-extract-plugin": "^2.9.2",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.9.3",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
+  }
+}

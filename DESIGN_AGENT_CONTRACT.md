@@ -14,6 +14,14 @@ docs/<page-id>.md
 
 Design agents may use React, Vue, Svelte, plain HTML, or any other frontend stack while designing. The delivered output for ProtoDock must be a static preview entry that the browser can load.
 
+### Native WeChat source
+
+When an existing WeChat Mini Program is the implementation baseline, its WXML, WXSS, TypeScript, components, and assets are the frontend source of truth. Do not replace them with screenshots, copied DOM, or a separately maintained hand-built imitation.
+
+Use `adapters/wechat-native/build.mjs` to compile the native source into browser-readable ProtoDock entries. The adapter must read the frontend repository without editing, committing, or pushing it unless the repository owner explicitly requests source changes. Pin the inspected source commit in `_wechat-adapter-report.json`.
+
+The browser preview must use local fixtures and `wx.*` mocks; it must not call production services. Register generated entries in `protodock.project.json`, provide explicit page IDs and fallback routes, and keep product intent and acceptance criteria in the PRD. WXS, unsupported APIs, unsupported native tags, missing fixtures required by the main flow, or browser runtime errors block delivery. Acceptance must exercise one input/state change, one cross-page navigation, one return path, assets, and the same page in local Player and public Share.
+
 ## Product Workspace Contract
 
 When several ProtoDock projects are different endpoints of one product, keep each endpoint as a complete normal project and add one optional workspace above them:

@@ -183,6 +183,21 @@ Treat a feature change as a coherent documentation unit, even though the durable
 - Keep local integration secrets, including Feishu custom-bot Webhooks, only in optional `protodock.local.json`. Ensure it is ignored by Git and excluded from upload ZIPs, public shares, downloads, pages, docs, assets, and the manifest.
 - “Static artifact” means deployable HTML/CSS/JS, not static DOM only. Preserve the source prototype’s click, input, scroll, modal, and state behavior; do not use server-rendered markup as the final entry when it strips event handlers.
 
+## Native WeChat Mini Program Build
+
+When an existing native WeChat Mini Program is the implementation baseline, treat its WXML, WXSS, TypeScript, components, and assets as the frontend source of truth.
+
+1. Do not replace real source pages with screenshots, copied DOM, static image previews, or a separately maintained hand-built imitation. A screenshot may be QA evidence, never the executable page.
+2. Read the frontend repository at a pinned commit. Do not edit, commit, or push that repository unless its owner explicitly asks for source changes. Perform compatibility work in the ProtoDock workspace or adapter staging directory.
+3. Build with `adapters/wechat-native/build.mjs`; never point a manifest entry directly to WXML. Generated browser entries belong in the endpoint's published `pages/` layer and must be reproducible from the documented source commit and config.
+4. Keep `protodock.wechat.json`, deterministic fixtures, and repeatable build commands in the editable ProtoDock project. Use explicit page IDs, route mappings, initial query/storage, and direct-entry fallback pages.
+5. Preview data must come from local fixtures and browser mocks. Never call production or UAT services merely to make a prototype render. Missing data required by the accepted main flow is a fixture defect, not permission to invent a different UI.
+6. Treat `_wechat-adapter-report.json` as a delivery gate. WXS, unsupported `wx.*` APIs, unsupported native tags, build errors, runtime errors, or required routes without mappings block delivery. Never silently remove, flatten, screenshot, or relabel unsupported behavior.
+7. The native source owns implemented visual structure and interaction behavior; the PRD owns product intent, business rules, exceptions, and acceptance. When they differ, record the difference and resolve it explicitly instead of changing either side by assumption.
+8. Browser acceptance must cover the manifest viewport, assets, one input or state change, one forward route, history return, direct-entry fallback, and a fixture-backed success/error state. Repeat representative clicks in local Player and public Share.
+9. Keep generated runtime files shared per endpoint rather than duplicating a full bundle per page. Rebuild once for a pinned source/config change; otherwise reuse the generated files and capture cache.
+10. A native-source endpoint remains a normal independently valid ProtoDock project. Workspace shared contracts, page PRDs, Canvas preservation, changelog, Git publishing, Feishu notification, ZIP validation, product-document rendering, and full-screen presentation follow the same rules as hand-authored pages.
+
 ## Changelog Writing Contract
 
 Product-document changelog text is release communication, not an engineering diary.

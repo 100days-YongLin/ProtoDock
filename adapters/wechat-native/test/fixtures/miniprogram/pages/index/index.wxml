@@ -1,0 +1,4 @@
+<view class="page">
+  <text>{{message}}</text>
+  <button bindtap="changeMessage">切换文案</button>
+</view>

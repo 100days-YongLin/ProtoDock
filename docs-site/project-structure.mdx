@@ -67,6 +67,10 @@ prototype-project/
 
 需要框架源码时，优先使用 `source/`；微信小程序等生态也可以保留 `miniprogram/`、`src/` 或 `app/` 这类工具原生目录，但只能有一个权威源码。`README.md` 和 `scripts/` 必须写清楚源码如何生成 `pages/`，禁止保留多套作用相同却无法判断新旧的实现。
 
+已有微信原生小程序时，WXML、WXSS、TypeScript、组件和素材是前端事实源。使用 ProtoDock 仓库的 `adapters/wechat-native/build.mjs` 生成浏览器入口，不要截图交付或另写一套仿制页面。适配器只读业务仓库，并以本地 fixture 和微信 API Mock 驱动预览；禁止为了展示而调用生产接口。
+
+构建会生成 `_wechat-adapter-report.json`。报告记录来源 commit、页面入口和兼容性；存在 WXS、不支持的微信 API 或原生标签时会阻止交付。生成后仍需登记 manifest 页面、补齐 PRD，并在本地 Player 与公开 Share 中实际操作输入、前进、返回和异常状态。
+
 ## References 与 QA
 
 仍用于后续设计的需求截图、品牌参考和视觉基准放在 `references/`。当前版本的可复现验收报告与对比图放在 `qa/`。已经过期的探索稿、历史 QA 批次和被替代的参考资料移入 `temps/`，不要继续散落在根目录。

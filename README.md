@@ -47,6 +47,21 @@ prototype-project/
 
 只有 manifest、`pages`、`docs` 和 `assets` 属于发布层。源码、脚本、测试、有效参考资料和当前 QA 证据属于工作层；`temps`、备份、本地密钥、缓存和日志属于本地临时层。工具要求的 `package.json`、锁文件和平台配置可以保留在根目录，除此之外不要在根目录散放截图、ZIP、实验目录或重复源码。
 
+### 微信原生源码适配
+
+微信原生项目不需要另做一套截图或手写 Web 仿制页。`adapters/wechat-native` 可将真实 WXML、WXSS 和 TypeScript 编译成 ProtoDock 静态页面，保留数据绑定、组件、输入、滚动、页面状态和端内路由；微信专属能力由本地 Mock 与 fixture 提供。
+
+```bash
+cd /path/to/ProtoDock/adapters/wechat-native
+npm ci
+node build.mjs \
+  --source /absolute/path/to/miniprogram \
+  --output /absolute/path/to/prototype/pages \
+  --config /absolute/path/to/prototype/protodock.wechat.json
+```
+
+业务源码仓库是前端事实源，适配器只读取源码并在临时目录构建，不修改源码。生成后应把 `_wechat-adapter-report.json` 留作 QA 证据，并将各页面入口登记进 `protodock.project.json`。报告中存在 WXS、不支持的微信 API 或原生标签时不得静默降级；先补适配、补 fixture，或保留已有可操作原型。预览禁止调用生产接口。
+
 ## 多端产品工作区
 
 同一个产品包含家长端、教师端、Web 管理端等多个原型时，可以在这些项目外增加一个轻量产品工作区。每个子项目仍然是完整、独立、向后兼容的 ProtoDock 项目；工作区只增加产品身份、共享 Markdown 文档池和端列表。
