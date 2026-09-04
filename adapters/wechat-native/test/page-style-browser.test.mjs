@@ -81,7 +81,7 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
       executablePath: process.env.PROTODOCK_CHROME_PATH
         || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined),
     });
-    const page = await browser.newPage({ viewport: { width: 390, height: 830 } });
+    const page = await browser.newPage({ viewport: { width: 430, height: 830 } });
     const address = server.address();
     await page.goto(`http://127.0.0.1:${address.port}/wx-pages-index-index/index.html`, { waitUntil: 'networkidle' });
     await page.waitForSelector('wx-glass-easel-root [data-style-probe="panel"]');
@@ -93,6 +93,10 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
       const panel = document.querySelector('[data-style-probe="panel"]');
       const scrollHost = document.querySelector('[data-scroll-probe="true"]');
       const scrollContainer = scrollHost?.querySelector('.pd-scroll');
+      const outerScrollHost = document.querySelector('[data-nested-scroll-outer="true"]');
+      const outerScrollContainer = outerScrollHost?.querySelector('.pd-scroll');
+      const innerScrollHost = document.querySelector('[data-nested-scroll-inner="true"]');
+      const innerScrollContainer = innerScrollHost?.querySelector('.pd-scroll');
       const rootStyle = getComputedStyle(root);
       const maskStyle = getComputedStyle(mask);
       const panelStyle = getComputedStyle(panel);
@@ -116,6 +120,13 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
         scrollContainerScrollTop: scrollContainer.scrollTop,
         pageCanScroll: document.documentElement.scrollHeight > window.innerHeight,
         pageScrollTop: window.scrollY,
+        viewportWidth: window.innerWidth,
+        outerHostWidth: outerScrollHost.getBoundingClientRect().width,
+        outerClientWidth: outerScrollContainer.clientWidth,
+        outerScrollWidth: outerScrollContainer.scrollWidth,
+        innerHostWidth: innerScrollHost.getBoundingClientRect().width,
+        innerClientWidth: innerScrollContainer.clientWidth,
+        innerScrollWidth: innerScrollContainer.scrollWidth,
         tabbarMounted: !!document.querySelector('.protodock-wechat-tabbar'),
         navbarMounted: !!document.querySelector('.protodock-wechat-navbar'),
         navbarTitle: document.querySelector('.protodock-wechat-navbar__title')?.textContent || '',
@@ -138,6 +149,13 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     assert.ok(styles.scrollContainerScrollTop > 0);
     assert.equal(styles.pageCanScroll, true);
     assert.ok(styles.pageScrollTop > 0);
+    assert.equal(styles.viewportWidth, 430);
+    assert.equal(styles.outerHostWidth, styles.viewportWidth);
+    assert.equal(styles.outerClientWidth, styles.viewportWidth);
+    assert.ok(styles.outerScrollWidth <= styles.outerClientWidth);
+    assert.equal(styles.innerHostWidth, styles.viewportWidth);
+    assert.equal(styles.innerClientWidth, styles.viewportWidth);
+    assert.ok(styles.innerScrollWidth > styles.innerClientWidth);
     assert.equal(styles.tabbarMounted, true);
     assert.equal(styles.navbarMounted, true);
     assert.equal(styles.navbarTitle, '适配器测试');

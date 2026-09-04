@@ -129,7 +129,7 @@ const COMPONENT_STYLES = {
   button: ':host{display:inline-block;box-sizing:border-box}.pd-control{width:100%;height:100%;padding:0;border:0;color:inherit;font:inherit;background:transparent}\n',
   input: ':host{display:block;box-sizing:border-box}.pd-control{width:100%;height:100%;padding:0;border:0;outline:0;color:inherit;font:inherit;background:transparent}\n',
   textarea: ':host{display:block;box-sizing:border-box}.pd-control{width:100%;height:100%;padding:0;border:0;outline:0;resize:none;color:inherit;font:inherit;background:transparent}\n',
-  'scroll-view': ':host{display:block;box-sizing:border-box}.pd-scroll{width:100%;height:100%;overflow:auto}\n',
+  'scroll-view': ':host{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%}.pd-scroll{width:100%;min-width:0;max-width:100%;height:100%;overflow:auto}\n',
   swiper: ':host{display:block;overflow:hidden;box-sizing:border-box}.pd-swiper{display:flex;width:100%;height:100%;overflow:auto;scroll-snap-type:x mandatory}\n',
   'swiper-item': ':host{display:block;flex:0 0 100%;box-sizing:border-box;scroll-snap-align:start}.pd-swiper-item{width:100%;height:100%}\n',
   picker: ':host{display:block;box-sizing:border-box}.pd-picker{position:relative;width:100%;height:100%}.pd-picker>select{position:absolute;inset:0;width:100%;height:100%;opacity:0}\n',

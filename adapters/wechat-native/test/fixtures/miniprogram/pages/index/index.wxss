@@ -17,6 +17,30 @@
   height: 240rpx;
 }
 
+.nested-scroll-layout {
+  display: flex;
+  width: 100%;
+}
+
+.nested-scroll-outer {
+  flex: 1;
+  height: 180rpx;
+}
+
+.nested-scroll-section {
+  min-width: 0;
+}
+
+.nested-scroll-horizontal {
+  width: 100%;
+  height: 100rpx;
+}
+
+.wide-timetable {
+  width: 910rpx;
+  height: 80rpx;
+}
+
 .bottom-sheet-mask {
   background: var(--hm-color-mask);
 }

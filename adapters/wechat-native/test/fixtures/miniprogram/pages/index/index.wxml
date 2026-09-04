@@ -5,6 +5,15 @@
   <scroll-view class="scroll-probe" scroll-y="true" data-scroll-probe="true">
     <view class="scroll-probe-content">可滚动内容</view>
   </scroll-view>
+  <view class="nested-scroll-layout">
+    <scroll-view class="nested-scroll-outer" scroll-y="true" data-nested-scroll-outer="true">
+      <view class="nested-scroll-section">
+        <scroll-view class="nested-scroll-horizontal" scroll-x="true" data-nested-scroll-inner="true">
+          <view class="wide-timetable">固定宽横向课表</view>
+        </scroll-view>
+      </view>
+    </scroll-view>
+  </view>
   <view class="bottom-sheet-mask" data-style-probe="mask">
     <view class="bottom-sheet-panel" data-style-probe="panel">弹窗内容</view>
   </view>
