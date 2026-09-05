@@ -6,3 +6,8 @@ page {
   background: #fffaf2;
   color: var(--hm-color-text);
 }
+
+.apply-shared-probe {
+  color: rgb(12, 104, 196);
+  font-size: 19px;
+}

@@ -22,6 +22,8 @@ Use `adapters/wechat-native/build.mjs` to compile the native source into browser
 
 The browser preview must use local fixtures and `wx.*` mocks; it must not call production services. Register generated entries in `protodock.project.json`, provide explicit page IDs and fallback routes, and keep product intent and acceptance criteria in the PRD. WXS, unsupported APIs, unsupported native tags, missing fixtures required by the main flow, or browser runtime errors block delivery. Acceptance must exercise one input/state change, one cross-page navigation, one return path, assets, and the same page in local Player and public Share.
 
+The adapter must preserve component style-isolation semantics even when native source declares `styleIsolation` in `Component({ options })` instead of component JSON; any compatibility metadata is added only in the temporary build stage. On a declared TabBar page, component `selectViewport()` measurements and `wx.getWindowInfo()` / `wx.getSystemInfoSync()` window and safe-area metrics must describe the visible area above the simulated native TabBar. Delivery is blocked when a fixed action region is obscured by that TabBar.
+
 If page behavior or fixtures depend on the current date, declare one timezone-qualified ISO 8601 `previewDate` in `protodock.wechat.json`. The generated runtime must apply it before the application bundle executes, and local Player, product documents, and public Share must use the same value. Freezing time only inside a test is not valid delivery evidence.
 
 ## Product Workspace Contract

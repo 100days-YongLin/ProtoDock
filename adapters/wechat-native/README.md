@@ -53,9 +53,10 @@ node build.mjs \
 - 页面、组件、数据绑定、`setData`、常用表单控件和路由可复用。
 - WXSS 的 `page` 选择器会映射到每个预览 iframe 内的真实页面根，页面背景、尺寸和 CSS 自定义属性可继续由组件继承，且不会跨页面串样式。
 - WXSS 中的微信原生标签选择器会精确映射到浏览器里的 `wx-*` 标签，后代、子级和相邻选择器可保持原有语义；类名、属性选择器和自定义组件不会被改写。
+- 组件若在 `Component({ options: { styleIsolation } })` 中声明样式隔离，适配器会在临时构建目录将其同步到组件 JSON；业务源码保持只读，显式 JSON 配置始终优先。
 - 手机预览 iframe 默认隐藏页面与内部滚动容器的浏览器滚动条，但继续支持触控、滚轮和脚本滚动；该样式不会影响 ProtoDock 外壳或 Web 端原型。
 - `scroll-view` 作为 flex item 时会收缩到父容器宽度；固定宽横向内容保留在内部滚动层中，不会撑宽外层页面或被裁掉。
-- TabBar 只出现在 `tabBar.list[].pagePath` 声明的页面。`navigationStyle` 非 `custom` 的页面会根据 app `window` 与页面 JSON 的合并配置显示轻量原生导航栏；非 TabBar 页面提供返回按钮。
+- TabBar 只出现在 `tabBar.list[].pagePath` 声明的页面。TabBar 页面中的 `selectViewport()`、`wx.getWindowInfo()` 和 `wx.getSystemInfoSync()` 会统一扣除模拟原生 TabBar 高度，固定操作区不会被覆盖。`navigationStyle` 非 `custom` 的页面会根据 app `window` 与页面 JSON 的合并配置显示轻量原生导航栏；非 TabBar 页面提供返回按钮。
 - 扫码、上传、订阅消息和媒体预览使用浏览器 Mock。
 - `canvas`、视频、文件系统和外部小程序只提供展示级兼容，不等同于真机能力。
 - `_wechat-adapter-report.json` 中出现不支持的微信 API、原生标签或 WXS 时，构建会以非零状态退出；必须先补适配或保留已有可操作原型，不能静默交付。

@@ -89,6 +89,7 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     await page.goto(`http://127.0.0.1:${address.port}/wx-pages-index-index/index.html`, { waitUntil: 'networkidle' });
     await page.waitForSelector('wx-glass-easel-root [data-style-probe="panel"]');
     await page.waitForSelector('.protodock-wechat-tabbar');
+    await page.waitForFunction(() => Number(document.querySelector('[data-viewport-height]')?.getAttribute('data-viewport-height')) > 0);
 
     const clock = await page.evaluate(() => ({
       implicitIso: new Date().toISOString(),
@@ -126,6 +127,10 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
       const outerScrollContainer = outerScrollHost?.querySelector('.pd-scroll');
       const innerScrollHost = document.querySelector('[data-nested-scroll-inner="true"]');
       const innerScrollContainer = innerScrollHost?.querySelector('.pd-scroll');
+      const sharedProbe = document.querySelector('[data-apply-shared-probe="true"]');
+      const fixedAction = document.querySelector('[data-fixed-action-probe="true"]');
+      const tabbar = document.querySelector('.protodock-wechat-tabbar');
+      const windowInfo = wx.getWindowInfo();
       const rootStyle = getComputedStyle(root);
       const maskStyle = getComputedStyle(mask);
       const panelStyle = getComputedStyle(panel);
@@ -156,6 +161,14 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
         innerHostWidth: innerScrollHost.getBoundingClientRect().width,
         innerClientWidth: innerScrollContainer.clientWidth,
         innerScrollWidth: innerScrollContainer.scrollWidth,
+        sharedProbeColor: getComputedStyle(sharedProbe).color,
+        sharedProbeFontSize: getComputedStyle(sharedProbe).fontSize,
+        measuredViewportHeight: Number(fixedAction.getAttribute('data-viewport-height')),
+        fixedActionBottom: fixedAction.getBoundingClientRect().bottom,
+        tabbarTop: tabbar.getBoundingClientRect().top,
+        tabbarHeight: tabbar.getBoundingClientRect().height,
+        windowHeight: windowInfo.windowHeight,
+        safeAreaBottom: windowInfo.safeArea.bottom,
         tabbarMounted: !!document.querySelector('.protodock-wechat-tabbar'),
         navbarMounted: !!document.querySelector('.protodock-wechat-navbar'),
         navbarTitle: document.querySelector('.protodock-wechat-navbar__title')?.textContent || '',
@@ -185,6 +198,13 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     assert.equal(styles.innerHostWidth, styles.viewportWidth);
     assert.equal(styles.innerClientWidth, styles.viewportWidth);
     assert.ok(styles.innerScrollWidth > styles.innerClientWidth);
+    assert.equal(styles.sharedProbeColor, 'rgb(12, 104, 196)');
+    assert.equal(styles.sharedProbeFontSize, '19px');
+    assert.equal(styles.measuredViewportHeight, 766);
+    assert.equal(styles.windowHeight, styles.measuredViewportHeight);
+    assert.equal(styles.safeAreaBottom, styles.measuredViewportHeight);
+    assert.equal(styles.tabbarHeight, 64);
+    assert.ok(Math.abs(styles.fixedActionBottom - styles.tabbarTop) < 1);
     assert.equal(styles.tabbarMounted, true);
     assert.equal(styles.navbarMounted, true);
     assert.equal(styles.navbarTitle, '适配器测试');

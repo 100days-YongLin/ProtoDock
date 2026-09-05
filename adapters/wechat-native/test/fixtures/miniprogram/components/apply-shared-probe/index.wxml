@@ -1,0 +1,7 @@
+<view class="apply-shared-probe" data-apply-shared-probe="true">共享样式</view>
+<view
+  class="fixed-action-probe"
+  style="top: {{viewportHeight ? viewportHeight + 'px' : '100vh'}}"
+  data-fixed-action-probe="true"
+  data-viewport-height="{{viewportHeight}}"
+>固定操作</view>

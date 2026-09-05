@@ -5,6 +5,7 @@
   const pageMap = config.pageMap || {};
   const fixtures = config.fixtures || {};
   const timers = new Set();
+  const NATIVE_TAB_BAR_HEIGHT = 64;
   let appDefinition = null;
   let toastTimer = null;
 
@@ -74,6 +75,33 @@
     return pageMap[route] || pageMap[`pages/${route}`] || null;
   }
 
+  function isTabRoute() {
+    const currentRoute = cleanRoute(config.route);
+    return !!config.tabBar?.list?.some((item) => cleanRoute(item.pagePath) === currentRoute);
+  }
+
+  function tabBarInsetBottom() {
+    if (!isTabRoute() || global.document?.documentElement?.dataset.protodockTabbarHidden === 'true') return 0;
+    return NATIVE_TAB_BAR_HEIGHT;
+  }
+
+  function visibleViewportHeight(fullHeight = global.innerHeight) {
+    return Math.max(0, Number(fullHeight || 0) - tabBarInsetBottom());
+  }
+
+  function windowMetrics() {
+    const windowWidth = global.innerWidth;
+    const windowHeight = visibleViewportHeight();
+    return {
+      windowWidth,
+      windowHeight,
+      screenWidth: windowWidth,
+      screenHeight: global.innerHeight,
+      pixelRatio: global.devicePixelRatio || 1,
+      safeArea: { top: 0, left: 0, right: windowWidth, bottom: windowHeight, width: windowWidth, height: windowHeight },
+    };
+  }
+
   function navigate(url, replace = false) {
     const pageId = pageIdForUrl(url);
     if (pageId && global.ProtoDockPreview?.navigate) {
@@ -127,10 +155,10 @@
     env: { USER_DATA_PATH: '/protodock-user-data' },
     nextTick(callback) { later(callback); },
     getWindowInfo() {
-      return { windowWidth: global.innerWidth, windowHeight: global.innerHeight, pixelRatio: global.devicePixelRatio || 1, safeArea: { top: 0, left: 0, right: global.innerWidth, bottom: global.innerHeight, width: global.innerWidth, height: global.innerHeight } };
+      return windowMetrics();
     },
     getSystemInfoSync() {
-      return { windowWidth: global.innerWidth, windowHeight: global.innerHeight, pixelRatio: global.devicePixelRatio || 1, platform: 'devtools', system: 'ProtoDock', model: 'ProtoDock Web Preview', statusBarHeight: 0, safeArea: { top: 0, left: 0, right: global.innerWidth, bottom: global.innerHeight, width: global.innerWidth, height: global.innerHeight } };
+      return { ...windowMetrics(), platform: 'devtools', system: 'ProtoDock', model: 'ProtoDock Web Preview', statusBarHeight: 0 };
     },
     getMenuButtonBoundingClientRect() {
       return { top: 8, left: Math.max(0, global.innerWidth - 96), right: Math.max(0, global.innerWidth - 8), bottom: 40, width: 88, height: 32 };
@@ -222,9 +250,7 @@
 
   function mountTabBar() {
     const tabBar = config.tabBar;
-    const currentRoute = cleanRoute(config.route);
-    const isTabRoute = tabBar?.list?.some((item) => cleanRoute(item.pagePath) === currentRoute);
-    if (!isTabRoute || global.document.querySelector('.protodock-wechat-tabbar')) return;
+    if (!isTabRoute() || global.document.querySelector('.protodock-wechat-tabbar')) return;
     const element = global.document.createElement('nav');
     element.className = 'protodock-wechat-tabbar';
     tabBar.list.forEach((item) => {
@@ -286,6 +312,8 @@
     navigate,
     mountNativeNavBar,
     mountTabBar,
+    tabBarInsetBottom,
+    visibleViewportHeight,
     startApp() {
       const app = global.getApp();
       if (!app || app.__protodockStarted) return;

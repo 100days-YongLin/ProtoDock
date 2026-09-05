@@ -26,6 +26,10 @@ const NATIVE_COMPONENTS = new Set([
   'button', 'canvas', 'cover-image', 'cover-view', 'image', 'input', 'picker', 'rich-text',
   'scroll-view', 'slider', 'swiper', 'swiper-item', 'text', 'textarea', 'video', 'view',
 ]);
+const COMPONENT_STYLE_ISOLATION_VALUES = new Set([
+  'isolated', 'apply-shared', 'shared',
+  'page-isolated', 'page-apply-shared', 'page-shared',
+]);
 
 const COMPONENT_TEMPLATES = {
   view: '<slot />\n',
@@ -301,6 +305,10 @@ async function patchComponentMappings(stage, includeNativeShims) {
       continue;
     }
     if (path.basename(file) === 'app.json' || file.includes(`${path.sep}__protodock${path.sep}`)) continue;
+    if (document.component && document.styleIsolation === undefined) {
+      const styleIsolation = await readComponentStyleIsolation(file);
+      if (styleIsolation) document.styleIsolation = styleIsolation;
+    }
     document.usingComponents = { ...(document.usingComponents || {}) };
     if (includeNativeShims) {
       for (const name of NATIVE_COMPONENTS) {
@@ -309,6 +317,58 @@ async function patchComponentMappings(stage, includeNativeShims) {
     }
     await writeFile(file, `${JSON.stringify(document, null, 2)}\n`);
   }
+}
+
+async function readComponentStyleIsolation(jsonFile) {
+  const root = jsonFile.slice(0, -path.extname(jsonFile).length);
+  for (const extension of ['.ts', '.js']) {
+    const sourceFile = `${root}${extension}`;
+    try {
+      return collectComponentStyleIsolation(await readFile(sourceFile, 'utf8'), sourceFile);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  return null;
+}
+
+export function collectComponentStyleIsolation(content, fileName = 'component.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    fileName.endsWith('.js') ? ts.ScriptKind.JS : ts.ScriptKind.TS,
+  );
+  let value = null;
+
+  const propertyName = (node) => {
+    if (ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNumericLiteral(node)) return node.text;
+    return null;
+  };
+  const objectProperty = (object, name) => object.properties.find((property) => (
+    ts.isPropertyAssignment(property) && propertyName(property.name) === name
+  ));
+  const visit = (node) => {
+    if (value) return;
+    if (ts.isCallExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'Component'
+      && ts.isObjectLiteralExpression(node.arguments[0])) {
+      const options = objectProperty(node.arguments[0], 'options');
+      if (options && ts.isObjectLiteralExpression(options.initializer)) {
+        const isolation = objectProperty(options.initializer, 'styleIsolation');
+        const initializer = isolation?.initializer;
+        const candidate = initializer && (ts.isStringLiteral(initializer) || ts.isNoSubstitutionTemplateLiteral(initializer))
+          ? initializer.text
+          : null;
+        if (candidate && COMPONENT_STYLE_ISOLATION_VALUES.has(candidate)) value = candidate;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return value;
 }
 
 async function normalizePageRuntimeCollections(stage, routes) {

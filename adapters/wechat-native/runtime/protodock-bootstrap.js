@@ -13,6 +13,11 @@
   });
 
   const backendContext = new glassEasel.CurrentWindowBackendContext();
+  const nativeGetWindowHeight = backendContext.getWindowHeight.bind(backendContext);
+  backendContext.getWindowHeight = () => (
+    window.ProtoDockWechatRuntime?.visibleViewportHeight(nativeGetWindowHeight())
+      ?? nativeGetWindowHeight()
+  );
   bundle.registerGlobalEventListener(backendContext);
   const backend = bundle.initWithBackend(backendContext);
   const root = backend.createRoot('glass-easel-root', bundle.codeSpace, config.route);

@@ -7,6 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   assertCompatible,
+  collectComponentStyleIsolation,
   collectPageRuntimeCollections,
   collectRoutes,
   normalizeCompiledCssContent,
@@ -97,6 +98,16 @@ test('previewDate requires an explicit timezone and normalizes the instant', () 
   assert.equal(normalizePreviewDate('2026-09-04T10:00:00+08:00'), '2026-09-04T02:00:00.000Z');
   assert.throws(() => normalizePreviewDate('2026-09-04'), /explicit timezone/);
   assert.throws(() => normalizePreviewDate('2026-09-04T10:00:00'), /explicit timezone/);
+});
+
+test('component style isolation is read from the Component options object', () => {
+  assert.equal(collectComponentStyleIsolation(`
+    Component({ options: { styleIsolation: 'apply-shared' }, data: {} });
+  `), 'apply-shared');
+  assert.equal(collectComponentStyleIsolation(`
+    export default Component({ options: { styleIsolation: \`shared\` } });
+  `), 'shared');
+  assert.equal(collectComponentStyleIsolation(`Component({ options: { styleIsolation: dynamicValue } })`), null);
 });
 
 test('builds an interactive browser entry from a native mini program', { timeout: 30000 }, async () => {

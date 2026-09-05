@@ -1,0 +1,13 @@
+:host {
+  display: block;
+}
+
+.fixed-action-probe {
+  position: fixed;
+  z-index: 2;
+  right: 0;
+  left: 0;
+  height: 40px;
+  background: #ffffff;
+  transform: translateY(-100%);
+}

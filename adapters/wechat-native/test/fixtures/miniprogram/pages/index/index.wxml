@@ -17,4 +17,5 @@
   <view class="bottom-sheet-mask" data-style-probe="mask">
     <view class="bottom-sheet-panel" data-style-probe="panel">弹窗内容</view>
   </view>
+  <apply-shared-probe />
 </view>
