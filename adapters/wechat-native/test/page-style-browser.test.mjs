@@ -84,7 +84,7 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
       executablePath: process.env.PROTODOCK_CHROME_PATH
         || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined),
     });
-    const page = await browser.newPage({ viewport: { width: 430, height: 830 } });
+    const page = await browser.newPage({ viewport: { width: 430, height: 830 }, deviceScaleFactor: 2 });
     const propertyWarnings = [];
     const listWarnings = [];
     page.on('console', (message) => {
@@ -110,6 +110,36 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     });
     await page.waitForFunction(() => document.querySelector('[data-slider-events]')?.textContent === 'changing:37.2;change:37.2;');
     assert.deepEqual(propertyWarnings, []);
+    const canvasQuery = await page.evaluate(() => {
+      const owner = window.__PROTODOCK_WECHAT_ROOT__.get();
+      let result;
+      wx.createSelectorQuery().in(owner).select('.canvas-query-probe').fields({ node: true, size: true }).exec((results) => { result = results[0]; });
+      const canvas = result.node;
+      const dpr = wx.getWindowInfo().pixelRatio;
+      canvas.width = result.width * dpr;
+      canvas.height = result.height * dpr;
+      const context = canvas.getContext('2d');
+      context.scale(dpr, dpr);
+      context.fillStyle = '#ff0000';
+      context.fillRect(0, 0, 20, 20);
+      const first = Array.from(context.getImageData(10, 10, 1, 1).data);
+      context.clearRect(0, 0, result.width, result.height);
+      context.fillStyle = '#008000';
+      context.fillRect(0, 0, 20, 20);
+      const second = Array.from(context.getImageData(10, 10, 1, 1).data);
+      let scoped;
+      wx.createSelectorQuery().in(owner.selectComponent('#shared-probe')).selectAll('.canvas-query-probe').fields({ node: true, size: true }).exec((results) => { scoped = results[0]; });
+      let callbackRect;
+      let rects;
+      wx.createSelectorQuery().in(owner).select('.canvas-query-probe').boundingClientRect((rect) => { callbackRect = rect; })
+        .select('.missing-canvas').fields({ node: true }).exec((results) => { rects = results; });
+      return { width: result.width, height: result.height, bitmapWidth: canvas.width, bitmapHeight: canvas.height, first, second,
+        scopeCount: scoped.length, scopeWidth: scoped[0].width, scopeIsDifferent: scoped[0].node !== canvas,
+        callbackMatches: callbackRect === rects[0], missing: rects[1] };
+    });
+    assert.deepEqual(canvasQuery, { width: 120, height: 80, bitmapWidth: 240, bitmapHeight: 160,
+      first: [255, 0, 0, 255], second: [0, 128, 0, 255], scopeCount: 1, scopeWidth: 60,
+      scopeIsDifferent: true, callbackMatches: true, missing: null });
     assert.deepEqual(listWarnings, []);
     assert.equal(await page.locator('[data-optional-list]').textContent(), 'ready');
     assert.deepEqual(await page.locator('[data-picker-probe] option').allTextContents(), ['same', 'same', 'other']);

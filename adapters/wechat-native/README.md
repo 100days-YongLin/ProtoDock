@@ -59,6 +59,7 @@ node build.mjs \
 - `scroll-view` 作为 flex item 时会收缩到父容器宽度；固定宽横向内容保留在内部滚动层中，不会撑宽外层页面或被裁掉。
 - TabBar 只出现在 `tabBar.list[].pagePath` 声明的页面。TabBar 页面中的 `selectViewport()`、`wx.getWindowInfo()` 和 `wx.getSystemInfoSync()` 会统一扣除模拟原生 TabBar 高度，固定操作区不会被覆盖。`navigationStyle` 非 `custom` 的页面会根据 app `window` 与页面 JSON 的合并配置显示轻量原生导航栏；非 TabBar 页面提供返回按钮。
 - 扫码、上传、订阅消息和媒体预览使用浏览器 Mock。
-- `canvas`、视频、文件系统和外部小程序只提供展示级兼容，不等同于真机能力。
+- Canvas 2D 支持通过 `wx.createSelectorQuery().in(pageOrComponent).select(selector).fields({ node: true, size: true }).exec(callback)` 获取真实浏览器画布与 CSS 尺寸；即使未传 `fields` 回调，`exec` 也会收到结果。支持按 DPR 设置位图尺寸及后续重绘，不包含旧版 `wx.createCanvasContext` 或 WebGL 的完整微信兼容。
+- 视频、文件系统和外部小程序只提供展示级兼容，不等同于真机能力。
 - `_wechat-adapter-report.json` 中出现不支持的微信 API、原生标签或 WXS 时，构建会以非零状态退出；必须先补适配或保留已有可操作原型，不能静默交付。
 - 生成页面仍需写入 `protodock.project.json` 并按常规 ProtoDock 路由、返回和 ZIP 门禁验收。

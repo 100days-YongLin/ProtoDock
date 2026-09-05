@@ -134,18 +134,65 @@
   }
 
   function selectorQuery() {
-    const callbacks = [];
+    const requests = [];
+    let scope = null;
+    let selection = null;
+    const enqueue = (fields, callback) => {
+      requests.push({ ...selection, scope, fields, callback });
+      return query;
+    };
+    const measure = (element, fields, virtualNode) => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      const value = {};
+      if (fields.id) value.id = virtualNode?.id || element.id;
+      if (fields.dataset) value.dataset = { ...(virtualNode?.dataset || element.dataset) };
+      if (fields.size) Object.assign(value, { width: rect.width, height: rect.height });
+      if (fields.rect) Object.assign(value, { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left });
+      if (fields.scrollOffset) {
+        const scroll = element.querySelector('.pd-scroll') || element;
+        Object.assign(value, { scrollTop: scroll.scrollTop, scrollLeft: scroll.scrollLeft, scrollWidth: scroll.scrollWidth, scrollHeight: scroll.scrollHeight });
+      }
+      if (fields.node) value.node = element.matches('canvas') ? element : element.querySelector('canvas') || element;
+      for (const name of fields.properties || []) value[name] = virtualNode?.data?.[name] ?? element[name];
+      if (fields.computedStyle?.length) {
+        const style = global.getComputedStyle(element);
+        for (const name of fields.computedStyle) value[name] = style.getPropertyValue(name);
+      }
+      return value;
+    };
+    const execute = (request) => {
+      if (request.viewport) {
+        const value = {};
+        if (request.fields.size) Object.assign(value, { width: global.innerWidth, height: visibleViewportHeight() });
+        if (request.fields.rect) Object.assign(value, { top: 0, left: 0, right: global.innerWidth, bottom: visibleViewportHeight() });
+        if (request.fields.scrollOffset) Object.assign(value, { scrollTop: global.scrollY, scrollLeft: global.scrollX });
+        return value;
+      }
+      const virtualRoot = request.scope?._$?.getShadowRoot?.();
+      const domRoot = request.scope?.querySelector ? request.scope : global.document;
+      if (request.scope && !virtualRoot && domRoot === global.document) return request.all ? [] : null;
+      const root = virtualRoot || domRoot;
+      const nodes = request.all ? Array.from(root.querySelectorAll(request.selector)) : [root.querySelector(request.selector)];
+      const results = nodes.map((node) => measure(virtualRoot ? node?.getBackendElement?.() : node, request.fields, virtualRoot ? node : null));
+      return request.all ? results : results[0];
+    };
     const query = {
-      in() { return query; },
-      select() { return query; },
-      selectAll() { return query; },
-      boundingClientRect(callback) { if (typeof callback === 'function') callbacks.push(callback); return query; },
-      scrollOffset(callback) { if (typeof callback === 'function') callbacks.push(callback); return query; },
-      fields(_fields, callback) { if (typeof callback === 'function') callbacks.push(callback); return query; },
+      in(component) { scope = component; return query; },
+      select(selector) { selection = { selector, all: false }; return query; },
+      selectAll(selector) { selection = { selector, all: true }; return query; },
+      selectViewport() { selection = { viewport: true }; return query; },
+      boundingClientRect(callback) { return enqueue({ id: true, dataset: true, rect: true, size: true }, callback); },
+      scrollOffset(callback) { return enqueue({ id: true, dataset: true, scrollOffset: true }, callback); },
+      fields(fields, callback) { return enqueue(fields || {}, callback); },
       exec(callback) {
-        const empty = { width: 0, height: 0, top: 0, left: 0, scrollTop: 0, scrollLeft: 0 };
-        callbacks.forEach((item) => item(empty));
-        callback?.(callbacks.map(() => empty));
+        const results = requests.splice(0).map((request) => {
+          const value = execute(request);
+          request.callback?.(value);
+          return value;
+        });
+        callback?.(results);
+        return query;
       },
     };
     return query;

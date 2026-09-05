@@ -17,7 +17,8 @@
   <view class="bottom-sheet-mask" data-style-probe="mask">
     <view class="bottom-sheet-panel" data-style-probe="panel">弹窗内容</view>
   </view>
-  <apply-shared-probe />
+  <apply-shared-probe id="shared-probe" />
+  <canvas class="canvas-query-probe" style="width: 120px; height: 80px" type="2d" />
   <input data-digit-probe="true" type="digit" value="36.5" />
   <slider data-slider-probe="true" min="36" max="39" step="0.1" value="36.5" activeColor="#ff7300" block-color="#ee6600" bindchanging="sliderChanging" bindchange="sliderChanged" />
   <text data-slider-events="true">{{sliderEvents}}</text>

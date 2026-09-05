@@ -1,4 +1,5 @@
 <view class="apply-shared-probe" data-apply-shared-probe="true">共享样式</view>
+<canvas class="canvas-query-probe" style="width: 60px; height: 40px" type="2d" />
 <view
   class="fixed-action-probe"
   style="top: {{viewportHeight ? viewportHeight + 'px' : '100vh'}}"
