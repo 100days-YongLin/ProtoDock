@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -69,10 +69,13 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
   let browser;
 
   try {
+    const configPath = path.join(output, 'protodock.wechat.json');
+    await writeFile(configPath, JSON.stringify({ previewDate: '2026-09-04T10:00:00+08:00' }));
     await run(process.execPath, [
       path.join(ADAPTER_ROOT, 'build.mjs'),
       '--source', path.join(TEST_ROOT, 'fixtures', 'miniprogram'),
       '--output', output,
+      '--config', configPath,
     ]);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const { chromium } = loadPlaywright();
@@ -86,6 +89,32 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     await page.goto(`http://127.0.0.1:${address.port}/wx-pages-index-index/index.html`, { waitUntil: 'networkidle' });
     await page.waitForSelector('wx-glass-easel-root [data-style-probe="panel"]');
     await page.waitForSelector('.protodock-wechat-tabbar');
+
+    const clock = await page.evaluate(() => ({
+      implicitIso: new Date().toISOString(),
+      implicitNow: Date.now(),
+      callableMatches: Date() === new Date('2026-09-04T02:00:00.000Z').toString(),
+      explicitIso: new Date('2020-01-02T03:04:05.000Z').toISOString(),
+      parsed: Date.parse('2020-01-02T03:04:05.000Z'),
+      utc: Date.UTC(2020, 0, 2, 3, 4, 5),
+    }));
+    assert.equal(clock.implicitIso, '2026-09-04T02:00:00.000Z');
+    assert.equal(clock.implicitNow, 1788487200000);
+    assert.equal(clock.callableMatches, true);
+    assert.equal(clock.explicitIso, '2020-01-02T03:04:05.000Z');
+    assert.equal(clock.parsed, 1577934245000);
+    assert.equal(clock.utc, 1577934245000);
+
+    await page.evaluate(() => wx.showToast({ title: '发布失败，请稍后重试', duration: 800 }));
+    const toast = await page.locator('.protodock-wechat-toast').evaluate((element) => ({
+      text: element.textContent,
+      role: element.getAttribute('role'),
+      pointerEvents: getComputedStyle(element).pointerEvents,
+    }));
+    assert.equal(toast.text, '发布失败，请稍后重试');
+    assert.equal(toast.role, 'status');
+    assert.equal(toast.pointerEvents, 'none');
+    await page.waitForSelector('.protodock-wechat-toast', { state: 'detached', timeout: 2500 });
 
     const styles = await page.evaluate(() => {
       const root = document.querySelector('wx-glass-easel-root');

@@ -22,6 +22,8 @@ Use `adapters/wechat-native/build.mjs` to compile the native source into browser
 
 The browser preview must use local fixtures and `wx.*` mocks; it must not call production services. Register generated entries in `protodock.project.json`, provide explicit page IDs and fallback routes, and keep product intent and acceptance criteria in the PRD. WXS, unsupported APIs, unsupported native tags, missing fixtures required by the main flow, or browser runtime errors block delivery. Acceptance must exercise one input/state change, one cross-page navigation, one return path, assets, and the same page in local Player and public Share.
 
+If page behavior or fixtures depend on the current date, declare one timezone-qualified ISO 8601 `previewDate` in `protodock.wechat.json`. The generated runtime must apply it before the application bundle executes, and local Player, product documents, and public Share must use the same value. Freezing time only inside a test is not valid delivery evidence.
+
 ## Product Workspace Contract
 
 When several ProtoDock projects are different endpoints of one product, keep each endpoint as a complete normal project and add one optional workspace above them:

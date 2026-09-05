@@ -111,6 +111,7 @@ const manifest = {
 };
 
 const projectPrefix = 'prototypes/mobile/';
+const teacherProjectPrefix = 'prototypes/teacher/';
 const adapterOutput = await mkdtemp(path.join(os.tmpdir(), 'protodock-local-wechat-preview-'));
 await run(process.execPath, [
   path.join(adapterRoot, 'build.mjs'),
@@ -122,11 +123,21 @@ const files = {
     schemaVersion: 1,
     product: { id: 'local-workspace-gate', name: '本地工作区门禁', version: 'v1.0.0' },
     sharedDocs: 'shared-docs',
-    projects: [{ id: 'mobile', name: '移动端', path: 'prototypes/mobile' }]
+    projects: [
+      { id: 'mobile', name: '移动端', path: 'prototypes/mobile' },
+      { id: 'teacher', name: '教师端', path: 'prototypes/teacher' }
+    ]
   })}\n`,
   [`${projectPrefix}protodock.project.json`]: `${JSON.stringify(manifest)}\n`,
   [`${projectPrefix}docs/home.md`]: '# 首页\n\n本地微信预览浏览器门禁。\n',
-  ...await readGeneratedFiles(adapterOutput, `${projectPrefix}pages/`)
+  ...await readGeneratedFiles(adapterOutput, `${projectPrefix}pages/`),
+  [`${teacherProjectPrefix}protodock.project.json`]: `${JSON.stringify({
+    ...manifest,
+    project: { ...manifest.project, id: 'local-wechat-preview-gate-teacher', name: '教师端本地门禁' }
+  })}\n`,
+  [`${teacherProjectPrefix}docs/home.md`]: '# 首页\n\n教师端本地微信预览浏览器门禁。\n',
+  ...Object.fromEntries(Object.entries(await readGeneratedFiles(adapterOutput, `${teacherProjectPrefix}pages/`))
+    .map(([filePath, text]) => [filePath, text.replaceAll('适配前', '教师端适配前')]))
 };
 
 const server = staticServer();
@@ -155,16 +166,19 @@ try {
   await page.goto(`http://127.0.0.1:${address.port}/index.html`, { waitUntil: 'domcontentloaded' });
   await page.evaluate(async (projectFiles) => {
     const readCounts = new Map();
-    const makeFileHandle = (name, text, filePath) => ({
+    const failureBudgets = new Map();
+    const makeFileHandle = (name, filePath) => ({
       kind: 'file',
       name,
       async getFile() {
         const readCount = (readCounts.get(filePath) || 0) + 1;
         readCounts.set(filePath, readCount);
-        if (filePath.endsWith('pages/wx-pages-index-index/index.html') && readCount > 1) {
-          throw new DOMException('Local file handle expired', 'NotFoundError');
+        const failures = failureBudgets.get(filePath) || 0;
+        if (failures > 0) {
+          failureBudgets.set(filePath, failures - 1);
+          throw new DOMException('Simulated local file read failure', 'NotFoundError');
         }
-        return new File([text], name, { type: name.endsWith('.json') ? 'application/json' : 'text/plain' });
+        return new File([projectFiles[filePath]], name, { type: name.endsWith('.json') ? 'application/json' : 'text/plain' });
       },
       async createWritable() {
         return { async write() {}, async close() {} };
@@ -186,9 +200,16 @@ try {
         if (!(filePath in projectFiles)) {
           throw new DOMException('Missing file', 'NotFoundError');
         }
-        return makeFileHandle(fileName, projectFiles[filePath], filePath);
+        return makeFileHandle(fileName, filePath);
       }
     });
+    window.__previewGate = {
+      failNext(filePath, count = 1) { failureBudgets.set(filePath, count); },
+      failuresLeft(filePath) { return failureBudgets.get(filePath) || 0; },
+      replaceText(filePath, before, after) {
+        projectFiles[filePath] = projectFiles[filePath].replaceAll(before, after);
+      }
+    };
     await window.ProtoDock.openDroppedProjectDirectory(makeDirectoryHandle('local-workspace-preview-gate'));
   }, files);
 
@@ -214,6 +235,8 @@ try {
   assert.equal(result.runtimeRootTag, 'WX-GLASS-EASEL-ROOT');
   assert.equal(result.previewError, '');
 
+  const mobileEntryPath = `${projectPrefix}pages/wx-pages-index-index/index.html`;
+  await page.evaluate((filePath) => window.__previewGate.failNext(filePath), mobileEntryPath);
   await page.click('#playFlow');
   await page.waitForFunction(() => document.querySelector('iframe.playback-frame')?.contentDocument
     ?.querySelector('wx-glass-easel-root'));
@@ -228,7 +251,50 @@ try {
   assert.match(playbackResult.bodyText, /适配前/);
   assert.equal(playbackResult.runtimeRootTag, 'WX-GLASS-EASEL-ROOT');
   assert.equal(playbackResult.previewError, '');
-  const relevantConsoleErrors = consoleErrors.filter((message) => !message.includes('uicdn.toast.com'));
+  assert.equal(await page.evaluate((filePath) => window.__previewGate.failuresLeft(filePath), mobileEntryPath), 1);
+
+  await page.click('#closePlayback');
+  await page.click('#playFlow');
+  await page.waitForFunction(() => document.querySelector('iframe.playback-frame')?.contentDocument
+    ?.querySelector('wx-glass-easel-root'));
+  assert.equal(await page.locator('iframe.playback-frame').evaluate((frame) => frame.contentDocument.body.innerText.includes('适配前')), true);
+  assert.equal(await page.evaluate((filePath) => window.__previewGate.failuresLeft(filePath), mobileEntryPath), 1);
+  await page.evaluate((filePath) => window.__previewGate.failNext(filePath, 0), mobileEntryPath);
+  await page.click('#closePlayback');
+
+  const teacherEntryPath = `${teacherProjectPrefix}pages/wx-pages-index-index/index.html`;
+  await page.evaluate((filePath) => window.__previewGate.failNext(filePath), teacherEntryPath);
+  await page.click('[data-workspace-project="teacher"]');
+  await page.waitForFunction(() => document.querySelector('[data-workspace-project="teacher"]')?.getAttribute('aria-selected') === 'true');
+  await page.waitForFunction(() => document.querySelector('[data-preview-node] .preview-error')?.textContent.includes('无法预览'));
+  assert.equal(await page.evaluate((filePath) => window.__previewGate.failuresLeft(filePath), teacherEntryPath), 0);
+
+  await page.click('#reloadProject');
+  await page.waitForFunction(() => document.querySelector('iframe.prototype-frame')?.dataset.previewReady === 'true');
+  await page.waitForFunction(() => document.querySelector('iframe.prototype-frame')?.contentDocument?.body.innerText.includes('教师端适配前'));
+
+  const teacherBundlePath = `${teacherProjectPrefix}pages/_wechat-runtime/index.js`;
+  await page.evaluate(({ filePath, before, after }) => window.__previewGate.replaceText(filePath, before, after), {
+    filePath: teacherBundlePath,
+    before: '教师端适配前',
+    after: '教师端已更新'
+  });
+  await page.click('#reloadProject');
+  await page.waitForFunction(() => document.querySelector('iframe.prototype-frame')?.dataset.previewReady === 'true');
+  await page.waitForFunction(() => document.querySelector('iframe.prototype-frame')?.contentDocument?.body.innerText.includes('教师端已更新'));
+  await page.click('#playFlow');
+  await page.waitForFunction(() => document.querySelector('iframe.playback-frame')?.contentDocument?.body.innerText.includes('教师端已更新'));
+
+  await page.click('#closePlayback');
+  await page.click('[data-workspace-project="mobile"]');
+  await page.waitForFunction(() => document.querySelector('[data-workspace-project="mobile"]')?.getAttribute('aria-selected') === 'true');
+  await page.waitForFunction(() => document.querySelector('iframe.prototype-frame')?.contentDocument?.body.innerText.includes('适配前'));
+  assert.equal(await page.locator('iframe.prototype-frame').evaluate((frame) => frame.contentDocument.body.innerText.includes('教师端已更新')), false);
+
+  const relevantConsoleErrors = consoleErrors.filter((message) => (
+    !message.includes('uicdn.toast.com')
+    && !message.includes('Simulated local file read failure')
+  ));
   assert.equal(relevantConsoleErrors.length, 0, [...relevantConsoleErrors, ...failedResponses].join('\n'));
   console.log('local workspace browser preview gate passed');
 } finally {

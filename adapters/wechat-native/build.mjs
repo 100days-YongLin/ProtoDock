@@ -180,6 +180,18 @@ export function collectRoutes(appJson) {
   return [...new Set(routes)];
 }
 
+export function normalizePreviewDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+    throw new Error('previewDate must be an ISO 8601 date-time with an explicit timezone');
+  }
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    throw new Error('previewDate must be a valid ISO 8601 date-time');
+  }
+  return new Date(timestamp).toISOString();
+}
+
 async function main() {
   const args = parseArguments(process.argv.slice(2));
   if (!args.source || !args.output) {
@@ -188,7 +200,8 @@ async function main() {
 
   const source = path.resolve(args.source);
   const output = path.resolve(args.output);
-  const config = args.config ? JSON.parse(await readFile(path.resolve(args.config), 'utf8')) : {};
+  const rawConfig = args.config ? JSON.parse(await readFile(path.resolve(args.config), 'utf8')) : {};
+  const config = { ...rawConfig, previewDate: normalizePreviewDate(rawConfig.previewDate) };
   const appJson = JSON.parse(await readFile(path.join(source, 'app.json'), 'utf8'));
   const routes = collectRoutes(appJson);
   const pageMap = Object.fromEntries(routes.map((route) => [route, config.pages?.[route] || pageIdForRoute(route, config.pageIdPrefix || 'wx')]));
@@ -217,7 +230,14 @@ async function main() {
     );
     await normalizeCompiledCss(path.join(runtimeOutput, 'index.css'));
     await writeEntries({ appJson, config, fixtures, output, pageMap, routes, runtimeCollectionsByRoute, sourceStage });
-    const report = await buildReport({ source, stage: sourceStage, output, pageMap, routes });
+    const report = await buildReport({
+      source,
+      stage: sourceStage,
+      output,
+      pageMap,
+      routes,
+      previewDate: config.previewDate,
+    });
     await writeFile(path.join(output, '_wechat-adapter-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     assertCompatible(report);
@@ -457,6 +477,7 @@ async function writeEntries({ appJson, config, fixtures, output, pageMap, routes
       },
       storage: config.storage || {},
       fixtures,
+      previewDate: config.previewDate,
       scanResult: config.scanResult || '',
       fallbackPageId: config.fallbackPages?.[route] || null,
       query: config.query?.[route] || {},
@@ -489,7 +510,7 @@ function pageHtml(config) {
 `;
 }
 
-async function buildReport({ source, stage, pageMap, routes }) {
+async function buildReport({ source, stage, pageMap, routes, previewDate = null }) {
   const sourceFiles = await filesRecursively(stage, (file) => /\.(?:js|ts|wxml)$/i.test(file) && !file.includes(`${path.sep}__protodock${path.sep}`));
   const apiNames = new Set();
   const unsupportedTags = new Set();
@@ -511,6 +532,7 @@ async function buildReport({ source, stage, pageMap, routes }) {
   return {
     adapterVersion: '0.1.0',
     generatedAt: new Date().toISOString(),
+    previewDate,
     sourceCommit: commit,
     pageCount: routes.length,
     pages: routes.map((route) => ({ route, pageId: pageMap[route], entry: `${pageMap[route]}/index.html` })),

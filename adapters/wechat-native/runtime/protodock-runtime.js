@@ -1,10 +1,52 @@
 (function initProtoDockWechatRuntime(global) {
   const config = global.__PROTODOCK_WECHAT__ || {};
+  installPreviewClock(config.previewDate);
   const storage = new Map(Object.entries(config.storage || {}));
   const pageMap = config.pageMap || {};
   const fixtures = config.fixtures || {};
   const timers = new Set();
   let appDefinition = null;
+  let toastTimer = null;
+
+  function installPreviewClock(value) {
+    if (!value) return;
+    const NativeDate = global.Date;
+    const timestamp = NativeDate.parse(value);
+    if (!Number.isFinite(timestamp)) {
+      global.console.warn(`[ProtoDock WeChat] Invalid previewDate: ${value}`);
+      return;
+    }
+    function PreviewDate(...args) {
+      if (!new.target) return new NativeDate(timestamp).toString();
+      return Reflect.construct(NativeDate, args.length ? args : [timestamp], new.target);
+    }
+    Object.setPrototypeOf(PreviewDate, NativeDate);
+    Object.defineProperties(PreviewDate, {
+      now: { configurable: true, value: () => timestamp },
+      parse: { configurable: true, value: NativeDate.parse.bind(NativeDate) },
+      UTC: { configurable: true, value: NativeDate.UTC.bind(NativeDate) },
+      prototype: { value: NativeDate.prototype },
+    });
+    global.Date = PreviewDate;
+  }
+
+  function showVisibleToast(options = {}) {
+    const title = String(options.title || '').trim();
+    if (!title || !global.document?.documentElement) return;
+    global.clearTimeout(toastTimer);
+    global.document.querySelector('.protodock-wechat-toast')?.remove();
+    const element = global.document.createElement('div');
+    element.className = 'protodock-wechat-toast';
+    element.setAttribute('role', 'status');
+    element.setAttribute('aria-live', 'polite');
+    element.textContent = title;
+    global.document.documentElement.append(element);
+    const duration = Math.min(10000, Math.max(800, Number(options.duration) || 1500));
+    toastTimer = global.setTimeout(() => {
+      element.remove();
+      toastTimer = null;
+    }, duration);
+  }
 
   function later(callback, value) {
     const timer = global.setTimeout(() => {
@@ -131,6 +173,7 @@
       result(options, { ...response, errMsg: 'requestSubscribeMessage:ok' });
     },
     showToast(options) {
+      showVisibleToast(options);
       global.dispatchEvent(new CustomEvent('protodock:wechat-toast', { detail: options || {} }));
       result(options, { errMsg: 'showToast:ok' });
     },

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,6 +10,7 @@ import {
   collectPageRuntimeCollections,
   collectRoutes,
   normalizeCompiledCssContent,
+  normalizePreviewDate,
   pageIdForRoute,
   parseArguments,
 } from '../build.mjs';
@@ -91,23 +92,35 @@ test('runtime collection scan rejects non-empty instance initializers', () => {
   );
 });
 
+test('previewDate requires an explicit timezone and normalizes the instant', () => {
+  assert.equal(normalizePreviewDate(undefined), null);
+  assert.equal(normalizePreviewDate('2026-09-04T10:00:00+08:00'), '2026-09-04T02:00:00.000Z');
+  assert.throws(() => normalizePreviewDate('2026-09-04'), /explicit timezone/);
+  assert.throws(() => normalizePreviewDate('2026-09-04T10:00:00'), /explicit timezone/);
+});
+
 test('builds an interactive browser entry from a native mini program', { timeout: 30000 }, async () => {
   const output = await mkdtemp(path.join(os.tmpdir(), 'protodock-wechat-test-'));
+  const configPath = path.join(output, 'protodock.wechat.json');
+  await writeFile(configPath, JSON.stringify({ previewDate: '2026-09-04T10:00:00+08:00' }));
   await run(process.execPath, [
     path.join(ADAPTER_ROOT, 'build.mjs'),
     '--source', path.join(TEST_ROOT, 'fixtures', 'miniprogram'),
     '--output', output,
+    '--config', configPath,
   ]);
 
   const report = JSON.parse(await readFile(path.join(output, '_wechat-adapter-report.json'), 'utf8'));
   assert.equal(report.pageCount, 2);
   assert.equal(report.pages[0].pageId, 'wx-pages-index-index');
   assert.equal(report.pages[1].pageId, 'wx-packages-facebank-add-index');
+  assert.equal(report.previewDate, '2026-09-04T02:00:00.000Z');
   assert.deepEqual(report.compatibility.unsupportedWxApis, []);
   const html = await readFile(path.join(output, 'wx-pages-index-index', 'index.html'), 'utf8');
   assert.match(html, /protodock-bootstrap\.js/);
   assert.match(html, /pages\/index\/index/);
   assert.match(html, /"navigationBarTitleText":"适配器测试"/);
+  assert.match(html, /"previewDate":"2026-09-04T02:00:00\.000Z"/);
   assert.match(html, /"runtimeCollections":\[\]/);
 });
 

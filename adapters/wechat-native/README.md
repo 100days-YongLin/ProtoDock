@@ -27,6 +27,7 @@ node build.mjs \
     "pages/moments/list/index": "moments"
   },
   "fixtures": "fixtures/wechat.json",
+  "previewDate": "2026-09-04T10:00:00+08:00",
   "storage": {
     "token": "preview-token"
   },
@@ -42,6 +43,8 @@ node build.mjs \
 ```
 
 `fixtures` 可以直接写对象，也可以指向相对于配置文件的 JSON。请求键使用 `METHOD /path`；`*` 是兜底响应。适配器不会请求生产接口，未配置的请求会进入页面原有失败逻辑并在控制台给出明确提示。
+
+页面按“今天”请求 fixture 或展示相对日期时，配置带明确时区的 ISO 8601 `previewDate`。它会在业务 bundle 执行前固定无参数 `Date()`、`new Date()` 和 `Date.now()`；显式日期参数、`Date.parse` 与 `Date.UTC` 保持原生行为。未配置时使用浏览器真实时间。
 
 将报告中的 `pages[].entry` 登记到 `protodock.project.json`。正式验收至少实际操作一个输入或状态变化、一个前进路由、一个返回路径，并分别在本地 Player 与公开 Share 中检查资源和控制台。
 

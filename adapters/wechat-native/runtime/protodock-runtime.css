@@ -153,3 +153,23 @@ html[data-protodock-has-navbar="true"] body {
 html[data-protodock-tabbar-hidden="true"] .protodock-wechat-tabbar {
   display: none;
 }
+
+.protodock-wechat-toast {
+  position: fixed;
+  z-index: 10020;
+  top: 50%;
+  left: 50%;
+  max-width: min(78vw, 320px);
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  background: rgba(24, 24, 27, 0.9);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  transform: translate(-50%, -50%);
+}
