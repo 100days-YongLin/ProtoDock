@@ -21,4 +21,6 @@
   <input data-digit-probe="true" type="digit" value="36.5" />
   <slider data-slider-probe="true" min="36" max="39" step="0.1" value="36.5" activeColor="#ff7300" block-color="#ee6600" bindchanging="sliderChanging" bindchange="sliderChanged" />
   <text data-slider-events="true">{{sliderEvents}}</text>
+  <picker data-picker-probe="true" range="{{['same', 'same', 'other']}}" />
+  <view wx:for="{{report.items}}" wx:key="id" data-optional-list="true">{{item.label}}</view>
 </view>

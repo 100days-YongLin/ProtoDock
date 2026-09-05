@@ -86,8 +86,10 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     });
     const page = await browser.newPage({ viewport: { width: 430, height: 830 } });
     const propertyWarnings = [];
+    const listWarnings = [];
     page.on('console', (message) => {
       if (/is not a valid property/.test(message.text())) propertyWarnings.push(message.text());
+      if (/for-list data|keys are not unique/.test(message.text())) listWarnings.push(message.text());
     });
     const address = server.address();
     await page.goto(`http://127.0.0.1:${address.port}/wx-pages-index-index/index.html`, { waitUntil: 'networkidle' });
@@ -108,6 +110,13 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
     });
     await page.waitForFunction(() => document.querySelector('[data-slider-events]')?.textContent === 'changing:37.2;change:37.2;');
     assert.deepEqual(propertyWarnings, []);
+    assert.deepEqual(listWarnings, []);
+    assert.equal(await page.locator('[data-optional-list]').textContent(), 'ready');
+    assert.deepEqual(await page.locator('[data-picker-probe] option').allTextContents(), ['same', 'same', 'other']);
+    await page.evaluate(() => window.__PROTODOCK_WECHAT_ROOT__.get().setData({
+      report: { items: [{ id: 'duplicate', label: 'first' }, { id: 'duplicate', label: 'second' }] },
+    }));
+    assert.ok(listWarnings.some((message) => /keys are not unique/.test(message)), 'real duplicate keys must still warn');
 
     const clock = await page.evaluate(() => ({
       implicitIso: new Date().toISOString(),

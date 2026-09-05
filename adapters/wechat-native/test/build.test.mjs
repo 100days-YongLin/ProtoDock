@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { normalizeWxmlLists } from '../wxml-lists.mjs';
 import {
   assertCompatible,
   collectComponentStyleIsolation,
@@ -18,6 +19,14 @@ import {
 
 const TEST_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const ADAPTER_ROOT = path.dirname(TEST_ROOT);
+
+test('optional WXML lists normalize only nullish values in real attributes', () => {
+  const source = '<!-- <view wx:for="{{ignore}}" /> --><view wx:for="{{report.items}}" wx:key="id" /><text>unchanged</text>';
+  const output = normalizeWxmlLists(source);
+  assert.match(output, /wx:for="\{\{\(report.items\) == null \? \[\] : \(report.items\)\}\}"/);
+  assert.ok(output.startsWith('<!-- <view wx:for="{{ignore}}" /> -->'));
+  assert.ok(output.endsWith('<text>unchanged</text>'));
+});
 
 test('collectRoutes includes main and subpackage pages', () => {
   assert.deepEqual(collectRoutes({

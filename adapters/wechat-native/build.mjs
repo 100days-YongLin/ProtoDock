@@ -9,6 +9,7 @@ import postcss from 'postcss';
 import selectorParser from 'postcss-selector-parser';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
+import { normalizeWxmlLists } from './wxml-lists.mjs';
 
 const ADAPTER_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const RUNTIME_ROOT = path.join(ADAPTER_ROOT, 'runtime');
@@ -41,7 +42,7 @@ const COMPONENT_TEMPLATES = {
   'scroll-view': '<div class="pd-scroll"><slot /></div>\n',
   swiper: '<div class="pd-swiper"><slot /></div>\n',
   'swiper-item': '<div class="pd-swiper-item"><slot /></div>\n',
-  picker: '<div class="pd-picker"><slot /><select value="{{value}}" disabled="{{disabled}}" bindchange="onPickerChange"><option wx:for="{{displayRange}}" wx:key="index" value="{{index}}">{{item}}</option></select></div>\n',
+  picker: '<div class="pd-picker"><slot /><select value="{{value}}" disabled="{{disabled}}" bindchange="onPickerChange"><option wx:for="{{displayRange}}" value="{{index}}">{{item}}</option></select></div>\n',
   slider: '<input class="pd-slider" style="accent-color: {{activeColor}}; --pd-slider-thumb: {{blockColor}}" type="range" min="{{min}}" max="{{max}}" step="{{step}}" value="{{value}}" disabled="{{disabled}}" bindinput="onSliderChanging" bindchange="onSliderChange" />\n',
   video: '<video class="pd-control" src="{{resolvedSrc}}" poster="{{resolvedPoster}}" controls="{{controls}}"></video>\n',
   'rich-text': '<div class="pd-rich-text">{{displayText}}</div>\n',
@@ -225,6 +226,11 @@ async function main() {
     const includeNativeShims = config.nativeComponentShims !== false;
     if (includeNativeShims) await installNativeComponents(sourceStage);
     await patchComponentMappings(sourceStage, includeNativeShims);
+    for (const file of await filesRecursively(sourceStage, (file) => file.endsWith('.wxml'))) {
+      const sourceTemplate = await readFile(file, 'utf8');
+      const normalizedTemplate = normalizeWxmlLists(sourceTemplate);
+      if (normalizedTemplate !== sourceTemplate) await writeFile(file, normalizedTemplate);
+    }
     await mkdir(output, { recursive: true });
     const runtimeCollectionsByRoute = await normalizePageRuntimeCollections(sourceStage, routes);
     await runWebpack(stage, runtimeOutput);

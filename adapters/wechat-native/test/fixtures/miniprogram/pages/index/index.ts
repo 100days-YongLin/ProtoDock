@@ -3,6 +3,9 @@ export default Page({
     message: '适配前',
     sliderEvents: ''
   },
+  onReady() {
+    this.setData({ report: { items: [{ id: 'one', label: 'ready' }] } });
+  },
   sliderChanging(event) {
     this.setData({ sliderEvents: this.data.sliderEvents + 'changing:' + event.detail.value + ';' });
   },
