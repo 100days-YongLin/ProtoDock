@@ -29,7 +29,7 @@
   const findWechatFormHost = (element) => {
     let current = element;
     while (current) {
-      if (current.matches?.('wx-input, wx-textarea, wx-picker')) return current;
+      if (current.matches?.('wx-input, wx-textarea, wx-picker, wx-slider')) return current;
       const rootNode = current.getRootNode?.();
       current = current.parentElement || (rootNode instanceof ShadowRoot ? rootNode.host : null);
     }
@@ -45,7 +45,9 @@
           window.setTimeout(() => {
             if (event.__protodockWechatHandled) return;
             const host = findWechatFormHost(element);
-            (host?.__wxElement || element.__wxElement)?.triggerEvent?.(eventName, { value });
+            const isSlider = host?.matches('wx-slider');
+            const bridgedEventName = isSlider && eventName === 'input' ? 'changing' : eventName;
+            (host?.__wxElement || element.__wxElement)?.triggerEvent?.(bridgedEventName, { value: isSlider ? Number(value) : value });
           }, 0);
         });
       }

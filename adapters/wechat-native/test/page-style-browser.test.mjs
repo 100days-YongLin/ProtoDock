@@ -85,11 +85,29 @@ test('page styles and variables reach the real glass-easel root', { timeout: 450
         || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined),
     });
     const page = await browser.newPage({ viewport: { width: 430, height: 830 } });
+    const propertyWarnings = [];
+    page.on('console', (message) => {
+      if (/is not a valid property/.test(message.text())) propertyWarnings.push(message.text());
+    });
     const address = server.address();
     await page.goto(`http://127.0.0.1:${address.port}/wx-pages-index-index/index.html`, { waitUntil: 'networkidle' });
     await page.waitForSelector('wx-glass-easel-root [data-style-probe="panel"]');
     await page.waitForSelector('.protodock-wechat-tabbar');
     await page.waitForFunction(() => Number(document.querySelector('[data-viewport-height]')?.getAttribute('data-viewport-height')) > 0);
+    const digit = page.locator('[data-digit-probe] input');
+    assert.equal(await digit.getAttribute('type'), 'number');
+    assert.equal(await digit.getAttribute('inputmode'), 'decimal');
+    assert.equal(await digit.inputValue(), '36.5');
+    const slider = page.locator('[data-slider-probe] input');
+    assert.equal(await slider.evaluate((element) => getComputedStyle(element).accentColor), 'rgb(255, 115, 0)');
+    assert.equal(await slider.evaluate((element) => getComputedStyle(element).getPropertyValue('--pd-slider-thumb').trim()), '#ee6600');
+    await slider.evaluate((element) => {
+      element.value = '37.2';
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForFunction(() => document.querySelector('[data-slider-events]')?.textContent === 'changing:37.2;change:37.2;');
+    assert.deepEqual(propertyWarnings, []);
 
     const clock = await page.evaluate(() => ({
       implicitIso: new Date().toISOString(),

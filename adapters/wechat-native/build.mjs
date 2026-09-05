@@ -36,13 +36,13 @@ const COMPONENT_TEMPLATES = {
   text: '<slot />\n',
   image: '<img class="pd-control pd-image-{{mode}}" src="{{resolvedSrc}}" alt="{{alt}}" />\n',
   button: '<button class="pd-control" disabled="{{disabled}}"><slot /></button>\n',
-  input: '<input class="pd-control" value="{{value}}" placeholder="{{placeholder}}" disabled="{{disabled}}" type="{{password ? \'password\' : \'text\'}}" bindinput="onInput" bindchange="onChange" bindfocus="onFocus" bindblur="onBlur" />\n',
+  input: '<input class="pd-control" value="{{value}}" placeholder="{{placeholder}}" disabled="{{disabled}}" type="{{password ? \'password\' : type === \'number\' || type === \'digit\' ? \'number\' : \'text\'}}" inputmode="{{type === \'digit\' ? \'decimal\' : type === \'number\' ? \'numeric\' : \'text\'}}" step="any" bindinput="onInput" bindchange="onChange" bindfocus="onFocus" bindblur="onBlur" />\n',
   textarea: '<textarea class="pd-control" value="{{value}}" placeholder="{{placeholder}}" disabled="{{disabled}}" bindinput="onInput" bindchange="onChange" bindfocus="onFocus" bindblur="onBlur"></textarea>\n',
   'scroll-view': '<div class="pd-scroll"><slot /></div>\n',
   swiper: '<div class="pd-swiper"><slot /></div>\n',
   'swiper-item': '<div class="pd-swiper-item"><slot /></div>\n',
   picker: '<div class="pd-picker"><slot /><select value="{{value}}" disabled="{{disabled}}" bindchange="onPickerChange"><option wx:for="{{displayRange}}" wx:key="index" value="{{index}}">{{item}}</option></select></div>\n',
-  slider: '<input class="pd-slider" type="range" min="{{min}}" max="{{max}}" step="{{step}}" value="{{value}}" disabled="{{disabled}}" bindinput="onSliderChange" bindchange="onSliderChange" />\n',
+  slider: '<input class="pd-slider" style="accent-color: {{activeColor}}; --pd-slider-thumb: {{blockColor}}" type="range" min="{{min}}" max="{{max}}" step="{{step}}" value="{{value}}" disabled="{{disabled}}" bindinput="onSliderChanging" bindchange="onSliderChange" />\n',
   video: '<video class="pd-control" src="{{resolvedSrc}}" poster="{{resolvedPoster}}" controls="{{controls}}"></video>\n',
   'rich-text': '<div class="pd-rich-text">{{displayText}}</div>\n',
   canvas: '<canvas class="pd-control"></canvas>\n',
@@ -66,7 +66,7 @@ function markNativeEventHandled(event) {
 }
 export default Component({
   properties: {
-    value: null, placeholder: String, placeholderClass: String, disabled: Boolean, password: Boolean,
+    value: null, type: String, placeholder: String, placeholderClass: String, disabled: Boolean, password: Boolean,
     maxlength: Number, confirmType: String, confirmHold: Boolean, cursor: Number,
     selectionStart: Number, selectionEnd: Number, adjustPosition: Boolean, holdKeyboard: Boolean,
     role: String, ariaLabel: String, ariaHidden: Boolean, ariaDisabled: Boolean, ariaChecked: Boolean, ariaExpanded: Boolean, ariaPressed: Boolean, ariaBusy: Boolean, ariaLive: String,
@@ -111,9 +111,12 @@ export default Component({
 `.trimStart(),
   slider: `
 export default Component({
-  properties: { min: { type: Number, value: 0 }, max: { type: Number, value: 100 }, step: { type: Number, value: 1 }, value: Number, disabled: Boolean },
+  properties: { min: { type: Number, value: 0 }, max: { type: Number, value: 100 }, step: { type: Number, value: 1 }, value: Number, disabled: Boolean, activeColor: { type: String, value: '#1aad19' }, blockColor: { type: String, value: '#ffffff' } },
   data: {},
-  methods: { onSliderChange(event) { this.triggerEvent('change', { value: Number(event?.detail?.value ?? event?.target?.value ?? 0) }); } },
+  methods: {
+    onSliderChanging(event) { if (event?.originalEvent) event.originalEvent.__protodockWechatHandled = true; this.triggerEvent('changing', { value: Number(event?.detail?.value ?? event?.originalEvent?.target?.value ?? event?.target?.value ?? 0) }); },
+    onSliderChange(event) { if (event?.originalEvent) event.originalEvent.__protodockWechatHandled = true; this.triggerEvent('change', { value: Number(event?.detail?.value ?? event?.originalEvent?.target?.value ?? event?.target?.value ?? 0) }); },
+  },
 });
 `.trimStart(),
   'rich-text': `
@@ -137,7 +140,7 @@ const COMPONENT_STYLES = {
   swiper: ':host{display:block;overflow:hidden;box-sizing:border-box}.pd-swiper{display:flex;width:100%;height:100%;overflow:auto;scroll-snap-type:x mandatory}\n',
   'swiper-item': ':host{display:block;flex:0 0 100%;box-sizing:border-box;scroll-snap-align:start}.pd-swiper-item{width:100%;height:100%}\n',
   picker: ':host{display:block;box-sizing:border-box}.pd-picker{position:relative;width:100%;height:100%}.pd-picker>select{position:absolute;inset:0;width:100%;height:100%;opacity:0}\n',
-  slider: ':host{display:block;box-sizing:border-box}.pd-slider{width:100%;height:100%;margin:0}\n',
+  slider: ':host{display:block;box-sizing:border-box}.pd-slider{width:100%;height:100%;margin:0}.pd-slider::-webkit-slider-thumb{background:var(--pd-slider-thumb)}.pd-slider::-moz-range-thumb{background:var(--pd-slider-thumb)}\n',
   video: ':host{display:block;box-sizing:border-box}.pd-control{display:block;width:100%;height:100%;object-fit:contain}\n',
   'rich-text': ':host{display:block;box-sizing:border-box}.pd-rich-text{white-space:pre-wrap}\n',
   canvas: ':host{display:block;box-sizing:border-box}.pd-control{display:block;width:100%;height:100%}\n',
