@@ -1054,6 +1054,23 @@ async function createShareArchive(options = {}) {
   });
 }
 
+let workspaceReleasePlan = null;
+
+async function createWorkspaceShareArchive(options = {}) {
+  if (!state.workspace || hasUnsavedProjectChanges()) throw new Error('请先保存当前端及共享文档，再发布工作区');
+  await checkExternalManifestChange('manual');
+  workspaceReleasePlan = await window.ProtoDockWorkspaceRelease.prepare(state.workspace, options.release, collectShareFiles, options.onProgress);
+  return workspaceReleasePlan.archive;
+}
+
+async function finalizeWorkspacePublishedVersion() {
+  if (hasUnsavedProjectChanges() || state.workspace !== workspaceReleasePlan?.workspace) throw new Error('发布期间工作区已改变，本地记录未写回');
+  await window.ProtoDockWorkspaceRelease.finalize(workspaceReleasePlan);
+  const handle = state.workspace.rootHandle;
+  workspaceReleasePlan = null;
+  await loadLocalWorkspaceHandle(handle);
+}
+
 async function finalizePublishedVersion(release) {
   if (!state.manifest || state.readOnly || !state.manifestHandle) {
     throw new Error('当前项目没有本地清单写入权限');
@@ -5485,6 +5502,8 @@ window.ProtoDock = {
   readProjectLocalSettings,
   writeProjectLocalSettings,
   createShareArchive,
+  createWorkspaceShareArchive,
+  finalizeWorkspacePublishedVersion,
   finalizePublishedVersion,
   copySelectedPagePng,
   openFullProductDocument,

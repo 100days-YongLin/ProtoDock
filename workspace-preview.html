@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProtoDock · 工作区版本</title>
+  <link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor-viewer.min.css">
+  <link rel="stylesheet" href="/workspace-preview.css">
+</head>
+<body>
+  <header><div><strong id="workspaceName">正在读取工作区…</strong><span id="releaseVersion"></span></div><nav id="endpointTabs" aria-label="产品端切换"></nav><button id="openRelease" type="button">版本更新</button><button id="openShared" type="button">共享产品文档</button><a id="latestVersion">最新版本</a></header>
+  <p id="workspaceError" role="alert" hidden></p>
+  <iframe id="endpointPreview" title="产品文档与原型"></iframe>
+  <dialog id="sharedDialog"><header><strong>共享产品文档</strong><button id="closeShared" type="button">关闭</button></header><nav id="sharedTabs" aria-label="共享文档切换"></nav><article id="sharedContent"></article></dialog>
+  <script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-viewer.min.js"></script>
+  <script src="/workspace-preview.js"></script>
+</body></html>

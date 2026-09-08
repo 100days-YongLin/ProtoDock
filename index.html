@@ -624,8 +624,12 @@
       <section class="workspace-publish-snapshot" id="workspacePublishSnapshot" hidden>
         <header>
           <strong>产品工作区快照</strong>
-          <span>本次只发布当前端，共享文档随版本固化。</span>
+          <span id="workspacePublishHint">全部端与共享文档固化为同一版本，分享页可切换各端。</span>
         </header>
+        <div>
+          <label for="publishScope">发布范围</label>
+          <select id="publishScope"><option value="workspace">整个工作区</option><option value="project">仅当前端</option></select>
+        </div>
         <div>
           <span>当前原型</span>
           <strong id="workspacePublishProject">-</strong>
@@ -760,6 +764,7 @@
   <script src="./product-workspace.js?v=1"></script>
   <script src="./sidebar-sections.js?v=1"></script>
   <script src="./project-changelog.js?v=8"></script>
+  <script src="./workspace-release.js"></script>
   <script src="./page-change-details.js"></script>
   <script src="./workspace-version-history.js?v=2"></script>
   <script src="./page-change-editor.js"></script>
@@ -768,8 +773,8 @@
   <script src="./local-preview-assets.js?v=2"></script>
   <script src="./product-document-cache.js?v=4"></script>
   <script src="./product-document.js?v=8"></script>
-  <script src="./app.js?v=25"></script>
+  <script src="./app.js?v=26"></script>
   <script src="./project-name.js"></script>
-  <script src="./share.js?v=12"></script>
+  <script src="./share.js?v=13"></script>
 </body>
 </html>

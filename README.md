@@ -163,9 +163,11 @@ product-workspace/
 - 左侧“共享产品文档”和“画布规格”可以独立收起；偏好只保存在当前浏览器，不写入工作区、项目 manifest 或 Canvas 状态。
 - `shared-docs/` 第一版只读取目录直属的 `.md` 文件，按文件名排序；一级标题作为文档名。跨端角色权限、公共业务规则、共享数据口径和术语只写一次，不复制进各端页面 PRD。
 - “完整产品文档”与公开 Share 产品文档都按“共享产品文档 → 当前端页面 PRD”汇总。它不建立功能数据库、跨端 Canvas 或额外关系图。
-- 发布仍以当前端为单位。发布包在 `docs/_shared/` 固化共享文档快照，并把 `workspaceSnapshot` 写入发布清单；不会修改子项目源目录。公开标识使用 `<产品标识>-<端标识>` 避免不同端互相覆盖，各端共用 `product.version` 作为产品发布版本。
-- 发布成功后，ProtoDock 同时把版本写回工作区 `product.version` 和当前端 `changelog`。若同一产品版本包含多个端的变化，应依次发布这些端并使用同一个版本号。
-- 使用 `scripts/protodock-validate <product-workspace>` 可一次验证工作区清单、共享文档目录和所有子项目；发布前仍需对每个最终 ZIP 单独执行同一校验。
+- 打开工作区后，发布弹窗默认选择“整个工作区”，也可选择“仅当前端”。整工作区会把全部端与共享文档固化为同一版本；公开入口 `/w/<产品标识>/<版本>` 支持切换各端，集中展示共享文档与版本说明。`/w/<产品标识>/latest` 打开时解析并锁定一个版本，阅读期间不会混入其他版本。
+- 整工作区发布会先校验全部端，成功后再更新最新版入口；任一端校验或 Git 推送失败均不改变原最新版。已存在的版本只允许相同内容重试，重试旧版本不会把最新版入口回退。单端发布仍使用 `/s/<产品标识>-<端标识>/<版本>`。
+- 发布包在各端 `docs/_shared/` 和 `workspaceSnapshot` 固化共享文档，不向子项目源目录复制这些快照。整工作区成功后才写回工作区 `product.version` 与全部端 `changelog`，并清空对应待发布记录。没有待发布修改的端记为随版本归档，不生成虚构的页面变更。若发布期间本地文件被其他工具修改，公开版本保留成功状态，本地写回停止并提示核对。
+- 整工作区可同步到 GitHub 的 `project/workspace-<产品标识>` 分支与 `release/workspace-<产品标识>/<版本>` Tag。它与单端发布命名空间独立，不会覆盖单端发布内容。
+- 使用 `scripts/protodock-validate <product-workspace>` 可一次验证工作区清单、共享文档目录和所有子项目。整工作区上传由 `workspace_publish.py` 逐端调用同一发布校验器；外层包由 `workspace-release.js` 构建，不应当作单端 ZIP 交给校验器。
 - 工作区校验会额外提示核心协作文档、必要章节、端 README、页面 `关联共享契约` 和嵌套 Git 仓库问题。为保留旧版兼容，这些默认是升级警告；新工作区和 CI 可使用 `--workspace-contracts-as-errors` 只阻断协作契约问题，不受“尚未首次发布”等普通提示影响。
 - 工作区是单项目能力的外层编排：本地打开、变更检测、页面树、搜索、分组、Canvas、PRD 编辑、可操作预览、跨页与返回、截图、设备壳、完整产品文档、打印/PDF、全屏演示、公开 Share、GitHub 发布、最新版链接、飞书通知和变更历史继续复用原能力。没有 `protodock.workspace.json` 时不进入任何工作区分支。
 
@@ -304,6 +306,8 @@ http://localhost:4175/index.html
 脚本会运行 `mint validate` 和 `mint export`，并把导出包解压到 `docs-dist/`。`docs-dist/` 是生成产物，不进入 git；当目录存在时，内置 Python 服务会把 `/docs`、Mintlify 页面路由和 `_next` 资源指向这份导出结果。
 
 ## 统一发布服务
+
+工作区发布复用 `POST /api/publish` 的 multipart 接口，额外传入 `scope=workspace`；省略时仍按单项目处理。`archive` 根目录只包含 `protodock.workspace.json` 和 `projects/<端标识>.zip`，每个内层包是独立的标准项目 ZIP。`productName`、`version`、`commitMessage` 与可选的 `syncGithub` 沿用发布弹窗字段。服务端保存规范化的工作区目录及只读 `release.json`，公开资源位于 `/workspace-assets/<产品标识>/<版本>/`。整工作区阅读页提供各端 PRD 与原型；当前不提供工作区 Canvas 或整工作区服务端 PDF，单端原有发布功能不受影响。
 
 如果需要让同事通过 URL 只读预览项目，可以启动内置 Python 服务：
 

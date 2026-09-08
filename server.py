@@ -97,6 +97,7 @@ PRIVATE_ROOT_NAMES = {
     "docs-dist",
 }
 PRIVATE_STATIC_FILES = {
+    "workspace_publish.py",
     "server.py",
     "pdf_service.py",
     "pdf_renderer.py",
@@ -1627,7 +1628,22 @@ def open_project_from_github(repo_url: str, branch: str, project_path: str) -> d
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
-def push_project_to_github(project_dir: Path, product_name: str, version: str, commit_message: str) -> dict:
+def copy_workspace_to_delivery(source: Path, destination: Path) -> None:
+    # Source has already passed the workspace ZIP allowlist and every endpoint validator.
+    for child in destination.iterdir():
+        if child.name == ".git":
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+    shutil.copy2(source / "protodock.workspace.json", destination / "protodock.workspace.json")
+    shutil.copy2(source / "release.json", destination / "release.json")
+    shutil.copytree(source / "projects", destination / "projects")
+    shutil.copytree(source / "shared-docs", destination / "shared-docs")
+
+
+def push_project_to_github(project_dir: Path, product_name: str, version: str, commit_message: str, workspace: bool = False) -> dict:
     if not GITHUB_REPO_URL:
         raise ProtoDockError(HTTPStatus.BAD_REQUEST, "服务器未配置 PROTODOCK_GITHUB_REPO")
 
@@ -1645,7 +1661,7 @@ def push_project_to_github(project_dir: Path, product_name: str, version: str, c
             author_name=GITHUB_AUTHOR_NAME,
             author_email=GITHUB_AUTHOR_EMAIL,
             remote_context=github_git_context,
-            copy_project=copy_project_to_workspace,
+            copy_project=copy_workspace_to_delivery if workspace else copy_project_to_workspace,
             timeout=GITHUB_PUSH_TIMEOUT_SECONDS,
         )
     except GitDeliveryError as error:
@@ -1876,6 +1892,10 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
         try:
             parsed = urlparse(self.path)
             path = parsed.path
+            import workspace_publish
+            import sys
+            if workspace_publish.route(self, sys.modules[__name__], path):
+                return
             if path == "/api/health":
                 self.send_json(HTTPStatus.OK, {"ok": True, "service": "protodock"})
                 return
@@ -1983,6 +2003,15 @@ class ProtoDockHandler(BaseHTTPRequestHandler):
 
         SHARES_DIR.mkdir(parents=True, exist_ok=True)
         temp_dir = Path(tempfile.mkdtemp(prefix=".publish-upload-", dir=SHARES_DIR))
+        if fields.get("scope") == "workspace":
+            import workspace_publish
+            import sys
+            shutil.rmtree(temp_dir)
+            result = workspace_publish.publish(sys.modules[__name__], archive, fields)
+            result["url"] = self.absolute_url(result["path"])
+            result["latestUrl"] = self.absolute_url(result["latestPath"])
+            self.send_json(HTTPStatus.OK, result)
+            return
         try:
             validation = safe_extract_project_zip(archive, temp_dir)
             validate_publish_release(temp_dir, fields.get("version", ""))

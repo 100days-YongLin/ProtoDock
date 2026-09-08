@@ -27,6 +27,8 @@
     workspaceSnapshot: document.getElementById('workspacePublishSnapshot'),
     workspaceProject: document.getElementById('workspacePublishProject'),
     workspaceDocs: document.getElementById('workspacePublishDocs'),
+    scope: document.getElementById('publishScope'),
+    workspaceHint: document.getElementById('workspacePublishHint'),
     manualUpload: document.getElementById('shareManualUpload'),
     dropzone: document.getElementById('shareDropZone'),
     dropHint: document.getElementById('shareDropHint'),
@@ -149,10 +151,25 @@
   }
 
   function publishTargets() {
-    return window.ProtoDockPublishTargets?.build?.({
+    const targets = window.ProtoDockPublishTargets?.build?.({
       product: els.product?.value,
       version: els.version?.value
     }) || {};
+    if (workspaceScope() && targets.reference) {
+      const product = String(els.product.value).trim();
+      const version = String(els.version.value).trim();
+      return { ...targets, branch: `project/workspace-${product}`, tag: `release/workspace-${product}/${version}`, currentPath: `/w/${product}/${version}`, latestPath: `/w/${product}/latest` };
+    }
+    return targets;
+  }
+
+  function workspaceScope() {
+    return uploadSource() === 'auto' && !!protoDockState().workspaceProductId && els.scope?.value === 'workspace';
+  }
+
+  function preferenceId() {
+    const state = protoDockState();
+    return workspaceScope() ? `workspace:${state.workspaceProductId}` : state.publishPreferenceId || state.projectId;
   }
 
   function syncGithubEnabled() {
@@ -179,7 +196,7 @@
 
   function preparePublishTarget() {
     const state = protoDockState();
-    const projectId = state.publishPreferenceId || state.projectId || null;
+    const projectId = preferenceId() || null;
     if (formProjectId === projectId) {
       return;
     }
@@ -192,7 +209,7 @@
       inferredVersion: state.currentVersion
     }) || '';
     if (els.product) {
-      els.product.value = target.productName || state.publishProductId || '';
+      els.product.value = target.productName || (workspaceScope() ? state.workspaceProductId : state.publishProductId) || '';
     }
     if (els.version) {
       els.version.value = initialBranchValue(previousVersion, '');
@@ -288,7 +305,7 @@
       els.autoPanel.hidden = !usingAuto;
     }
     if (els.autoTitle && usingAuto) {
-      els.autoTitle.textContent = '自动打包当前项目';
+      els.autoTitle.textContent = workspaceScope() ? '自动打包整个工作区' : '自动打包当前项目';
     }
     if (els.autoDescription && usingAuto) {
       const state = protoDockState();
@@ -303,11 +320,15 @@
     }
     const state = protoDockState();
     const hasWorkspace = !!state.workspaceProductName && !!state.publishProductId;
+    if (els.scope) els.scope.disabled = isPublishing;
+    if (els.workspaceHint) els.workspaceHint.textContent = workspaceScope()
+      ? '全部端与共享文档固化为同一版本，分享页可切换各端。'
+      : '仅发布当前端，共享文档随本端版本固化。';
     if (els.workspaceSnapshot) {
       els.workspaceSnapshot.hidden = !hasWorkspace || !usingAuto;
     }
     if (els.workspaceProject) {
-      els.workspaceProject.textContent = state.workspaceProjectName || state.projectName || '-';
+      els.workspaceProject.textContent = workspaceScope() ? `${state.workspaceProductName} · 全部端` : state.workspaceProjectName || state.projectName || '-';
     }
     if (els.workspaceDocs) {
       els.workspaceDocs.textContent = `${state.workspaceSharedDocumentCount || 0} 份`;
@@ -654,7 +675,7 @@
     }
     const state = protoDockState();
     latestPublishSummary = window.ProtoDockPublishSummary?.build?.({
-      projectName: state.projectName || els.product?.value,
+      projectName: payload.workspace ? state.workspaceProductName : state.projectName || els.product?.value,
       version: els.version?.value,
       updateContent: els.commitMessage?.value || state.currentChangeDescription,
       shareUrl,
@@ -664,7 +685,7 @@
     }) || '';
     latestPublishDetails = {
       webhook: feishuWebhook,
-      projectName: state.projectName || els.product?.value || '',
+      projectName: payload.workspace ? state.workspaceProductName : state.projectName || els.product?.value || '',
       version: els.version?.value || '',
       publishedAt: new Date().toISOString(),
       updateContent: els.commitMessage?.value || state.currentChangeDescription || '',
@@ -788,6 +809,7 @@
       description: updateDescription
     };
 
+    const publishWorkspace = workspaceScope();
     isPublishing = true;
     updateState();
     resetProgress();
@@ -801,7 +823,7 @@
 
     try {
       const archiveFile = source === 'auto'
-        ? await window.ProtoDock.createShareArchive({ onProgress: setArchiveProgress, release })
+        ? await (publishWorkspace ? window.ProtoDock.createWorkspaceShareArchive : window.ProtoDock.createShareArchive)({ onProgress: setArchiveProgress, release })
         : selectedFile;
       const body = new FormData();
       body.append('archive', archiveFile, archiveFile.name || 'protodock-project.zip');
@@ -809,6 +831,7 @@
       body.append('version', release.version);
       body.append('syncGithub', String(syncGithubEnabled()));
       body.append('commitMessage', release.description);
+      if (publishWorkspace) body.append('scope', 'workspace');
       setProgress(0);
       setStatus('正在上传发布包...');
       const uploadEndpoint = await loadUploadEndpoint();
@@ -823,7 +846,7 @@
         setStatus('高速通道不可用，正在切换普通通道...');
         payload = await uploadArchive(body, currentUploadEndpoint());
       }
-      window.ProtoDockGithubPreferences?.setPushTarget?.(protoDockState().publishPreferenceId || protoDockState().projectId, {
+      window.ProtoDockGithubPreferences?.setPushTarget?.(preferenceId(), {
         productName: els.product.value,
         version: els.version.value,
         syncGithub: githubConfig?.configured ? !!els.syncGithub?.checked : true
@@ -833,7 +856,8 @@
       let localFinalizeWarning = '';
       if (source === 'auto') {
         try {
-          await window.ProtoDock.finalizePublishedVersion(release);
+          if (publishWorkspace) await window.ProtoDock.finalizeWorkspacePublishedVersion();
+          else await window.ProtoDock.finalizePublishedVersion(release);
         } catch (error) {
           localFinalizeWarning = `；公开版本已成功，但本地版本记录未写回：${error.message || '无法写入项目清单'}`;
           console.warn('ProtoDock: published snapshot could not be finalized locally', error);
@@ -931,6 +955,7 @@
     els.open?.addEventListener('click', openModal);
   }
   [els.product, els.version, els.commitMessage].forEach((input) => input?.addEventListener('input', updateState));
+  els.scope?.addEventListener('change', () => { preparePublishTarget(); fillDefaults(); updateState(); });
   els.syncGithub?.addEventListener('change', () => {
     syncPreferenceApplied = true;
     updateState();

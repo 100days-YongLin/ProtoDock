@@ -619,6 +619,7 @@
   }
 
   async function downloadServerPdf() {
+    if (state.workspaceRelease) return false;
     const statusPath = window.ProtoDockShareReference?.pdfPath?.(state.shareId, '/status');
     const pdfPath = window.ProtoDockShareReference?.pdfPath?.(state.shareId);
     if (!statusPath || !pdfPath || !window.ProtoDockPdfExport?.waitForReady) {
@@ -1065,6 +1066,17 @@
   }
 
   async function init() {
+    const query = new URLSearchParams(location.search);
+    const workspace = query.get('workspace');
+    const endpoint = query.get('endpoint');
+    const validPart = value => /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value || '') && !value.includes('..') && value !== 'latest';
+    if (workspace && workspace.split('/').length === 2 && workspace.split('/').every(validPart) && validPart(endpoint)) {
+      state.workspaceRelease = true;
+      state.shareId = workspace;
+      state.shareBaseUrl = new URL(`/workspace-assets/${workspace}/projects/${endpoint}/`, location.origin).toString();
+      els.canvasLink.hidden = true;
+      els.downloadLink.hidden = true;
+    } else {
     state.shareId = shareIdFromLocation();
     if (!state.shareId) {
       renderError('分享链接缺少有效的项目编号。');
@@ -1073,6 +1085,7 @@
     state.shareBaseUrl = new URL(window.ProtoDockShareReference.assetBasePath(state.shareId), window.location.origin).toString();
     els.canvasLink.href = window.ProtoDockShareReference.sharePath(state.shareId, '/canvas');
     els.downloadLink.href = window.ProtoDockShareReference.downloadPath(state.shareId);
+    }
     try {
       const response = await fetch(projectFileUrl(MANIFEST_FILE), { cache: 'no-store' });
       if (!response.ok) {
@@ -1085,7 +1098,7 @@
         response.headers.get('content-length') || '',
         JSON.stringify(state.manifest)
       ].join('|');
-      state.sharedDocuments = Array.isArray(state.manifest.workspaceSnapshot?.sharedDocs)
+      state.sharedDocuments = !state.workspaceRelease && Array.isArray(state.manifest.workspaceSnapshot?.sharedDocs)
         ? state.manifest.workspaceSnapshot.sharedDocs.map((document) => ({
           id: String(document.id || ''),
           title: String(document.title || document.id || '共享文档'),
