@@ -221,10 +221,16 @@
             <strong>${escapeHtml(entry.version)}</strong>
           </div>
           <p>${escapeHtml(entry.description)}</p>
+          ${entry.pageChanges?.length ? `<details class="release-page-details"><summary>页面变更明细（${entry.pageChanges.length}）</summary>${window.ProtoDockPageChanges.render(entry.pageChanges, {id:manifest.project.id, manifest})}</details>` : ''}
           ${index === 0 ? '<span>当前</span>' : ''}
         </li>
       `).join('')
       : '<li class="is-empty">尚无正式发布记录，下一次在 ProtoDock 发布项目后生成。</li>';
+    els.coverChangeLogList.onclick = event => {
+      const button = event.target.closest('[data-history-page]');
+      if (button) navigateToPage(button.dataset.historyPage);
+    };
+    els.coverChangeLogList.querySelectorAll('[data-history-page]').forEach(button => {button.textContent='打开本文页面与 PRD';});
   }
 
   function renderStructure() {

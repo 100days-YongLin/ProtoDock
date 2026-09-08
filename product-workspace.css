@@ -179,6 +179,17 @@
   }
 }
 
+.page-change-item { border: 1px solid #e4e4e7; border-radius: 8px; padding: 12px; margin: 10px 0; overflow-wrap: anywhere; }
+.page-change-item header { display: flex; justify-content: space-between; gap: 8px; }
+.page-change-item header span { color: #71717a; flex-shrink: 0; }
+.page-change-item dd { margin: 4px 0 12px; white-space: pre-wrap; }
+.page-change-item dt { font-weight: 600; }
+.history-comparison label, .page-change-editor label { display: grid; gap: 5px; margin: 10px 0; }
+.history-comparison select, .page-change-editor input, .page-change-editor textarea, .page-change-editor select { width: 100%; min-width: 0; padding: 8px; border: 1px solid #d4d4d8; border-radius: 6px; font: inherit; box-sizing: border-box; }
+.page-change-editor { border: 1px solid #d4d4d8; border-radius: 8px; margin: 12px 0; min-width: 0; }
+.page-change-editor label[hidden] { display: none; }
+.change-log-modal { max-height: 90vh; overflow-y: auto; }
+
 @media (max-width: 760px) {
   .workspace-project-switcher {
     order: 4;

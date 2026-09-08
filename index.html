@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="./styles.css?v=14">
   <link rel="stylesheet" href="./canvas-groups.css?v=4">
   <link rel="stylesheet" href="./canvas-minimap.css">
-  <link rel="stylesheet" href="./product-workspace.css?v=4">
+  <link rel="stylesheet" href="./product-workspace.css?v=5">
 </head>
 <body>
   <main class="app">
@@ -427,6 +427,7 @@
           <span>前后端逻辑（可选，每行一项）</span>
           <textarea id="changeLogTechnicalDescription" maxlength="600" rows="3" placeholder="例如：保存后同步刷新周报状态，失败时保留已填写内容"></textarea>
         </label>
+        <details><summary>页面变更明细（可选）</summary><div id="changeLogPageChanges"></div></details>
         <span class="field-message" id="changeLogMessage" aria-live="polite"></span>
       </div>
 
@@ -758,9 +759,11 @@
   <script src="./project-drop.js?v=2"></script>
   <script src="./product-workspace.js?v=1"></script>
   <script src="./sidebar-sections.js?v=1"></script>
-  <script src="./project-changelog.js?v=7"></script>
-  <script src="./workspace-version-history.js"></script>
-  <script src="./project-changelog-dialog.js?v=4"></script>
+  <script src="./project-changelog.js?v=8"></script>
+  <script src="./page-change-details.js"></script>
+  <script src="./workspace-version-history.js?v=2"></script>
+  <script src="./page-change-editor.js"></script>
+  <script src="./project-changelog-dialog.js?v=5"></script>
   <script src="./local-resource-paths.js?v=1"></script>
   <script src="./local-preview-assets.js?v=2"></script>
   <script src="./product-document-cache.js?v=4"></script>

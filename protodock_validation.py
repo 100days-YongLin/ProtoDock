@@ -214,6 +214,25 @@ def validate_changelog(manifest: dict) -> dict:
     warnings = []
 
     def check_pages(entry, label, historical=False):
+        changes = entry.get("pageChanges", [])
+        if not isinstance(changes, list):
+            issues.append(f"{label}.pageChanges 必须是数组")
+            changes = []
+        removed = set()
+        for index, change in enumerate(changes):
+            location = f"{label}.pageChanges[{index}]"
+            fields = {"pageId", "title", "type", "summary", "before", "after"}
+            if not isinstance(change, dict) or any(not isinstance(change.get(key), str) or not change[key].strip() for key in fields):
+                issues.append(f"{location} 必须填写页面、标题、类型、具体变更、修改前和修改后")
+                continue
+            if set(change) - fields:
+                issues.append(f"{location} 包含不支持的字段")
+            if change["type"] not in {"add", "modify", "remove", "copy", "docs"}:
+                issues.append(f"{location}.type 无效")
+            if change["type"] == "remove":
+                removed.add(change["pageId"])
+            elif change["pageId"] not in (manifest.get("pages") or {}):
+                (warnings if historical else issues).append(f"{location}.pageId 当前页面不存在")
         if "pageIds" not in entry:
             return
         ids = entry["pageIds"]
@@ -222,7 +241,7 @@ def validate_changelog(manifest: dict) -> dict:
             return
         if len(set(ids)) != len(ids):
             issues.append(f"{label}.pageIds 不允许重复")
-        missing = [value for value in ids if value not in (manifest.get("pages") or {})]
+        missing = [value for value in ids if value not in (manifest.get("pages") or {}) and value not in removed]
         if missing:
             (warnings if historical else issues).append(f"{label}.pageIds 当前页面不存在：{'、'.join(missing)}")
 

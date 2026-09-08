@@ -24,11 +24,12 @@
 
   function entryHtml(entry) {
     const {project} = entry;
-    const pageIds = Array.isArray(entry.pageIds) ? [...new Set(entry.pageIds)] : [];
+    const detailIds = new Set((entry.pageChanges || []).map(change=>change.pageId));
+    const pageIds = Array.isArray(entry.pageIds) ? [...new Set(entry.pageIds)].filter(id=>!detailIds.has(id)) : [];
     const pages = pageIds.map(id => project.manifest?.pages?.[id]
       ? `<button type="button" data-history-project="${escape(project.id)}" data-history-page="${escape(id)}">${escape(project.manifest.pages[id].title || id)} · 当前页面与 PRD</button>`
       : `<span>${escape(id)} · 当前页面已不存在</span>`).join('');
-    return `<article><time>${escape(entry.changedAt || '日期未记录')}</time><pre>${escape(entry.description)}</pre>${pageIds.length ? `<details><summary>涉及页面（${pageIds.length}）</summary><div class="history-pages">${pages}</div></details>` : '<p class="history-hint">未记录涉及页面</p>'}</article>`;
+    return `<article><time>${escape(entry.changedAt || '日期未记录')}</time><pre>${escape(entry.description)}</pre>${entry.pageChanges?.length ? `<details><summary>页面变更明细（${entry.pageChanges.length}）</summary>${global.ProtoDockPageChanges.render(entry.pageChanges, project)}</details>` : ''}${pageIds.length ? `<details><summary>涉及页面（${pageIds.length}，未记录明细）</summary><div class="history-pages">${pages}</div></details>` : !detailIds.size ? '<p class="history-hint">未记录涉及页面</p>' : ''}</article>`;
   }
 
   function groupedHtml(entries) {
@@ -52,8 +53,10 @@
     const data = records(projects);
     panel.innerHTML = `<p class="history-hint">按各端原始发布记录汇总；页面链接打开当前版本，不是历史快照。</p>
       ${projects.filter(p=>p.error).map(p=>`<p role="alert">${escape(p.name)}记录读取失败，请重新打开版本更新。</p>`).join('')}
+      ${global.ProtoDockPageChanges.comparison(projects)}
       <details open><summary>待发布（${data.pending.length}）</summary>${data.pending.length ? groupedHtml(data.pending) : '<p>暂无待发布改动</p>'}</details>
       <h2>已发布</h2>${data.versions.length ? data.versions.map(v=>`<details><summary>${escape(v.version)}</summary>${groupedHtml(v.entries)}</details>`).join('') : '<p>暂无发布记录</p>'}`;
+    global.ProtoDockPageChanges.bindComparison(panel, projects);
   }
 
   global.ProtoDockWorkspaceHistory = {ID, records, render};

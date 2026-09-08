@@ -19,24 +19,27 @@
       return Promise.reject(new Error('变更记录窗口已经打开'));
     }
     return new Promise((resolve) => {
+      const readPageChanges = window.ProtoDockPageChangeEditor.mount(document.getElementById('changeLogPageChanges'), manifest);
       const close = (entry = null) => {
         els.modal.hidden = true;
         closeActive = null;
         resolve(entry);
       };
       const submit = () => {
+        let pageChanges;
+        try { pageChanges = readPageChanges(); } catch (error) { els.message.textContent = error.message; return; }
         const description = window.ProtoDockChangeLog.formatDescription(
           els.userDescription.value,
           els.productDescription.value,
           els.technicalDescription.value
-        );
+        ) || pageChanges.map(change=>`${change.title}：${change.summary}`).join('\n');
         const validation = window.ProtoDockChangeLog.validateDescription(description);
         if (!validation.ok) {
           els.message.textContent = validation.message;
           (els.userDescription.value.trim() ? els.productDescription : els.userDescription).focus();
           return;
         }
-        close({ description, changedAt: new Date().toISOString() });
+        close({ description, changedAt: new Date().toISOString(), ...(pageChanges.length ? {pageChanges} : {}) });
       };
 
       closeActive = () => close(null);

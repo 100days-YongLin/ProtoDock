@@ -12,8 +12,12 @@
   }
 
   function pageReferences(entry) {
-    if (!Array.isArray(entry?.pageIds)) return {};
-    return {pageIds:[...new Set(entry.pageIds.filter(id => typeof id === 'string' && id.trim()))]};
+    const changes = Array.isArray(entry?.pageChanges) ? structuredClone(entry.pageChanges) : [];
+    const ids = [...(Array.isArray(entry?.pageIds) ? entry.pageIds : []), ...changes.map(change => change.pageId)];
+    return {
+      ...(ids.length ? {pageIds:[...new Set(ids.filter(id => typeof id === 'string' && id.trim()))]} : {}),
+      ...(changes.length ? {pageChanges:changes} : {})
+    };
   }
 
   function descriptionItems(value) {
@@ -233,7 +237,8 @@
     }
 
     const pageIds = [...new Set([...pending.flatMap(item => item.pageIds || []), ...(pageReferences(release).pageIds || [])])];
-    const entry = { version, changedAt, description, ...(pageIds.length ? {pageIds} : {}) };
+    const pageChanges = [...pending.flatMap(item => item.pageChanges || []), ...(pageReferences(release).pageChanges || [])];
+    const entry = { version, changedAt, description, ...pageReferences({pageIds, pageChanges}) };
     snapshot.changelog = [...normalize(snapshot.changelog), entry];
     snapshot.pendingChanges = [];
     return { manifest: snapshot, entry, changed: true };

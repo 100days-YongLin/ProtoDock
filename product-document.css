@@ -428,6 +428,14 @@ button {
   text-transform: uppercase;
 }
 
+.release-page-details { grid-column: 1 / -1; }
+.release-page-details .page-change-item { border: 1px solid #e4e4e7; border-radius: 8px; padding: 12px; margin: 10px 0; overflow-wrap: anywhere; }
+.release-page-details .page-change-item header { display: flex; justify-content: space-between; gap: 8px; }
+.release-page-details dd { margin: 5px 0 12px; white-space: pre-wrap; }
+.release-page-details dt { font-weight: 600; }
+.release-page-details summary { cursor: pointer; }
+.release-page-details button { padding: 7px 10px; border: 1px solid #b8d7ff; border-radius: 6px; background: #fff; color: #0969da; font: inherit; cursor: pointer; }
+
 .cover-changelog h2 {
   margin: 6px 0 0;
   font-size: 25px;
