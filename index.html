@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="./styles.css?v=14">
   <link rel="stylesheet" href="./canvas-groups.css?v=4">
   <link rel="stylesheet" href="./canvas-minimap.css">
-  <link rel="stylesheet" href="./product-workspace.css?v=5">
+  <link rel="stylesheet" href="./product-workspace.css?v=6">
 </head>
 <body>
   <main class="app">
@@ -626,18 +626,18 @@
           <strong>产品工作区快照</strong>
           <span id="workspacePublishHint">全部端与共享文档固化为同一版本，分享页可切换各端。</span>
         </header>
-        <div>
-          <label for="publishScope">发布范围</label>
-          <select id="publishScope"><option value="workspace">整个工作区</option><option value="project">仅当前端</option></select>
-        </div>
-        <div>
-          <span>当前原型</span>
+        <fieldset class="publish-scope" id="publishScope">
+          <legend>发布范围</legend>
+          <div class="publish-scope-options">
+            <label><input type="radio" name="publishScope" value="workspace" checked><span>整个工作区</span></label>
+            <label><input type="radio" name="publishScope" value="project"><span>仅当前端</span></label>
+          </div>
+        </fieldset>
+        <div class="workspace-publish-target">
+          <span id="workspacePublishTargetLabel">发布工作区</span>
           <strong id="workspacePublishProject">-</strong>
         </div>
-        <div>
-          <span>共享产品文档</span>
-          <strong id="workspacePublishDocs">0 份</strong>
-        </div>
+        <p class="workspace-publish-docs" id="workspacePublishDocs">包含 0 份共享文档</p>
       </section>
 
       <details class="share-manual-upload" id="shareManualUpload">
@@ -775,6 +775,6 @@
   <script src="./product-document.js?v=8"></script>
   <script src="./app.js?v=26"></script>
   <script src="./project-name.js"></script>
-  <script src="./share.js?v=13"></script>
+  <script src="./share.js?v=14"></script>
 </body>
 </html>

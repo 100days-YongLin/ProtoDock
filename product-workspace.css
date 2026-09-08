@@ -127,12 +127,11 @@
 }
 
 .workspace-publish-snapshot {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
+  display: flex;
+  flex-direction: column;
   border: 1px solid #d8d8dc;
   border-radius: 8px;
-  background: #d8d8dc;
+  background: #fff;
   overflow: hidden;
 }
 
@@ -141,7 +140,6 @@
 }
 
 .workspace-publish-snapshot header {
-  grid-column: 1 / -1;
   padding: 14px 16px;
   background: #f4f7fb;
 }
@@ -157,9 +155,10 @@
   font-size: 12px;
 }
 
-.workspace-publish-snapshot > div {
-  padding: 12px 16px;
-  background: #fff;
+.workspace-publish-snapshot .workspace-publish-target {
+  padding: 0 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .workspace-publish-snapshot > div span,
@@ -172,6 +171,18 @@
   color: #77777e;
   font-size: 12px;
 }
+
+.workspace-publish-snapshot .publish-scope { border: 0; margin: 16px; padding: 0; min-width: 0; }
+.publish-scope legend { padding: 0; margin-bottom: 8px; font-size: 12px; color: #77777e; }
+.publish-scope-options { display: flex; padding: 4px; gap: 4px; border-radius: 9px; background: #f0f0f3; }
+.publish-scope-options label { position: relative; flex: 1; min-width: 0; cursor: pointer; }
+.publish-scope-options input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.publish-scope-options span { display: block; padding: 9px 12px; border-radius: 6px; text-align: center; font-size: 13px; line-height: 20px; color: #62626a; }
+.publish-scope-options input:checked + span { background: #fff; color: #1d1d1f; font-weight: 600; box-shadow: 0 1px 4px #00000014; }
+.publish-scope-options input:focus-visible + span { outline: 2px solid #007aff; outline-offset: 1px; }
+.publish-scope:disabled { opacity: .55; }
+.publish-scope:disabled label { cursor: default; }
+.workspace-publish-docs { margin: 8px 16px 16px; font-size: 12px; line-height: 1.5; color: #77777e; }
 
 @media (max-width: 1180px) {
   .workspace-project-switcher {

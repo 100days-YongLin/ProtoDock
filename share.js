@@ -26,6 +26,7 @@
     autoDescription: document.getElementById('shareAutoDescription'),
     workspaceSnapshot: document.getElementById('workspacePublishSnapshot'),
     workspaceProject: document.getElementById('workspacePublishProject'),
+    workspaceTargetLabel: document.getElementById('workspacePublishTargetLabel'),
     workspaceDocs: document.getElementById('workspacePublishDocs'),
     scope: document.getElementById('publishScope'),
     workspaceHint: document.getElementById('workspacePublishHint'),
@@ -164,7 +165,7 @@
   }
 
   function workspaceScope() {
-    return uploadSource() === 'auto' && !!protoDockState().workspaceProductId && els.scope?.value === 'workspace';
+    return uploadSource() === 'auto' && !!protoDockState().workspaceProductId && els.scope?.querySelector('input:checked')?.value === 'workspace';
   }
 
   function preferenceId() {
@@ -310,11 +311,11 @@
     if (els.autoDescription && usingAuto) {
       const state = protoDockState();
       const dirtyText = state.dirty ? '发布前会先要求保存当前改动。' : '只读取清单、页面、文档和发布素材。';
-      const pendingText = state.pendingChangeCount
+      const pendingText = workspaceScope() ? '全部端将按本次统一版本归档。' : state.pendingChangeCount
         ? `已累计 ${state.pendingChangeCount} 条待发布变更。`
         : '当前没有待发布变更。';
       const workspaceText = state.workspaceProductName
-        ? `${state.workspaceProductName} · ${state.workspaceProjectName || state.projectName}`
+        ? (workspaceScope() ? state.workspaceProductName : `${state.workspaceProductName} · ${state.workspaceProjectName || state.projectName}`)
         : (state.projectDirectoryName || '本地项目');
       els.autoDescription.textContent = `${workspaceText}：${dirtyText}${pendingText}`;
     }
@@ -328,10 +329,11 @@
       els.workspaceSnapshot.hidden = !hasWorkspace || !usingAuto;
     }
     if (els.workspaceProject) {
-      els.workspaceProject.textContent = workspaceScope() ? `${state.workspaceProductName} · 全部端` : state.workspaceProjectName || state.projectName || '-';
+      els.workspaceProject.textContent = workspaceScope() ? state.workspaceProductName : state.workspaceProjectName || state.projectName || '-';
     }
+    if (els.workspaceTargetLabel) els.workspaceTargetLabel.textContent = workspaceScope() ? '发布工作区' : '发布当前端';
     if (els.workspaceDocs) {
-      els.workspaceDocs.textContent = `${state.workspaceSharedDocumentCount || 0} 份`;
+      els.workspaceDocs.textContent = `包含 ${state.workspaceSharedDocumentCount || 0} 份共享文档`;
     }
     if (els.manualUpload && !autoAvailable) {
       els.manualUpload.open = true;
@@ -391,7 +393,7 @@
     els.commitField?.classList.toggle('is-disabled', isPublishing);
     if (els.publish) {
       els.publish.disabled = !canPublish();
-      const source = uploadSource() === 'auto' ? '发布当前项目' : '发布 ZIP';
+      const source = uploadSource() === 'auto' ? (workspaceScope() ? '发布整个工作区' : '发布当前项目') : '发布 ZIP';
       els.publish.textContent = githubEnabled ? `${source}并同步 GitHub` : source;
     }
     if (els.refreshGithub) {
@@ -819,7 +821,7 @@
     latestPublishSummary = '';
     latestPublishDetails = null;
     setProgress(0);
-    setStatus(source === 'auto' ? '准备打包当前项目...' : '准备上传项目包...');
+    setStatus(source === 'auto' ? (publishWorkspace ? '准备打包整个工作区...' : '准备打包当前项目...') : '准备上传项目包...');
 
     try {
       const archiveFile = source === 'auto'
