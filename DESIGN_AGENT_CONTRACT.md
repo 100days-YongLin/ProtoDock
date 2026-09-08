@@ -4,6 +4,12 @@ This contract tells design agents how to create prototype pages that ProtoDock c
 
 ## Required Output
 
+### Compact workspace documents
+
+When the owner selects a compact document layout, use only `01-product-overview.md`, `02-business-rules.md`, and `03-open-questions.md` in `shared-docs/`. Keep permissions in the overview; keep flow steps and acceptance under stable `FLOW-*` identifiers in business rules; keep unresolved questions and verified implementation gaps separate. Move engineering references outside shared navigation and preserve historical decisions. The classic layout remains valid; do not recreate it inside a compact workspace.
+
+The workspace version-history view reads endpoint `pendingChanges` and `changelog`. Do not maintain a duplicate Markdown log. Optional `pageIds` identify explicitly affected pages in that endpoint and survive publishing; never infer missing historical associations or present current-page links as historical snapshots.
+
 Every prototype project must include:
 
 ```text

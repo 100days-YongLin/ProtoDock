@@ -748,6 +748,7 @@ function sharedDocumentRecords() {
 }
 
 function activeSharedDocument() {
+  if (state.workspace && state.activeSharedDocId === window.ProtoDockWorkspaceHistory.ID) return {id:state.activeSharedDocId, title:'版本更新', readOnly:true, dynamic:true};
   return sharedDocumentRecords().find((document) => document.id === state.activeSharedDocId) || null;
 }
 
@@ -2368,7 +2369,7 @@ function renderWorkspaceNavigation() {
     `).join('');
   }
 
-  const documents = sharedDocumentRecords();
+  const documents = [...sharedDocumentRecords(), ...(state.workspace ? [{id:window.ProtoDockWorkspaceHistory.ID, title:'版本更新'}] : [])];
   if (els.workspaceSharedDocsSection) {
     els.workspaceSharedDocsSection.hidden = !documents.length;
   }
@@ -2906,6 +2907,8 @@ function clearSelection(options = {}) {
 
 async function updateInspector() {
   const sharedDocument = activeSharedDocument();
+  const historyPanel = document.getElementById('workspaceVersionHistory');
+  historyPanel.hidden = !sharedDocument?.dynamic;
   if (sharedDocument) {
     els.inspectorName.textContent = sharedDocument.title;
     els.inspectorType.textContent = '产品级共享文档';
@@ -2913,6 +2916,12 @@ async function updateInspector() {
     els.entryPath.textContent = '-';
     els.docPath.textContent = sharedDocument.path || sharedDocument.releasePath || '-';
     renderPageSettingsControls();
+    if (sharedDocument.dynamic) {
+      setEditorValue('');
+      const workspace = state.workspace;
+      await window.ProtoDockWorkspaceHistory.render(historyPanel, workspace, state.activeWorkspaceProjectId, state.manifest, () => state.workspace === workspace && state.activeSharedDocId === sharedDocument.id);
+      return;
+    }
     const content = await loadSharedDocument(sharedDocument);
     if (state.activeSharedDocId === sharedDocument.id) {
       setEditorValue(content);
@@ -3040,7 +3049,7 @@ function handleEditorChange() {
   }
   const sharedDocument = activeSharedDocument();
   if (sharedDocument) {
-    if (!state.workspace) {
+    if (!state.workspace || sharedDocument.readOnly) {
       return;
     }
     state.sharedDocCache.set(sharedDocument.id, getEditorValue());
@@ -4608,7 +4617,8 @@ function selectPageFromList(nodeId) {
 }
 
 function selectSharedDocument(documentId) {
-  const sharedDocument = sharedDocumentRecords().find((item) => item.id === documentId);
+  const sharedDocument = state.workspace && documentId === window.ProtoDockWorkspaceHistory.ID
+    ? {id:documentId, title:'版本更新'} : sharedDocumentRecords().find((item) => item.id === documentId);
   if (!sharedDocument) {
     return;
   }
@@ -5292,6 +5302,12 @@ function bindGlobalEvents() {
     if (button) {
       selectSharedDocument(button.dataset.sharedDocument);
     }
+  });
+  document.getElementById('workspaceVersionHistory').addEventListener('click', async event => {
+    const button = event.target.closest('[data-history-page]');
+    if (!button || !await switchWorkspaceProject(button.dataset.historyProject)) return;
+    const node = state.manifest.canvas.nodes.find(node => node.pageId === button.dataset.historyPage);
+    if (node) selectPageFromList(node.id);
   });
   els.pageList?.addEventListener('pointerdown', beginPageSortDrag);
   els.pageSearchInput?.addEventListener('input', (event) => {

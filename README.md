@@ -101,7 +101,17 @@ product-workspace/
 - **工作层**：可选的根级 `references/`、`qa/`、`scripts/`、`tests/`，服务于跨端参考、验收和自动化。
 - **本地临时层**：`temps/`、`protodock/backups/`、`protodock.local.json`、缓存、日志和发布 ZIP，必须忽略且不进入发布。
 
-`shared-docs/` 直属 Markdown 的职责固定如下：
+`shared-docs/` 支持精简版与经典版，勿混用两套权威文档。用户选择精简版时保留三份 Markdown：
+
+- `01-product-overview.md`：产品说明，包含目标、边界、端职责、权限矩阵、数据范围和越权处理。
+- `02-business-rules.md`：业务规则与流程，包含通用规则，各业务模块用稳定 `FLOW-*` 标识组织步骤和验收。
+- `03-open-questions.md`：待确认与实现差异，区分目标要求和已核验的实际实现。
+
+工程协议和实现基线放在 `references/development/`，历史决策保留存档。页面 PRD 引用上述文件标识与流程 ID，不复制共享规则。严格校验支持两种布局。
+
+工作区自动提供第四个“版本更新”入口，汇总各端 `pendingChanges` 和 `changelog`，无需新增日志 Markdown。变更可用可选 `pageIds` 显式关联本端页面；发布时合并保留这些关联。历史记录未提供关联时不猜测补齐。页面链接打开当前页面与 PRD，并非历史快照。
+
+经典版的共享 Markdown 职责如下：
 
 | 文档 | 解决的问题 | 主要读者 |
 | --- | --- | --- |

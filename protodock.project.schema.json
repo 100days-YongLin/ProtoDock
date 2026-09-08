@@ -43,6 +43,7 @@
         "additionalProperties": false,
         "properties": {
           "version": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "pageIds": { "$ref": "#/$defs/changePageIds" },
           "changedAt": { "type": "string", "format": "date-time" },
           "description": { "type": "string", "minLength": 1, "maxLength": 1200, "description": "Non-empty release summary; 用户体验, 产品调整, and 前后端逻辑 sections are recommended but optional." }
         }
@@ -56,6 +57,7 @@
         "required": ["changedAt", "description"],
         "additionalProperties": false,
         "properties": {
+          "pageIds": { "$ref": "#/$defs/changePageIds" },
           "changedAt": { "type": "string", "format": "date-time" },
           "description": { "type": "string", "minLength": 1, "maxLength": 1200, "description": "Non-empty unreleased summary; sectioned bullets are recommended but optional." }
         }
@@ -195,6 +197,12 @@
     }
   },
   "$defs": {
+    "changePageIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Explicit affected page ids in this endpoint. Historical ids may refer to removed pages."
+    },
     "side": {
       "type": "string",
       "enum": ["top", "right", "bottom", "left"]

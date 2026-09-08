@@ -117,6 +117,26 @@ class WorkspaceValidationTests(unittest.TestCase):
             self.assertFalse(report["ok"])
             self.assertTrue(any("必须是 JSON 对象" in issue for issue in report["errors"]))
 
+    def test_compact_contract_and_missing_reference(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_workspace(root)
+            shared = root / "shared-docs"
+            for item in shared.glob("*.md"):
+                item.unlink()
+            (shared / "01-product-overview.md").write_text("# 产品说明\n" + "\n".join("## " + h for h in ["产品目标", "产品边界", "端与职责", "权限矩阵", "数据范围", "越权处理"]))
+            (shared / "02-business-rules.md").write_text("# 业务规则与流程\n## 通用规则\n正文\n## 发布\n`FLOW-PUBLISH`\n1. 发布。\n验收：结果唯一。")
+            (shared / "03-open-questions.md").write_text("# 待确认与实现差异\n## 待确认问题\n暂无。\n## 实现差异\n暂无。")
+            doc = root / "prototypes/web/docs/home.md"
+            doc.write_text(doc.read_text().replace("`03-domain-data-contract`、`04-interface-event-contract`", "`02-business-rules`、`FLOW-PUBLISH`"))
+            result, report = self.validate(root, "--workspace-contracts-as-errors")
+            self.assertEqual(result.returncode, 0, report)
+            self.assertEqual(report["stats"]["workspaceCoreDocCount"], 3)
+            doc.write_text(doc.read_text().replace("FLOW-PUBLISH", "FLOW-MISSING"))
+            result, report = self.validate(root, "--workspace-contracts-as-errors")
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(any("FLOW-MISSING" in item for item in report["workspaceContractWarnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()

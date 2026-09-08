@@ -34,6 +34,11 @@ WORKSPACE_CORE_DOCS = {
 WORKSPACE_RECOMMENDED_DOCS = {
     "90-decisions-open-questions.md": ("已确认决策", "待确认问题", "变更记录"),
 }
+WORKSPACE_COMPACT_DOCS = {
+    "01-product-overview.md": ("产品目标", "产品边界", "端与职责", "权限矩阵", "数据范围", "越权处理"),
+    "02-business-rules.md": ("通用规则",),
+    "03-open-questions.md": ("待确认问题", "实现差异"),
+}
 
 
 def markdown_headings(path: Path) -> set[str]:
@@ -128,11 +133,22 @@ def inspect_workspace_target(target: Path) -> dict:
             shared_dir = None
     shared_docs = sorted(shared_dir.glob("*.md")) if shared_dir else []
     shared_doc_names = {path.name for path in shared_docs}
+    compact = bool(shared_doc_names & {"02-business-rules.md", "03-open-questions.md"})
+    core_docs = WORKSPACE_COMPACT_DOCS if compact else WORKSPACE_CORE_DOCS
+    recommended_docs = {} if compact else WORKSPACE_RECOMMENDED_DOCS
+    if compact and shared_dir and (shared_dir / "02-business-rules.md").is_file():
+        rules = (shared_dir / "02-business-rules.md").read_text(encoding="utf-8")
+        modules = [part for part in re.split(r"(?m)^## ", rules) if re.search(r"`FLOW-[A-Z-]+`", part)]
+        if not modules:
+            warn_contract("业务规则与流程至少需要一个稳定 FLOW 标识的业务模块")
+        for part in modules:
+            if not re.search(r"(?m)^\d+\.\s+\S", part) or "验收" not in part:
+                warn_contract(f"业务模块 {part.splitlines()[0]} 缺少编号流程或验收说明")
     if not (target / "README.md").is_file():
         warn_contract("工作区缺少 README.md；团队无法确认端列表、源码入口、构建命令和验收方式")
     if not (target / ".gitignore").is_file():
         warn_contract("工作区缺少 .gitignore；请排除 temps、备份、本地密钥、缓存和发布 ZIP")
-    for name, required_headings in WORKSPACE_CORE_DOCS.items():
+    for name, required_headings in core_docs.items():
         doc_path = shared_dir / name if shared_dir else None
         if name not in shared_doc_names:
             warn_contract(f"缺少核心协作文档：{shared_path.as_posix()}/{name}")
@@ -141,7 +157,7 @@ def inspect_workspace_target(target: Path) -> dict:
         missing_headings = [heading for heading in required_headings if heading not in headings]
         if missing_headings:
             warn_contract(f"{shared_path.as_posix()}/{name} 缺少章节：{'、'.join(missing_headings)}")
-    for name, required_headings in WORKSPACE_RECOMMENDED_DOCS.items():
+    for name, required_headings in recommended_docs.items():
         doc_path = shared_dir / name if shared_dir else None
         if name not in shared_doc_names:
             warn_contract(f"建议补充协作文档：{shared_path.as_posix()}/{name}")
@@ -197,6 +213,23 @@ def inspect_workspace_target(target: Path) -> dict:
         warnings.extend(f"{name} · {warning}" for warning in child["warnings"])
         routes.extend({**route, "workspaceProjectId": project_id} for route in child["routes"])
         missing_contracts = inspect_workspace_page_contracts(project_dir)
+        shared_texts = {path.stem: path.read_text(encoding="utf-8") for path in shared_docs}
+        try:
+            child_manifest = json.loads((project_dir / server.MANIFEST_FILE).read_text(encoding="utf-8"))
+            for page_id, page in child_manifest.get("pages", {}).items():
+                doc_path = project_dir / str(page.get("doc") or "")
+                if not doc_path.is_file():
+                    continue
+                text = doc_path.read_text(encoding="utf-8")
+                for line in text.splitlines():
+                    if "共享契约：" not in line:
+                        continue
+                    for ref in re.findall(r"`([^`]+)`", line):
+                        valid = any(f"`{ref}`" in value for value in shared_texts.values()) if ref.startswith("FLOW-") else ref in shared_texts
+                        if not valid:
+                            warn_contract(f"{name}/{page_id} 共享引用不存在：{ref}")
+        except (OSError, json.JSONDecodeError):
+            pass
         unlinked_page_docs += len(missing_contracts)
         if missing_contracts:
             preview = "、".join(missing_contracts[:8])
@@ -221,8 +254,9 @@ def inspect_workspace_target(target: Path) -> dict:
         "stats": {
             "workspaceProjectCount": len(child_reports),
             "workspaceSharedDocCount": len(shared_docs),
-            "workspaceCoreDocCount": sum(name in shared_doc_names for name in WORKSPACE_CORE_DOCS),
-            "workspaceMissingCoreDocCount": sum(name not in shared_doc_names for name in WORKSPACE_CORE_DOCS),
+            "workspaceCoreDocCount": sum(name in shared_doc_names for name in core_docs),
+            "workspaceRequiredCoreDocCount": len(core_docs),
+            "workspaceMissingCoreDocCount": sum(name not in shared_doc_names for name in core_docs),
             "workspaceUnlinkedPageDocCount": unlinked_page_docs,
             "workspaceNestedGitProjectCount": len(nested_git_projects),
             "pageCount": sum(report["stats"].get("pageCount", 0) for report in child_reports),
@@ -344,7 +378,7 @@ def print_text_report(report: dict) -> None:
     if report.get("sourceType") == "workspace":
         print(
             "Workspace contracts: "
-            f"coreDocs={stats.get('workspaceCoreDocCount', 0)}/{len(WORKSPACE_CORE_DOCS)}, "
+            f"coreDocs={stats.get('workspaceCoreDocCount', 0)}/{stats.get('workspaceRequiredCoreDocCount', len(WORKSPACE_CORE_DOCS))}, "
             f"unlinkedPageDocs={stats.get('workspaceUnlinkedPageDocCount', 0)}, "
             f"nestedGitProjects={stats.get('workspaceNestedGitProjectCount', 0)}, "
             f"contractWarnings={len(report.get('workspaceContractWarnings', []))}"

@@ -11,6 +11,11 @@
     return String(value ?? '').trim();
   }
 
+  function pageReferences(entry) {
+    if (!Array.isArray(entry?.pageIds)) return {};
+    return {pageIds:[...new Set(entry.pageIds.filter(id => typeof id === 'string' && id.trim()))]};
+  }
+
   function descriptionItems(value) {
     const lines = text(value)
       .split(/\r?\n/)
@@ -111,7 +116,8 @@
       .map((entry) => ({
         version: text(entry.version),
         changedAt: text(entry.changedAt),
-        description: text(entry.description)
+        description: text(entry.description),
+        ...pageReferences(entry)
       }))
       .filter((entry) => entry.version || entry.changedAt || entry.description);
   }
@@ -133,7 +139,8 @@
       .filter((entry) => entry && typeof entry === 'object')
       .map((entry) => ({
         changedAt: text(entry.changedAt),
-        description: text(entry.description)
+        description: text(entry.description),
+        ...pageReferences(entry)
       }))
       .filter((entry) => entry.changedAt || entry.description);
   }
@@ -154,7 +161,8 @@
     const next = {
       version: text(entry?.version),
       changedAt: text(entry?.changedAt),
-      description: text(entry?.description)
+      description: text(entry?.description),
+      ...pageReferences(entry)
     };
     if (!next.version || !next.changedAt || !next.description) {
       throw new Error('版本号、变更时间和变更内容均不能为空');
@@ -170,7 +178,8 @@
   function appendPending(manifest, entry) {
     const next = {
       changedAt: text(entry?.changedAt),
-      description: text(entry?.description)
+      description: text(entry?.description),
+      ...pageReferences(entry)
     };
     if (!next.changedAt || !next.description) {
       throw new Error('变更时间和变更内容均不能为空');
@@ -223,7 +232,8 @@
       return { manifest: snapshot, entry: current, changed: false };
     }
 
-    const entry = { version, changedAt, description };
+    const pageIds = [...new Set([...pending.flatMap(item => item.pageIds || []), ...(pageReferences(release).pageIds || [])])];
+    const entry = { version, changedAt, description, ...(pageIds.length ? {pageIds} : {}) };
     snapshot.changelog = [...normalize(snapshot.changelog), entry];
     snapshot.pendingChanges = [];
     return { manifest: snapshot, entry, changed: true };

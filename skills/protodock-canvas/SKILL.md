@@ -13,6 +13,8 @@ Use this skill when an Agent needs to create or update a ProtoDock prototype, ad
 
 ## Required Project Structure
 
+For a user-approved compact product workspace, follow the compact profile in `references/product-workspace-collaboration.md` instead of recreating the classic six-document layout. Keep three shared Markdown documents and use the built-in dynamic version-history entry; do not create a duplicate version-log document.
+
 Every prototype project must contain:
 
 ```text

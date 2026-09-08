@@ -13,6 +13,17 @@
   scrollbar-width: none;
 }
 
+.workspace-version-history { padding: 12px; overflow: auto; max-height: 100%; font-size: 13px; }
+.workspace-version-history[hidden] { display: none; }
+.markdown-panel:has(.workspace-version-history:not([hidden])) > .field { display: none; }
+.workspace-version-history details { margin: 8px 0; padding: 10px; border: 1px solid #dedee2; border-radius: 8px; }
+.workspace-version-history summary { cursor: pointer; font-weight: 600; }
+.workspace-version-history article { padding: 10px 0; border-bottom: 1px solid #eee; }
+.workspace-version-history pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.6; }
+.workspace-version-history time, .history-hint { color: #74747b; font-size: 12px; }
+.history-pages { display: grid; gap: 6px; margin-top: 8px; }
+.history-pages button { color: #0068d8; text-align: left; border: 0; background: #f0f6ff; border-radius: 6px; padding: 8px; cursor: pointer; }
+
 .workspace-project-switcher[hidden] {
   display: none;
 }

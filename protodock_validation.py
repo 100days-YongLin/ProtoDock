@@ -213,6 +213,19 @@ def validate_changelog(manifest: dict) -> dict:
     issues = []
     warnings = []
 
+    def check_pages(entry, label, historical=False):
+        if "pageIds" not in entry:
+            return
+        ids = entry["pageIds"]
+        if not isinstance(ids, list) or any(not isinstance(value, str) or not value.strip() for value in ids):
+            issues.append(f"{label}.pageIds 必须是非空字符串数组")
+            return
+        if len(set(ids)) != len(ids):
+            issues.append(f"{label}.pageIds 不允许重复")
+        missing = [value for value in ids if value not in (manifest.get("pages") or {})]
+        if missing:
+            (warnings if historical else issues).append(f"{label}.pageIds 当前页面不存在：{'、'.join(missing)}")
+
     if pending_entries is None:
         pending_entries = []
     elif not isinstance(pending_entries, list):
@@ -225,6 +238,7 @@ def validate_changelog(manifest: dict) -> dict:
             issues.append(f"{label} 必须是对象")
             continue
         changed_at = str(entry.get("changedAt") or "").strip()
+        check_pages(entry, label)
         description = str(entry.get("description") or "").strip()
         if not description:
             issues.append(f"{label}.description 不能为空")
@@ -258,6 +272,7 @@ def validate_changelog(manifest: dict) -> dict:
             issues.append(f"{label} 必须是对象")
             continue
         version = str(entry.get("version") or "").strip()
+        check_pages(entry, label, historical=True)
         changed_at = str(entry.get("changedAt") or "").strip()
         description = str(entry.get("description") or "").strip()
         if not version:
